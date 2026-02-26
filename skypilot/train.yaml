@@ -15,7 +15,7 @@ file_mounts:
     mode: MOUNT
 
 setup: |
-  sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1 ffmpeg sox
+  sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.cargo/bin:$PATH"
   uv sync --extra train --extra export

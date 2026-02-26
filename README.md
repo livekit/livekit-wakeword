@@ -77,10 +77,10 @@ uv sync --all-extras
 
 ```bash
 # macOS
-brew install espeak-ng ffmpeg
+brew install espeak-ng ffmpeg portaudio
 
 # Ubuntu/Debian
-sudo apt install espeak-ng libsndfile1 ffmpeg sox
+sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
 ```
 
 **Download models and data:**
