@@ -24,7 +24,7 @@ setup: |
 run: |
   export PATH="$HOME/.cargo/bin:$PATH"
   uv run livewakeword run configs/${CONFIG_FILE}
-  cp -r output/* /outputs/${MODEL_NAME}/
+  cp -r output/${MODEL_NAME}/* /outputs/${MODEL_NAME}/
 
 envs:
   CONFIG_FILE: hey_livekit.yaml
