@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import onnx
 import torch
 
 from livewakeword.config import WakeWordConfig
@@ -43,6 +44,16 @@ def export_classifier(
             "score": {0: "batch"},
         },
     )
+
+    # Bundle external data into a single ONNX file
+    onnx_model = onnx.load(str(output_path), load_external_data=True)
+    onnx.save(onnx_model, str(output_path), save_as_external_data=False)
+
+    # Remove leftover external data file if it exists
+    external_data_path = output_path.with_suffix(".onnx.data")
+    if external_data_path.exists():
+        external_data_path.unlink()
+
     logger.info(f"Exported classifier ONNX to {output_path}")
     return output_path
 
