@@ -33,7 +33,6 @@ uv run livewakeword augment <config>  # Augment + extract features → .npy
 uv run livewakeword train <config>    # 3-phase adaptive training
 uv run livewakeword export <config>   # Export classifier to ONNX
 uv run livewakeword run <config>      # Full pipeline (generate→augment→train→export)
-uv run livewakeword detect <model>    # Real-time mic detection
 ```
 
 ## Architecture
@@ -63,7 +62,6 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
   - `trainer.py` — `WakeWordTrainer` with 3-phase training (full → refinement → fine-tuning), hard example mining, adaptive negative weighting, checkpoint averaging
   - `metrics.py` — FPPH (false positives per hour), recall, balanced accuracy
 - **`export/onnx.py`** — Export classifier to ONNX with optional INT8 quantization
-- **`inference/engine.py`** — `StreamingWakeWordEngine` (80ms frames, sliding window, cooldown)
 
 ### Key Design Decisions
 

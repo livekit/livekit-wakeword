@@ -359,17 +359,3 @@ def run(
     logger.info("Full pipeline complete!")
 
 
-@app.command()
-def detect(
-    model_path: str = typer.Argument(..., help="Path to ONNX classifier model"),
-    models_dir: str = typer.Option(
-        "./data/models", help="Directory with melspectrogram.onnx and embedding_model.onnx"
-    ),
-    threshold: float = typer.Option(0.5, help="Detection threshold"),
-) -> None:
-    """Real-time wake word detection from microphone."""
-    logger.info(f"Starting detection with {model_path} (threshold={threshold})...")
-
-    from livewakeword.inference.engine import run_detect
-
-    run_detect(model_path, models_dir=models_dir, threshold=threshold)

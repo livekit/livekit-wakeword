@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.0",
     "huggingface-hub>=0.20",
+    "pyaudio>=0.2.14",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +43,6 @@ export = [
     "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
 ]
-detect = ["pyaudio>=0.2"]
 dev = ["pytest>=8.0", "pytest-cov>=4.0", "ruff>=0.4", "mypy>=1.8"]
 
 [project.scripts]
@@ -53,6 +53,17 @@ packages = ["src/livewakeword"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
+
+# Include bundled ONNX models for feature extraction
+[tool.hatch.build.targets.wheel.force-include]
+"src/livewakeword/resources/melspectrogram.onnx" = "livewakeword/resources/melspectrogram.onnx"
+"src/livewakeword/resources/embedding_model.onnx" = "livewakeword/resources/embedding_model.onnx"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/livewakeword/**/*.py",
+    "src/livewakeword/resources/*.onnx",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
