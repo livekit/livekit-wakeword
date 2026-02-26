@@ -118,6 +118,15 @@ See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training j
 sky launch skypilot/train.yaml
 ```
 
+## Documentation
+
+- [Architecture Overview](docs/overview.md) — system design and data flow
+- [Data Generation](docs/data-generation.md) — TTS synthesis and adversarial negatives
+- [Augmentation](docs/augmentation.md) — audio transforms and alignment
+- [Feature Extraction](docs/feature-extraction.md) — mel spectrograms and embeddings
+- [Training](docs/training.md) — 3-phase training and checkpoint averaging
+- [Export & Inference](docs/export-and-inference.md) — ONNX export and Python API
+
 ## License
 
 TBD

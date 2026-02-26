@@ -62,6 +62,9 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
   - `trainer.py` — `WakeWordTrainer` with 3-phase training (full → refinement → fine-tuning), hard example mining, adaptive negative weighting, checkpoint averaging
   - `metrics.py` — FPPH (false positives per hour), recall, balanced accuracy
 - **`export/onnx.py`** — Export classifier to ONNX with optional INT8 quantization
+- **`inference/`**
+  - `model.py` — `Model` class for simple prediction API
+  - `listener.py` — `Listener` class for async microphone detection
 
 ### Key Design Decisions
 
@@ -70,7 +73,18 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 - **Model sizes** (tiny/small/medium/large) map to `layer_dim` and `n_blocks` in config. Factory: `build_classifier(model_type, model_size)`.
 - **Training loss**: BCE with hard example mining (only non-trivial predictions contribute) and linearly increasing negative class weight.
 - **Checkpoint averaging**: final model averages top checkpoints by 90th-pct accuracy and 10th-pct FPPH.
-- **Config format**: YAML loaded via `WakeWordConfig.load_config(path)`. See `configs/hey_jarvis.yaml` for reference.
+- **Config format**: YAML loaded via `WakeWordConfig.load_config(path)`. See `configs/hey_livekit.yaml` for reference.
+
+## Documentation
+
+For detailed documentation on each pipeline stage, see `docs/`:
+
+- [docs/overview.md](docs/overview.md) — Architecture and data flow
+- [docs/data-generation.md](docs/data-generation.md) — TTS synthesis and adversarial negatives
+- [docs/augmentation.md](docs/augmentation.md) — Audio transforms and alignment
+- [docs/feature-extraction.md](docs/feature-extraction.md) — Mel spectrograms and embeddings
+- [docs/training.md](docs/training.md) — 3-phase training and checkpoint averaging
+- [docs/export-and-inference.md](docs/export-and-inference.md) — ONNX export and Python API
 
 ## Code Style
 

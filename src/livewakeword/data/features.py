@@ -8,12 +8,8 @@ from pathlib import Path
 import numpy as np
 
 from livewakeword.config import WakeWordConfig
-from livewakeword.models.feature_extractor import (
-    EMBEDDING_ONNX_FILENAME,
-    MEL_ONNX_FILENAME,
-    MelSpectrogramFrontend,
-    SpeechEmbedding,
-)
+from livewakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
+from livewakeword.resources import get_embedding_model_path, get_mel_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +71,11 @@ def extract_features_from_directory(
 
 def extract_features_for_config(config: WakeWordConfig) -> None:
     """Extract and save features for all splits of a wake word config."""
-    models_dir = config.data_path / "models"
     mel_frontend = MelSpectrogramFrontend(
-        onnx_path=models_dir / MEL_ONNX_FILENAME,
+        onnx_path=get_mel_model_path(),
     )
     speech_embedding = SpeechEmbedding(
-        onnx_path=models_dir / EMBEDDING_ONNX_FILENAME,
+        onnx_path=get_embedding_model_path(),
     )
 
     model_dir = config.model_output_dir

@@ -79,25 +79,20 @@ def export_full_pipeline(
     """
     import shutil
 
-    from livewakeword.models.feature_extractor import (
-        EMBEDDING_ONNX_FILENAME,
-        MEL_ONNX_FILENAME,
-    )
+    from livewakeword.resources import get_embedding_model_path, get_mel_model_path
 
     # Export the classifier head
     classifier_path = export_classifier(config, model_path, output_path, opset_version)
 
     # Copy frozen ONNX models alongside the classifier
-    models_dir = config.data_path / "models"
     out_dir = output_path.parent
-    for onnx_name in [MEL_ONNX_FILENAME, EMBEDDING_ONNX_FILENAME]:
-        src = models_dir / onnx_name
-        dst = out_dir / onnx_name
+    for src in [get_mel_model_path(), get_embedding_model_path()]:
+        dst = out_dir / src.name
         if src.exists() and src != dst:
             shutil.copy2(src, dst)
-            logger.info(f"Copied {onnx_name} to {out_dir}")
+            logger.info(f"Copied {src.name} to {out_dir}")
         elif not src.exists():
-            logger.warning(f"Frozen model not found: {src}")
+            logger.warning(f"Bundled model not found: {src}")
 
     logger.info(f"Exported full pipeline (3 ONNX files) to {out_dir}")
     return classifier_path

@@ -1099,9 +1099,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-detect = [
-    { name = "pyaudio" },
-]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
@@ -1145,7 +1142,6 @@ requires-dist = [
     { name = "piper-train", marker = "extra == 'train'", git = "https://github.com/rhasspy/piper.git?subdirectory=src%2Fpython" },
     { name = "pronouncing", marker = "extra == 'train'", specifier = ">=0.2" },
     { name = "pyaudio", specifier = ">=0.2.14" },
-    { name = "pyaudio", marker = "extra == 'detect'", specifier = ">=0.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
@@ -1163,7 +1159,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "webrtcvad", marker = "extra == 'train'", specifier = ">=2.0.10" },
 ]
-provides-extras = ["train", "export", "detect", "dev"]
+provides-extras = ["train", "export", "dev"]
 
 [[package]]
 name = "llvmlite"

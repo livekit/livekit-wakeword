@@ -84,7 +84,7 @@ The embedding model uses a 5-block CNN with separable convolutions (1x3 + 3x1), 
 ```
 src/livewakeword/
 ├── config.py                    Pydantic config models + YAML loading
-├── cli.py                       Typer CLI (setup, generate, augment, train, export, run, detect)
+├── cli.py                       Typer CLI (setup, generate, augment, train, export, run)
 ├── models/
 │   ├── feature_extractor.py     MelSpectrogramFrontend + SpeechEmbedding (ONNX)
 │   ├── classifier.py            DNNClassifier, RNNClassifier, build_classifier()
@@ -100,7 +100,8 @@ src/livewakeword/
 ├── export/
 │   └── onnx.py                  ONNX export + INT8 quantization
 └── inference/
-    └── engine.py                StreamingWakeWordEngine (80ms frame processing)
+    ├── model.py                 Model class (simple prediction API)
+    └── listener.py              Listener class (async microphone detection)
 ```
 
 ## Pipeline Stages

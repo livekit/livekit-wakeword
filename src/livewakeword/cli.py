@@ -43,11 +43,6 @@ def setup(
 
     logger.info("Setting up livewakeword data dependencies...")
 
-    # Download frozen ONNX models (mel spectrogram + speech embedding)
-    models_dir = data_path / "models"
-    models_dir.mkdir(exist_ok=True)
-    _download_onnx_models(models_dir)
-
     # Download VITS TTS model (.pt checkpoint + config)
     piper_dir = data_path / "piper"
     piper_dir.mkdir(exist_ok=True)
@@ -73,43 +68,6 @@ def setup(
     _download_musan_noise(bg_dir)
 
     logger.info("Setup complete!")
-
-
-def _download_onnx_models(models_dir: Path) -> None:
-    """Download frozen ONNX models for mel spectrogram and speech embedding."""
-    import urllib.request
-
-    from rich.progress import Progress
-
-    base_url = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1"
-    files = {
-        "melspectrogram.onnx": f"{base_url}/melspectrogram.onnx",
-        "embedding_model.onnx": f"{base_url}/embedding_model.onnx",
-    }
-
-    for filename, url in files.items():
-        dest = models_dir / filename
-        if dest.exists():
-            logger.info(f"ONNX model already exists: {dest}")
-            continue
-        logger.info(f"Downloading {filename}...")
-        try:
-            with Progress() as progress:
-                task = progress.add_task(f"[cyan]{filename}", total=None)
-                tmp_path = dest.with_suffix(".tmp")
-
-                def _reporthook(block_num: int, block_size: int, total: int) -> None:
-                    if total > 0:
-                        progress.update(task, total=total, completed=block_num * block_size)
-
-                urllib.request.urlretrieve(url, str(tmp_path), reporthook=_reporthook)
-                tmp_path.rename(dest)
-            logger.info(f"Downloaded {filename}")
-        except Exception as e:
-            logger.warning(f"Failed to download {filename}: {e}")
-            tmp_path = dest.with_suffix(".tmp")
-            if tmp_path.exists():
-                tmp_path.unlink()
 
 
 def _download_piper(piper_dir: Path) -> None:

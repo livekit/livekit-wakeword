@@ -10,12 +10,8 @@ import torch.nn as nn
 
 from livewakeword.config import WakeWordConfig
 from livewakeword.models.classifier import build_classifier
-from livewakeword.models.feature_extractor import (
-    EMBEDDING_ONNX_FILENAME,
-    MEL_ONNX_FILENAME,
-    MelSpectrogramFrontend,
-    SpeechEmbedding,
-)
+from livewakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
+from livewakeword.resources import get_embedding_model_path, get_mel_model_path
 
 
 class WakeWordClassifier(nn.Module):
@@ -43,16 +39,12 @@ class WakeWordPipeline:
     Used for inference. Not an nn.Module since the first two stages are ONNX.
     """
 
-    def __init__(self, config: WakeWordConfig, models_dir: str | Path | None = None):
-        if models_dir is None:
-            models_dir = config.data_path / "models"
-        models_dir = Path(models_dir)
-
+    def __init__(self, config: WakeWordConfig):
         self.mel_frontend = MelSpectrogramFrontend(
-            onnx_path=models_dir / MEL_ONNX_FILENAME,
+            onnx_path=get_mel_model_path(),
         )
         self.speech_embedding = SpeechEmbedding(
-            onnx_path=models_dir / EMBEDDING_ONNX_FILENAME,
+            onnx_path=get_embedding_model_path(),
         )
         self.classifier = build_classifier(
             model_type=config.model.model_type,
