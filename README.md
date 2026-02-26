@@ -1,44 +1,33 @@
+<a href="https://livekit.io/">
+  <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
+</a>
+
 # livewakeword
 
 An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training — generate synthetic data, augment, train, and export from a single YAML config.
+
+**Features:**
 
 - **Backward compatible** with openWakeWord models and library
 - **Train anywhere** — local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
 - **Zero dependency headaches** — uv handles everything
 
-## Installation
+**Quick Links:**
 
-**As a package** (for inference only):
+- [Using Existing Models](#using-existing-models-and-library)
+- [Training New Models](#training-new-models)
+
+## Quick Start
+
+### Using Existing Models and Library
+
+**Installation:**
 
 ```bash
 pip install git+https://github.com/livekit/livewakeword.git
 # or
 uv add git+https://github.com/livekit/livewakeword
 ```
-
-**For development/training:**
-
-```bash
-# Install uv (if you don't have it)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone and install
-git clone https://github.com/livekit/livewakeword
-cd livewakeword
-uv sync --all-extras
-```
-
-**System dependencies** (required for TTS/training):
-
-```bash
-# macOS
-brew install espeak-ng
-
-# Ubuntu/Debian
-sudo apt install espeak-ng libsndfile1 ffmpeg sox
-```
-
-## Quick Start
 
 **Basic inference:**
 
@@ -70,7 +59,29 @@ async def main():
 asyncio.run(main())
 ```
 
-## Training
+### Training New Models
+
+**Installation:**
+
+```bash
+# Install uv (if you don't have it)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and install
+git clone https://github.com/livekit/livewakeword
+cd livewakeword
+uv sync --all-extras
+```
+
+**System dependencies:**
+
+```bash
+# macOS
+brew install espeak-ng ffmpeg
+
+# Ubuntu/Debian
+sudo apt install espeak-ng libsndfile1 ffmpeg sox
+```
 
 **Download models and data:**
 
@@ -118,7 +129,7 @@ See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training j
 sky launch skypilot/train.yaml
 ```
 
-## Documentation
+## Detailed Documentation
 
 If you want to understand more about how this library works:
 
