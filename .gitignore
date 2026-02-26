@@ -23,7 +23,6 @@ ENV/
 /data/
 /output/
 *.npy
-*.onnx
 *.pt
 *.pth
 
