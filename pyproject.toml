@@ -20,6 +20,7 @@ dependencies = [
     "rich>=13.0",
     "huggingface-hub>=0.20",
     "pyaudio>=0.2.14",
+    "soundfile>=0.12",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +31,6 @@ train = [
     "nltk>=3.8",
     "pronouncing>=0.2",
     "scipy>=1.11",
-    "soundfile>=0.12",
     "setuptools>=69.0,<81",
     "librosa>=0.10",
     "scikit-learn>=1.3",

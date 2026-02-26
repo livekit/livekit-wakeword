@@ -120,6 +120,8 @@ sky launch skypilot/train.yaml
 
 ## Documentation
 
+If you want to understand more about how this library works:
+
 - [Architecture Overview](docs/overview.md) — system design and data flow
 - [Data Generation](docs/data-generation.md) — TTS synthesis and adversarial negatives
 - [Augmentation](docs/augmentation.md) — audio transforms and alignment
