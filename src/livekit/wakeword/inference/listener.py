@@ -5,12 +5,10 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from .model import WakeWordModel
+from .model import WakeWordModel
 
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80ms
