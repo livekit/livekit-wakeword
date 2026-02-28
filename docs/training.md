@@ -45,7 +45,7 @@ Final model (.pt)
 | Hold | `steps // 3` constant LR |
 | Decay | Cosine decay to 0 |
 | Negative weight | Linear 1.0 → `max_negative_weight` |
-| Validation | Final quarter, every `steps // 4` steps |
+| Validation | Final quarter, every `steps // 20` steps |
 
 ### Phase 2 — Refinement
 
@@ -63,7 +63,9 @@ Between phase 1 and 2, the trainer validates and checks if FPPH exceeds `target_
 |-----------|-------|
 | Steps | `config.steps // 10` |
 | Learning rate | `config.learning_rate * 0.01` |
-| Negative weight | Same as phase 2 |
+| Negative weight | `max_negative_weight` (doubled again if FPPH > target) |
+
+Between phase 2 and 3, the trainer validates again and doubles `max_negative_weight` a second time if FPPH still exceeds the target.
 
 ## Learning Rate Schedule
 
@@ -136,7 +138,7 @@ The `evaluate_model()` function computes all metrics at once with a default `val
 
 ### Validation Schedule
 
-Validation runs during the final quarter of each phase, at intervals of `steps // 4`. Each validation produces a checkpoint.
+Validation runs during the final quarter of each phase, at intervals of `steps // 20`. Each validation produces a checkpoint.
 
 ## Checkpoint Averaging
 

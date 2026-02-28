@@ -58,7 +58,7 @@ src/livekit/wakeword/
 ├── models/
 │   ├── feature_extractor.py     MelSpectrogramFrontend + SpeechEmbedding (ONNX)
 │   ├── classifier.py            DNNClassifier, RNNClassifier, build_classifier()
-│   └── pipeline.py              WakeWordClassifier (training) + WakeWordPipeline (inference)
+│   └── pipeline.py              WakeWordClassifier (training wrapper for classifier head)
 ├── data/
 │   ├── generate.py              VITS TTS + SLERP speaker blending + adversarial negatives
 │   ├── augment.py               AudioAugmentor + clip alignment

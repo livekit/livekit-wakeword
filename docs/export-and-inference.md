@@ -17,20 +17,7 @@ The export stage converts the trained PyTorch classifier to ONNX for deployment.
 | Input shape | `(1, 16, 96)` with dynamic batch axis |
 | Output name | `score` |
 | Output shape | `(1, 1)` with dynamic batch axis |
-| Opset version | 13 |
-
-### Full Pipeline Export
-
-`export_full_pipeline()` assembles all three ONNX models into one directory:
-
-```
-output/<model_name>/
-├── <model_name>.onnx          # Trained classifier head
-├── melspectrogram.onnx         # Frozen mel-spectrogram frontend
-└── embedding_model.onnx        # Frozen speech-embedding CNN
-```
-
-The mel-spectrogram and speech-embedding models are copied from `data/models/` (where `livekit-wakeword setup` placed them). They cannot be fused into a single ONNX graph because they are separate pre-trained models.
+| Opset version | 18 |
 
 ### INT8 Quantization
 
@@ -72,7 +59,6 @@ scores = model.predict(audio_frame)
 ```python
 WakeWordModel(
     models: list[str | Path] | None = None,  # Paths to ONNX classifiers
-    inference_framework: str = "onnx"                  # Only "onnx" supported
 )
 ```
 

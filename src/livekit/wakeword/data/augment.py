@@ -220,8 +220,8 @@ def _augment_directory(
     """Augment all WAV files in a directory.
 
     Round 0 overwrites originals in-place. Subsequent rounds write to new
-    files (e.g. ``clip_000000_r1.wav``) so that each round reads only the
-    unaugmented originals.
+    files (e.g. ``clip_000000_r1.wav``) but still read from the round-0
+    (already augmented) files, not the raw TTS output.
     """
     import soundfile as sf
     from tqdm import tqdm

@@ -100,7 +100,7 @@ Negative clips are centered within the target window. If longer than the target,
 
 ## Augmentation Rounds
 
-The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Each round augments clips in-place by overwriting the original `.wav` files.
+The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Round 0 overwrites the original `.wav` files in-place. Subsequent rounds write new files (e.g. `clip_000000_r1.wav`) but read from the round-0 (already augmented) files, not the raw TTS output.
 
 ## Per-Clip Processing Order
 
