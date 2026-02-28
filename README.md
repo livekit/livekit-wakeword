@@ -171,10 +171,10 @@ config = WakeWordConfig(
 )
 
 # Run individual stages
-clip_duration = run_generate(config)       # TTS synthesis + adversarial negatives
-run_augment(config, clip_duration=clip_duration)  # Augment + feature extraction
-run_train(config)                          # 3-phase adaptive training
-run_export(config)                         # Export to ONNX
+run_generate(config)   # TTS synthesis + adversarial negatives
+run_augment(config)    # Augment + feature extraction
+run_train(config)      # 3-phase adaptive training
+run_export(config)     # Export to ONNX
 ```
 
 This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.

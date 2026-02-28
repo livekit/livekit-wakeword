@@ -232,30 +232,12 @@ def _write_silence(path: Path, duration_s: float = 1.0, sample_rate: int = 16000
     sf.write(str(path), samples, sample_rate)
 
 
-def compute_clip_duration(output_dir: Path, n_sample: int = 50) -> float:
-    """Sample clips and compute median duration + 750ms buffer, minimum 2.0s."""
-    import soundfile as sf
-
-    wav_files = sorted(output_dir.glob("*.wav"))[:n_sample]
-    if not wav_files:
-        return 2.0
-    durations = []
-    for f in wav_files:
-        info = sf.info(str(f))
-        durations.append(info.duration)
-    median = float(np.median(durations))
-    return max(2.0, median + 0.75)
-
-
-def run_generate(config: WakeWordConfig) -> float:
+def run_generate(config: WakeWordConfig) -> None:
     """Run the full generate pipeline for a wake word config.
 
     Supports resuming: counts existing ``clip_######.wav`` files in each split
     directory and skips completed splits or resumes partial ones from the
     existing count.
-
-    Returns:
-        Computed clip duration in seconds (median + 750ms buffer, min 2.0s).
     """
     model_dir = config.model_output_dir
     vits_model = config.data_path / "piper" / "en-us-libritts-high.pt"
@@ -353,8 +335,3 @@ def run_generate(config: WakeWordConfig) -> float:
                 **synth_kwargs,  # type: ignore[arg-type]
             )
 
-    # Compute dynamic clip duration
-    pos_dir = model_dir / "positive_train"
-    clip_duration = compute_clip_duration(pos_dir)
-    logger.info(f"Computed clip duration: {clip_duration:.2f}s")
-    return clip_duration

@@ -97,16 +97,6 @@ This ensures adversarial phrases sound close to the target but are distinct word
 
 Additional negative phrases can be specified via `custom_negative_phrases` in the config. These are appended to the auto-generated adversarial phrases before synthesis.
 
-## Clip Duration Calculation
-
-`compute_clip_duration()` determines the target audio window length for augmentation:
-
-1. Sample up to 50 WAV files from the positive training directory
-2. Compute the median duration
-3. Return `max(2.0, median_duration + 0.75)`
-
-The 750ms buffer ensures the wake word fits within the detection window with room for alignment jitter. The minimum of 2.0 seconds prevents windows that are too short.
-
 ## Output Directory Structure
 
 After generation, the output directory contains:

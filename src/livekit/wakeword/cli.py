@@ -297,10 +297,10 @@ def run(
     from .training.trainer import run_train
 
     logger.info("Step 1/4: Generate synthetic data")
-    clip_duration = run_generate(config)
+    run_generate(config)
 
     logger.info("Step 2/4: Augment + extract features")
-    run_augment(config, clip_duration=clip_duration)
+    run_augment(config)
 
     logger.info("Step 3/4: Train classifier")
     run_train(config)

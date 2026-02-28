@@ -176,17 +176,12 @@ def align_clip_to_end(
     return result
 
 
-def run_augment(config: WakeWordConfig, clip_duration: float | None = None) -> None:
+def run_augment(config: WakeWordConfig) -> None:
     """Run augmentation pipeline on generated clips.
 
     Augments clips and then extracts features through the frozen pipeline.
-
-    Args:
-        config: Wake word configuration.
-        clip_duration: Target clip duration in seconds from generation phase.
-            Falls back to 2.0s if not provided.
     """
-    target_duration = clip_duration if clip_duration is not None else 2.0
+    target_duration = 2.0
 
     model_dir = config.model_output_dir
     augmentor = AudioAugmentor(
