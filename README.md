@@ -7,6 +7,7 @@
 [![CI](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml/badge.svg)](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v0.1-green)](https://github.com/livekit/livekit-wakeword)
 
 An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training — generate synthetic data, augment, train, and export from a single YAML config.
 
@@ -19,6 +20,7 @@ An open-source wake word library for creating voice-enabled applications. Based 
 **Quick Links:**
 
 - [Using Existing Models](#using-existing-models-and-library)
+- [Programmatic Training API](#programmatic-training-api)
 - [Training New Models](#training-new-models)
 
 ## Quick Start
@@ -142,6 +144,40 @@ See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training j
 ```bash
 sky launch skypilot/train.yaml
 ```
+
+### Programmatic Training API
+
+The full training pipeline is available as a Python API, so you can import and drive it from your own code instead of using the CLI:
+
+```python
+from livekit.wakeword import (
+    WakeWordConfig,
+    load_config,
+    run_generate,
+    run_augment,
+    run_train,
+    run_export,
+)
+
+# Load from YAML or construct directly
+config = load_config("configs/hey_livekit.yaml")
+
+# Or build a config programmatically
+config = WakeWordConfig(
+    model_name="hey_robot",
+    target_phrases=["hey robot"],
+    n_samples=5000,
+    steps=30000,
+)
+
+# Run individual stages
+clip_duration = run_generate(config)       # TTS synthesis + adversarial negatives
+run_augment(config, clip_duration=clip_duration)  # Augment + feature extraction
+run_train(config)                          # 3-phase adaptive training
+run_export(config)                         # Export to ONNX
+```
+
+This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.
 
 ## Detailed Documentation
 

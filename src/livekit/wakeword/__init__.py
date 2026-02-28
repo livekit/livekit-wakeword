@@ -10,10 +10,10 @@ from .training.trainer import run_train
 
 __version__ = "0.1.0"
 __all__ = [
-    "Detection",
     "WakeWordConfig",
     "WakeWordListener",
     "WakeWordModel",
+    "Detection",
     "load_config",
     "run_augment",
     "run_export",
