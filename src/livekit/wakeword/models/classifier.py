@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from livekit.wakeword.config import ModelSize, ModelType, MODEL_SIZE_PRESETS
+from ..config import ModelSize, ModelType, MODEL_SIZE_PRESETS
 
 
 class FCNBlock(nn.Module):

@@ -23,7 +23,7 @@ logger = logging.getLogger("livekit.wakeword")
 
 
 def _load_config(config_path: str) -> "WakeWordConfig":  # noqa: F821
-    from livekit.wakeword.config import load_config
+    from .config import load_config
 
     return load_config(config_path)
 
@@ -234,7 +234,7 @@ def generate(
     logger.info(f"Generating data for '{config.model_name}'...")
     logger.info(f"Target phrases: {config.target_phrases}")
 
-    from livekit.wakeword.data.generate import run_generate
+    from .data.generate import run_generate
 
     run_generate(config)
     logger.info("Generation complete!")
@@ -249,7 +249,7 @@ def augment(
 
     logger.info(f"Augmenting data for '{config.model_name}'...")
 
-    from livekit.wakeword.data.augment import run_augment
+    from .data.augment import run_augment
 
     run_augment(config)
     logger.info("Augmentation + feature extraction complete!")
@@ -266,7 +266,7 @@ def train(
     logger.info(f"Model: {config.model.model_type.value} ({config.model.model_size.value})")
     logger.info(f"Steps: {config.steps}")
 
-    from livekit.wakeword.training.trainer import run_train
+    from .training.trainer import run_train
 
     model_path = run_train(config)
     logger.info(f"Training complete! Model saved to {model_path}")
@@ -282,7 +282,7 @@ def export(
 
     logger.info(f"Exporting '{config.model_name}' to ONNX...")
 
-    from livekit.wakeword.export.onnx import run_export
+    from .export.onnx import run_export
 
     onnx_path = run_export(config, quantize=quantize)
     logger.info(f"Export complete! ONNX model at {onnx_path}")
@@ -297,10 +297,10 @@ def run(
 
     logger.info(f"Running full pipeline for '{config.model_name}'...")
 
-    from livekit.wakeword.data.augment import run_augment
-    from livekit.wakeword.data.generate import run_generate
-    from livekit.wakeword.export.onnx import run_export
-    from livekit.wakeword.training.trainer import run_train
+    from .data.augment import run_augment
+    from .data.generate import run_generate
+    from .export.onnx import run_export
+    from .training.trainer import run_train
 
     logger.info("Step 1/4: Generate synthetic data")
     clip_duration = run_generate(config)

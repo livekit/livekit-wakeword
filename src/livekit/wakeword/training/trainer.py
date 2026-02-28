@@ -11,11 +11,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from livekit.wakeword.config import WakeWordConfig
-from livekit.wakeword.data.dataset import create_dataloader
-from livekit.wakeword.models.pipeline import WakeWordClassifier
-from livekit.wakeword.training.metrics import evaluate_model
-from livekit.wakeword.utils import get_device
+from ..config import WakeWordConfig
+from ..data.dataset import create_dataloader
+from ..models.pipeline import WakeWordClassifier
+from ..utils import get_device
+from .metrics import evaluate_model
 
 logger = logging.getLogger(__name__)
 

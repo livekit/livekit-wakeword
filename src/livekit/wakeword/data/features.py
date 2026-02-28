@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
-from livekit.wakeword.config import WakeWordConfig
-from livekit.wakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
-from livekit.wakeword.resources import get_embedding_model_path, get_mel_model_path
+from ..config import WakeWordConfig
+from ..models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
+from ..resources import get_embedding_model_path, get_mel_model_path
 
 logger = logging.getLogger(__name__)
 

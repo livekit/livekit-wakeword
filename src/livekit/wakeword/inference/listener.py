@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from livekit.wakeword.inference.model import WakeWordModel
+    from .model import WakeWordModel
 
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80ms
