@@ -151,7 +151,7 @@ class SpeechEmbedding:
         if not Path(onnx_path).exists():
             raise FileNotFoundError(
                 f"Embedding ONNX model not found: {onnx_path}\n"
-                "This should not happen - please reinstall livewakeword."
+                "This should not happen - please reinstall livekit-wakeword."
             )
 
         self._session = ort.InferenceSession(

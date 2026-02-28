@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from livewakeword.inference.model import Model
+    from livekit.wakeword.inference.model import Model
 
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80ms
@@ -29,7 +29,7 @@ class Listener:
     """Async wake word listener that handles audio capture.
 
     Example:
-        from livewakeword import Model, Listener
+        from livekit.wakeword import Model, Listener
 
         model = Model(wakeword_models=["hey_livekit.onnx"])
 

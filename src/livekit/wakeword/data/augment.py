@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from livewakeword.config import WakeWordConfig
+from livekit.wakeword.config import WakeWordConfig
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,7 @@ def run_augment(config: WakeWordConfig, clip_duration: float | None = None) -> N
         clip_duration: Target clip duration in seconds from generation phase.
             Falls back to 2.0s if not provided.
     """
-    from livewakeword.data.features import extract_features_for_config
+    from livekit.wakeword.data.features import extract_features_for_config
 
     target_duration = clip_duration if clip_duration is not None else 2.0
 

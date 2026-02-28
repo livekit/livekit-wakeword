@@ -1,6 +1,6 @@
 """Real-time inference engine."""
 
-from livewakeword.inference.listener import Detection, Listener
-from livewakeword.inference.model import Model
+from livekit.wakeword.inference.listener import Detection, Listener
+from livekit.wakeword.inference.model import Model
 
 __all__ = ["Detection", "Listener", "Model"]

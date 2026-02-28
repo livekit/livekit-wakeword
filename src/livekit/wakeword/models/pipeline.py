@@ -8,10 +8,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from livewakeword.config import WakeWordConfig
-from livewakeword.models.classifier import build_classifier
-from livewakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
-from livewakeword.resources import get_embedding_model_path, get_mel_model_path
+from livekit.wakeword.config import WakeWordConfig
+from livekit.wakeword.models.classifier import build_classifier
+from livekit.wakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
+from livekit.wakeword.resources import get_embedding_model_path, get_mel_model_path
 
 
 class WakeWordClassifier(nn.Module):

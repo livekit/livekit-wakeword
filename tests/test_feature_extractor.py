@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from livewakeword.models.feature_extractor import MelSpectrogramFrontend
+from livekit.wakeword.models.feature_extractor import MelSpectrogramFrontend
 
 
 class TestMelSpectrogramFrontendFallback:

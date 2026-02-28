@@ -36,7 +36,7 @@ _vits_utils_loaded = False
 
 def _get_device() -> torch.device:
     """Select the best available device."""
-    from livewakeword.utils import get_device
+    from livekit.wakeword.utils import get_device
 
     return get_device()
 
@@ -116,7 +116,7 @@ def generate_samples(
     """
     global _vits_utils_loaded
     if not _vits_utils_loaded:
-        from livewakeword.data._piper_generate_compat import ensure_piper_train
+        from livekit.wakeword.data._piper_generate_compat import ensure_piper_train
 
         ensure_piper_train()
         _vits_utils_loaded = True
@@ -216,7 +216,7 @@ def generate_samples(
 
             # Resample 22050 → 16000
             audio_16k = resampler(audio.cpu()).numpy()
-            from livewakeword.data._vits_utils import audio_float_to_int16
+            from livekit.wakeword.data._vits_utils import audio_float_to_int16
 
             audio_int16 = audio_float_to_int16(audio_16k)
 
@@ -260,7 +260,7 @@ def _generate_audio(
     device: torch.device,
 ) -> torch.Tensor:
     """Run a single VITS forward pass with SLERP-blended speaker embedding."""
-    from livewakeword.data._vits_utils import generate_path, sequence_mask, slerp
+    from livekit.wakeword.data._vits_utils import generate_path, sequence_mask, slerp
 
     x = _to_device(torch.LongTensor(phoneme_ids), device)
     x_lengths = _to_device(torch.LongTensor(phoneme_lengths), device)

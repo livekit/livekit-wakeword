@@ -1,5 +1,5 @@
-"""Allow `python -m livewakeword`."""
+"""Allow `python -m livekit.wakeword`."""
 
-from livewakeword.cli import app
+from livekit.wakeword.cli import app
 
 app()

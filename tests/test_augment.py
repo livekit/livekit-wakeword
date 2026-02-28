@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from livewakeword.data.augment import align_clip_to_end
+from livekit.wakeword.data.augment import align_clip_to_end
 
 
 class TestAlignClipToEnd:

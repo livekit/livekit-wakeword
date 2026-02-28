@@ -1,4 +1,4 @@
-"""Shared utilities for livewakeword."""
+"""Shared utilities for livekit-wakeword."""
 
 from __future__ import annotations
 

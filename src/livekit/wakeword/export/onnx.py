@@ -8,8 +8,8 @@ from pathlib import Path
 import onnx
 import torch
 
-from livewakeword.config import WakeWordConfig
-from livewakeword.models.pipeline import WakeWordClassifier
+from livekit.wakeword.config import WakeWordConfig
+from livekit.wakeword.models.pipeline import WakeWordClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ def export_full_pipeline(
     """
     import shutil
 
-    from livewakeword.resources import get_embedding_model_path, get_mel_model_path
+    from livekit.wakeword.resources import get_embedding_model_path, get_mel_model_path
 
     # Export the classifier head
     classifier_path = export_classifier(config, model_path, output_path, opset_version)

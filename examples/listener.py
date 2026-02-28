@@ -3,8 +3,8 @@
 import asyncio
 from pathlib import Path
 
-from livewakeword import Model
-from livewakeword.inference import Listener
+from livekit.wakeword import Model
+from livekit.wakeword.inference import Listener
 
 model = Model(wakeword_models=[Path(__file__).parent / "resources" / "hey_livekit.onnx"])
 

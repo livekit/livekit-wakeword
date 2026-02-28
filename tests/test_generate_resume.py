@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from livewakeword.data.generate import _count_original_clips, synthesize_clips
+from livekit.wakeword.data.generate import _count_original_clips, synthesize_clips
 
 
 class TestCountOriginalClips:

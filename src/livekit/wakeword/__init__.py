@@ -1,6 +1,6 @@
-"""livewakeword — Simplified pure-PyTorch wake word detection."""
+"""livekit-wakeword — Simplified pure-PyTorch wake word detection."""
 
-from livewakeword.inference.model import Model
+from livekit.wakeword.inference.model import Model
 
 __version__ = "0.1.0"
 __all__ = ["Model", "__version__"]

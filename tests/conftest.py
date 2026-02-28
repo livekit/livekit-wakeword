@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from livewakeword.config import WakeWordConfig
+from livekit.wakeword.config import WakeWordConfig
 
 
 @pytest.fixture

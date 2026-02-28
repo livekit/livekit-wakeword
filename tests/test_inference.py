@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 import torch
 
-from livewakeword.config import WakeWordConfig
-from livewakeword.models.pipeline import WakeWordClassifier
+from livekit.wakeword.config import WakeWordConfig
+from livekit.wakeword.models.pipeline import WakeWordClassifier
 
 
 class TestWakeWordClassifier:

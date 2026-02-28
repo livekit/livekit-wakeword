@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from livewakeword.config import WakeWordConfig
+from livekit.wakeword.config import WakeWordConfig
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ def synthesize_clips(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if vits_model_path is not None and vits_model_path.exists():
-        from livewakeword.data._piper_generate import generate_samples
+        from livekit.wakeword.data._piper_generate import generate_samples
 
         try:
             generated = generate_samples(

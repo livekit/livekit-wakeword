@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import torch
 
-from livewakeword.config import ModelSize, ModelType
-from livewakeword.models.classifier import (
+from livekit.wakeword.config import ModelSize, ModelType
+from livekit.wakeword.models.classifier import (
     DNNClassifier,
     RNNClassifier,
     build_classifier,

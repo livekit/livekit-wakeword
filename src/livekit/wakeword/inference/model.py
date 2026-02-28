@@ -8,8 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from livewakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
-from livewakeword.resources import get_embedding_model_path, get_mel_model_path
+from livekit.wakeword.models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
+from livekit.wakeword.resources import get_embedding_model_path, get_mel_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class Model:
     """Simple API for wake word detection, similar to openwakeword.
 
     Example usage:
-        from livewakeword import Model
+        from livekit.wakeword import Model
 
         # Load wake word model(s)
         model = Model(wakeword_models=["path/to/model.onnx"])
@@ -55,12 +55,12 @@ class Model:
         if not mel_path.exists():
             raise FileNotFoundError(
                 f"Bundled mel model not found: {mel_path}\n"
-                "This should not happen - please reinstall livewakeword."
+                "This should not happen - please reinstall livekit-wakeword."
             )
         if not embedding_path.exists():
             raise FileNotFoundError(
                 f"Bundled embedding model not found: {embedding_path}\n"
-                "This should not happen - please reinstall livewakeword."
+                "This should not happen - please reinstall livekit-wakeword."
             )
 
         self._mel_frontend = MelSpectrogramFrontend(onnx_path=mel_path)
