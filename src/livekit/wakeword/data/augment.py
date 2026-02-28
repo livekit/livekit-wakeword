@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import random
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -41,7 +42,7 @@ class AudioAugmentor:
                 wavs.extend(d.glob("**/*.wav"))
         return wavs
 
-    def _get_per_sample_augmentations(self):  # type: ignore[no-untyped-def]
+    def _get_per_sample_augmentations(self) -> Any:
         """Lazy-load audiomentations transforms."""
         if self._per_sample_aug is None:
             from audiomentations import Compose, SevenBandParametricEQ, TanhDistortion
@@ -54,7 +55,7 @@ class AudioAugmentor:
             )
         return self._per_sample_aug
 
-    def _get_batch_augmentations(self):  # type: ignore[no-untyped-def]
+    def _get_batch_augmentations(self) -> Any:
         """Lazy-load torch-audiomentations transforms."""
         if self._batch_aug is None:
             from torch_audiomentations import (

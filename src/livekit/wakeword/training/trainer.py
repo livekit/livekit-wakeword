@@ -6,6 +6,7 @@ import copy
 import logging
 import math
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import torch
@@ -18,6 +19,13 @@ from ..utils import get_device
 from .metrics import evaluate_model
 
 logger = logging.getLogger(__name__)
+
+
+class _Checkpoint(TypedDict):
+    step: int
+    phase: int
+    metrics: dict[str, float]
+    state_dict: dict[str, torch.Tensor]
 
 
 def _cosine_warmup_schedule(
@@ -55,7 +63,7 @@ class WakeWordTrainer:
         self.config = config
         self.device = device or get_device()
         self.model = WakeWordClassifier(config).to(self.device)
-        self.checkpoints: list[dict[str, object]] = []
+        self.checkpoints: list[_Checkpoint] = []
 
     def _build_dataloader(self) -> torch.utils.data.DataLoader:  # type: ignore[type-arg]
         model_dir = self.config.model_output_dir
@@ -272,9 +280,9 @@ class WakeWordTrainer:
             return self.model
 
         # Extract metrics
-        fpph_values = [c["metrics"]["fpph"] for c in self.checkpoints]  # type: ignore[index]
-        recall_values = [c["metrics"]["recall"] for c in self.checkpoints]  # type: ignore[index]
-        acc_values = [c["metrics"]["accuracy"] for c in self.checkpoints]  # type: ignore[index]
+        fpph_values = [c["metrics"]["fpph"] for c in self.checkpoints]
+        recall_values = [c["metrics"]["recall"] for c in self.checkpoints]
+        acc_values = [c["metrics"]["accuracy"] for c in self.checkpoints]
 
         # Filter: low FP (10th percentile) + high recall/accuracy (90th percentile)
         fp_threshold = np.percentile(fpph_values, 10) if len(fpph_values) > 1 else float("inf")
@@ -284,21 +292,21 @@ class WakeWordTrainer:
         selected = [
             c
             for c in self.checkpoints
-            if c["metrics"]["fpph"] <= fp_threshold  # type: ignore[index]
-            and c["metrics"]["recall"] >= recall_threshold  # type: ignore[index]
-            and c["metrics"]["accuracy"] >= acc_threshold  # type: ignore[index]
+            if c["metrics"]["fpph"] <= fp_threshold
+            and c["metrics"]["recall"] >= recall_threshold
+            and c["metrics"]["accuracy"] >= acc_threshold
         ]
 
         if not selected:
             # Fallback: use checkpoint with best recall
-            selected = [max(self.checkpoints, key=lambda c: c["metrics"]["recall"])]  # type: ignore[index]
+            selected = [max(self.checkpoints, key=lambda c: c["metrics"]["recall"])]
 
         logger.info(f"Averaging {len(selected)} checkpoints")
 
         # Average state dicts
         avg_state = {}
-        for key in selected[0]["state_dict"].keys():  # type: ignore[union-attr]
-            tensors = [c["state_dict"][key] for c in selected]  # type: ignore[index]
+        for key in selected[0]["state_dict"].keys():
+            tensors = [c["state_dict"][key] for c in selected]
             avg_state[key] = torch.stack(tensors).float().mean(dim=0)
 
         self.model.load_state_dict(avg_state)

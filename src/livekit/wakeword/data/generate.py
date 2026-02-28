@@ -6,6 +6,7 @@ import logging
 import random
 import re
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -243,7 +244,7 @@ def run_generate(config: WakeWordConfig) -> None:
     vits_model = config.data_path / "piper" / "en-us-libritts-high.pt"
     vits_path = vits_model if vits_model.exists() else None
 
-    synth_kwargs: dict[str, object] = {
+    synth_kwargs: dict[str, Any] = {
         "noise_scales": config.noise_scales,
         "noise_scale_ws": config.noise_scale_ws,
         "length_scales": config.length_scales,
@@ -280,7 +281,7 @@ def run_generate(config: WakeWordConfig) -> None:
             vits_model_path=vits_path,
             batch_size=config.tts_batch_size,
             start_index=existing,
-            **synth_kwargs,  # type: ignore[arg-type]
+            **synth_kwargs,
         )
 
     # --- Adversarial negative splits ---
@@ -332,6 +333,6 @@ def run_generate(config: WakeWordConfig) -> None:
                 vits_model_path=vits_path,
                 batch_size=config.tts_batch_size,
                 start_index=existing,
-                **synth_kwargs,  # type: ignore[arg-type]
+                **synth_kwargs,
             )
 
