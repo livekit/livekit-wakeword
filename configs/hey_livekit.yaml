@@ -45,6 +45,13 @@ output_dir: ./output
 # ============================================================================
 
 augmentation:
+  # Target clip duration in seconds after augmentation
+  # Controls the fixed-length window that all clips are padded/cropped to.
+  # Default 2.0s is tuned for the built-in embedding model (16 timesteps).
+  # Set a different value when generating data for external models that
+  # expect a different input length.
+  clip_duration: 2.0
+
   # Batch size for augmentation processing
   batch_size: 16
 
