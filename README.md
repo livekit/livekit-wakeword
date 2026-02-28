@@ -25,6 +25,16 @@ An open-source wake word library for creating voice-enabled applications. Based 
 
 ### Using Existing Models and Library
 
+**System dependencies (for microphone listener):**
+
+```bash
+# macOS
+brew install portaudio
+
+# Ubuntu/Debian
+sudo apt install portaudio19-dev
+```
+
 **Installation:**
 
 ```bash
@@ -65,6 +75,16 @@ asyncio.run(main())
 
 ### Training New Models
 
+**System dependencies:**
+
+```bash
+# macOS
+brew install espeak-ng ffmpeg portaudio
+
+# Ubuntu/Debian
+sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
+```
+
 **Installation:**
 
 ```bash
@@ -75,16 +95,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/livekit/livekit-wakeword
 cd livekit-wakeword
 uv sync --all-extras
-```
-
-**System dependencies:**
-
-```bash
-# macOS
-brew install espeak-ng ffmpeg portaudio
-
-# Ubuntu/Debian
-sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
 ```
 
 **Download models and data:**
