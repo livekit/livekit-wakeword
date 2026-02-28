@@ -35,8 +35,6 @@ from ._vits_utils import audio_float_to_int16, generate_path, sequence_mask, sle
 
 logger = logging.getLogger(__name__)
 
-_vits_utils_loaded = False
-
 
 def _get_device() -> torch.device:
     """Select the best available device."""
@@ -116,10 +114,7 @@ def generate_samples(
     Returns:
         List of paths to generated ``.wav`` files.
     """
-    global _vits_utils_loaded
-    if not _vits_utils_loaded:
-        ensure_piper_train()
-        _vits_utils_loaded = True
+    ensure_piper_train()
 
     if slerp_weights is None:
         slerp_weights = [0.5]
