@@ -146,4 +146,4 @@ If you want to understand more about how this library works:
 
 ## License
 
-TBD
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
