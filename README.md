@@ -20,8 +20,8 @@ An open-source wake word library for creating voice-enabled applications. Based 
 **Quick Links:**
 
 - [Using Existing Models](#using-existing-models-and-library)
-- [Programmatic Training API](#programmatic-training-api)
-- [Training New Models](#training-new-models)
+- [Training New Models Using The CLI](#training-new-models-using-the-cli)
+- [Training New Models Using The Python API](#training-new-models-using-the-python-api)
 
 ## Quick Start
 
@@ -75,7 +75,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Training New Models
+### Training New Models Using The CLI
 
 **System dependencies:**
 
@@ -145,7 +145,7 @@ See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training j
 sky launch skypilot/train.yaml
 ```
 
-### Programmatic Training API
+### Training New Models Using The Python API
 
 The full training pipeline is available as a Python API, so you can import and drive it from your own code instead of using the CLI:
 
