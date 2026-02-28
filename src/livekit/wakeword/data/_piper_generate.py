@@ -8,7 +8,7 @@ Adaptations from dscripka's original:
 - Import from local ``_vits_utils`` instead of ``piper_train.vits.commons``
 - Use ``espeak-ng`` CLI for phonemization (cross-platform, no C binding issues)
 - Add MPS device support (Apple Silicon)
-- Use ``torch.load(..., weights_only=False)`` for PyTorch 2.x compat
+- Load via state_dict + config JSON (no pickle, no piper_train dependency)
 - Add type annotations for mypy strict mode
 - Remove argparse CLI, auto_reduce_batch_size, file_names params
 """
@@ -30,10 +30,39 @@ import torch
 import torchaudio
 
 from ..utils import get_device
-from ._piper_generate_compat import ensure_piper_train
+from ._vits.models import SynthesizerTrn
 from ._vits_utils import audio_float_to_int16, generate_path, sequence_mask, slerp
 
 logger = logging.getLogger(__name__)
+
+
+def _load_vits_model(model_path: Path, device: torch.device) -> SynthesizerTrn:
+    """Load VITS SynthesizerTrn from state_dict + config JSON.
+
+    Expects two files:
+    - ``model_path`` — state_dict saved with ``torch.save(model.state_dict(), ...)``
+    - ``model_path.with_suffix(".json")`` — config with a ``"synthesizer"`` key
+      containing the ``SynthesizerTrn`` constructor kwargs.
+    """
+    config_path = model_path.with_suffix(".json")
+    with open(config_path, encoding="utf-8") as f:
+        config = json.load(f)
+
+    synth_config: dict[str, Any] = config["synthesizer"]
+    model = SynthesizerTrn(**synth_config)
+
+    # The state_dict was saved with weight_norm removed on dec (Generator)
+    # and flow, but NOT on enc_q.  Match that before loading.
+    model.dec.remove_weight_norm()
+    for flow in model.flow.flows:
+        remove_fn = getattr(flow, "remove_weight_norm", None)
+        if remove_fn is not None:
+            remove_fn()
+
+    state_dict = torch.load(model_path, map_location=device, weights_only=True)
+    model.load_state_dict(state_dict)
+    model.eval()
+    return model.to(device)
 
 
 def _to_device(tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
@@ -97,7 +126,7 @@ def generate_samples(
         text: Phrases to synthesize.
         output_dir: Directory for output ``.wav`` files.
         max_samples: Stop after this many clips (default: ``len(text)``).
-        model: Path to ``.pt`` VITS checkpoint.
+        model: Path to VITS state_dict ``.pt`` file (with matching ``.json`` config).
         batch_size: Inference batch size.
         slerp_weights: SLERP interpolation weights (0=speaker1, 1=speaker2).
         length_scales: Speaking rate multipliers.
@@ -109,8 +138,6 @@ def generate_samples(
     Returns:
         List of paths to generated ``.wav`` files.
     """
-    ensure_piper_train()
-
     if slerp_weights is None:
         slerp_weights = [0.5]
     if length_scales is None:
@@ -130,14 +157,13 @@ def generate_samples(
 
     logger.debug("Loading VITS model from %s", model)
     model_path = Path(model)
-    vits_model: Any = torch.load(model_path, map_location=device, weights_only=False)
-    vits_model.eval()
+    vits_model = _load_vits_model(model_path, device)
     logger.info("VITS model loaded on %s", device)
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    config_path = Path(f"{model_path}.json")
+    config_path = model_path.with_suffix(".json")
     with open(config_path, encoding="utf-8") as config_file:
         config: dict[str, Any] = json.load(config_file)
 

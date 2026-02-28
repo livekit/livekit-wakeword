@@ -65,19 +65,19 @@ def setup(
 
 
 def _download_piper(piper_dir: Path) -> None:
-    """Download VITS .pt checkpoint and config JSON."""
+    """Download VITS state_dict and config JSON."""
     import urllib.request
 
     from rich.progress import Progress
 
-    # 1) Download .pt checkpoint from piper-sample-generator releases
-    pt_url = (
-        "https://github.com/rhasspy/piper-sample-generator"
-        "/releases/download/v1.0.0/en-us-libritts-high.pt"
-    )
+    # TODO: Replace with actual hosted URLs once the converted checkpoint is uploaded.
+    base_url = "https://github.com/rhasspy/piper-sample-generator/releases/download/v1.0.0"
+
+    # 1) Download state_dict .pt
+    pt_url = f"{base_url}/en-us-libritts-high.pt"
     pt_dest = piper_dir / "en-us-libritts-high.pt"
     if not pt_dest.exists():
-        logger.info("Downloading en-us-libritts-high.pt (~255 MB)...")
+        logger.info("Downloading en-us-libritts-high.pt (~166 MB)...")
         try:
             with Progress() as progress:
                 task = progress.add_task("[cyan]en-us-libritts-high.pt", total=None)
@@ -98,27 +98,14 @@ def _download_piper(piper_dir: Path) -> None:
     else:
         logger.info(f"VITS checkpoint already exists: {pt_dest}")
 
-    # 2) Download config JSON from HuggingFace piper-voices
-    #    Saved as .pt.json so generate_samples() finds it next to the .pt
-    json_dest = piper_dir / "en-us-libritts-high.pt.json"
+    # 2) Download config JSON (must be next to .pt with .json suffix)
+    json_url = f"{base_url}/en-us-libritts-high.json"
+    json_dest = piper_dir / "en-us-libritts-high.json"
     if not json_dest.exists():
+        logger.info("Downloading VITS config JSON...")
         try:
-            from huggingface_hub import hf_hub_download
-
-            logger.info("Downloading VITS config JSON...")
-            downloaded = hf_hub_download(
-                repo_id="rhasspy/piper-voices",
-                filename="en/en_US/libritts/high/en_US-libritts-high.onnx.json",
-            )
-            # Copy to expected location next to .pt file
-            import shutil
-
-            shutil.copy2(downloaded, str(json_dest))
+            urllib.request.urlretrieve(json_url, str(json_dest))
             logger.info("Downloaded VITS config JSON")
-        except ImportError:
-            logger.warning(
-                "huggingface-hub not installed. Install with: uv pip install huggingface-hub"
-            )
         except Exception as e:
             logger.warning(f"Failed to download VITS config JSON: {e}")
     else:
@@ -318,5 +305,3 @@ def run(
     run_export(config)
 
     logger.info("Full pipeline complete!")
-
-
