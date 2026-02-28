@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml/badge.svg)](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training — generate synthetic data, augment, train, and export from a single YAML config.
 

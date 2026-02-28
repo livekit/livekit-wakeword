@@ -7,7 +7,7 @@ name = "livekit-wakeword"
 version = "0.1.0"
 description = "Simplified pure-PyTorch wake word detection"
 requires-python = ">=3.11"
-license = "MIT"
+license = "Apache-2.0"
 
 dependencies = [
     "torch>=2.2",
