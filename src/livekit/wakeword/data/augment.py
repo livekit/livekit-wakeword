@@ -181,7 +181,7 @@ def run_augment(config: WakeWordConfig) -> None:
 
     Augments clips and then extracts features through the frozen pipeline.
     """
-    target_duration = 2.0
+    target_duration = config.augmentation.clip_duration
 
     model_dir = config.model_output_dir
     augmentor = AudioAugmentor(

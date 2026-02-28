@@ -35,6 +35,7 @@ MODEL_SIZE_PRESETS: dict[ModelSize, tuple[int, int]] = {
 
 
 class AugmentationConfig(BaseModel):
+    clip_duration: float = 2.0
     batch_size: int = 16
     rounds: int = 1
     background_paths: list[str] = Field(default_factory=lambda: ["./data/backgrounds"])
