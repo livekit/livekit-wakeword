@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "livewakeword"
+name = "livekit-wakeword"
 version = "0.1.0"
 description = "Simplified pure-PyTorch wake word detection"
 requires-python = ">=3.11"
@@ -46,23 +46,23 @@ export = [
 dev = ["pytest>=8.0", "pytest-cov>=4.0", "ruff>=0.4", "mypy>=1.8"]
 
 [project.scripts]
-livewakeword = "livewakeword.cli:app"
+livekit-wakeword = "livekit.wakeword.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/livewakeword"]
+packages = ["src/livekit"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
 
 # Include bundled ONNX models for feature extraction
 [tool.hatch.build.targets.wheel.force-include]
-"src/livewakeword/resources/melspectrogram.onnx" = "livewakeword/resources/melspectrogram.onnx"
-"src/livewakeword/resources/embedding_model.onnx" = "livewakeword/resources/embedding_model.onnx"
+"src/livekit/wakeword/resources/melspectrogram.onnx" = "livekit/wakeword/resources/melspectrogram.onnx"
+"src/livekit/wakeword/resources/embedding_model.onnx" = "livekit/wakeword/resources/embedding_model.onnx"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/livewakeword/**/*.py",
-    "src/livewakeword/resources/*.onnx",
+    "src/livekit/wakeword/**/*.py",
+    "src/livekit/wakeword/resources/*.onnx",
 ]
 
 [tool.pytest.ini_options]
