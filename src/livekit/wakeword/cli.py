@@ -70,11 +70,10 @@ def _download_piper(piper_dir: Path) -> None:
 
     from rich.progress import Progress
 
-    # TODO: Replace with actual hosted URLs once the converted checkpoint is uploaded.
-    base_url = "https://github.com/rhasspy/piper-sample-generator/releases/download/v1.0.0"
+    base_url = "https://github.com/livekit/livekit-wakeword/releases/download/v0.1.0"
 
     # 1) Download state_dict .pt
-    pt_url = f"{base_url}/en-us-libritts-high.pt"
+    pt_url = f"{base_url}/en-us-libritts-high.state_dict.pt"
     pt_dest = piper_dir / "en-us-libritts-high.pt"
     if not pt_dest.exists():
         logger.info("Downloading en-us-libritts-high.pt (~166 MB)...")
@@ -99,7 +98,7 @@ def _download_piper(piper_dir: Path) -> None:
         logger.info(f"VITS checkpoint already exists: {pt_dest}")
 
     # 2) Download config JSON (must be next to .pt with .json suffix)
-    json_url = f"{base_url}/en-us-libritts-high.json"
+    json_url = f"{base_url}/en-us-libritts-high.config.json"
     json_dest = piper_dir / "en-us-libritts-high.json"
     if not json_dest.exists():
         logger.info("Downloading VITS config JSON...")
