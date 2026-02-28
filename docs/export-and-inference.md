@@ -60,7 +60,7 @@ The `WakeWordModel` class provides a simple prediction API for wake word detecti
 ```python
 from livekit.wakeword import WakeWordModel
 
-model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])
 
 # Feed audio frames (16kHz, int16 or float32)
 scores = model.predict(audio_frame)
@@ -71,7 +71,7 @@ scores = model.predict(audio_frame)
 
 ```python
 WakeWordModel(
-    wakeword_models: list[str | Path] | None = None,  # Paths to ONNX classifiers
+    models: list[str | Path] | None = None,  # Paths to ONNX classifiers
     inference_framework: str = "onnx"                  # Only "onnx" supported
 )
 ```
@@ -100,7 +100,7 @@ The `WakeWordListener` class provides async microphone detection with debouncing
 import asyncio
 from livekit.wakeword import WakeWordModel, WakeWordListener
 
-model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])
 
 async def main():
     async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:

@@ -23,7 +23,7 @@ class WakeWordModel:
         from livekit.wakeword import WakeWordModel
 
         # Load wake word model(s)
-        model = WakeWordModel(wakeword_models=["path/to/model.onnx"])
+        model = WakeWordModel(models=["path/to/model.onnx"])
 
         # Get audio frame (16-bit 16kHz PCM, multiples of 80ms recommended)
         frame = get_audio_frame()
@@ -35,12 +35,12 @@ class WakeWordModel:
 
     def __init__(
         self,
-        wakeword_models: list[str | Path] | None = None,
+        models: list[str | Path] | None = None,
     ):
         """Initialize the wake word detection model.
 
         Args:
-            wakeword_models: List of paths to wake word ONNX classifier models.
+            models: List of paths to wake word ONNX classifier models.
                 If None, no models are loaded (call load_model() later).
         """
 
@@ -74,8 +74,8 @@ class WakeWordModel:
         self._last_scores: dict[str, float] = {}
 
         # Load provided models
-        if wakeword_models:
-            for model_path in wakeword_models:
+        if models:
+            for model_path in models:
                 self.load_model(model_path)
 
     def load_model(self, model_path: str | Path, model_name: str | None = None) -> None:

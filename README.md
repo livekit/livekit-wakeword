@@ -34,7 +34,7 @@ uv add git+https://github.com/livekit/livekit-wakeword
 ```python
 from livekit.wakeword import WakeWordModel
 
-model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])
 
 # Feed audio frames (16kHz, int16 or float32)
 scores = model.predict(audio_frame)
@@ -48,7 +48,7 @@ if scores["hey_livekit"] > 0.5:
 import asyncio
 from livekit.wakeword import WakeWordModel, WakeWordListener
 
-model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])
 
 async def main():
     async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:

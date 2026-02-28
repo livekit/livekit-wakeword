@@ -31,7 +31,7 @@ class WakeWordListener:
     Example:
         from livekit.wakeword import WakeWordModel, WakeWordListener
 
-        model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
+        model = WakeWordModel(models=["hey_livekit.onnx"])
 
         async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
             while True:

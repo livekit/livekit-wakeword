@@ -7,7 +7,7 @@ import numpy as np
 from livekit.wakeword import WakeWordModel
 
 # Load model
-model = WakeWordModel(wakeword_models=[Path(__file__).parent / "resources" / "hey_livekit.onnx"])
+model = WakeWordModel(models=[Path(__file__).parent / "resources" / "hey_livekit.onnx"])
 
 # Simulate 3 seconds of random audio (16kHz) - need ~2s to fill embedding buffer
 audio = np.random.randint(-32768, 32767, size=48000, dtype=np.int16)
