@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from livekit.wakeword.inference.model import Model
+    from livekit.wakeword.inference.model import WakeWordModel
 
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80ms
@@ -25,15 +25,15 @@ class Detection:
     timestamp: float
 
 
-class Listener:
+class WakeWordListener:
     """Async wake word listener that handles audio capture.
 
     Example:
-        from livekit.wakeword import Model, Listener
+        from livekit.wakeword import WakeWordModel, WakeWordListener
 
-        model = Model(wakeword_models=["hey_livekit.onnx"])
+        model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
 
-        async with Listener(model, threshold=0.5, debounce=2.0) as listener:
+        async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
             while True:
                 detection = await listener.wait_for_detection()
                 print(f"Detected {detection.name}! (confidence={detection.confidence:.2f})")
@@ -41,14 +41,14 @@ class Listener:
 
     def __init__(
         self,
-        model: Model,
+        model: WakeWordModel,
         threshold: float = 0.5,
         debounce: float = 2.0,
     ):
         """Initialize listener.
 
         Args:
-            model: Wake word Model instance with loaded classifiers.
+            model: WakeWordModel instance with loaded classifiers.
             threshold: Detection threshold (0-1).
             debounce: Minimum seconds between detections.
         """
@@ -62,7 +62,7 @@ class Listener:
         self._last_detection_time = 0.0
         self._detection_queue: asyncio.Queue[Detection] = asyncio.Queue()
 
-    async def __aenter__(self) -> "Listener":
+    async def __aenter__(self) -> "WakeWordListener":
         """Start audio capture."""
         import pyaudio
 

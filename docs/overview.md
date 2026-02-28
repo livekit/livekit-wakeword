@@ -70,8 +70,8 @@ src/livekit/wakeword/
 ├── export/
 │   └── onnx.py                  ONNX export + INT8 quantization
 └── inference/
-    ├── model.py                 Model class (simple prediction API)
-    └── listener.py              Listener class (async microphone detection)
+    ├── model.py                 WakeWordModel class (simple prediction API)
+    └── listener.py              WakeWordListener class (async microphone detection)
 ```
 
 ## Pipeline Stages

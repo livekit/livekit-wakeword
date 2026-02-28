@@ -32,9 +32,9 @@ uv add git+https://github.com/livekit/livekit-wakeword
 **Basic inference:**
 
 ```python
-from livekit.wakeword import Model
+from livekit.wakeword import WakeWordModel
 
-model = Model(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
 
 # Feed audio frames (16kHz, int16 or float32)
 scores = model.predict(audio_frame)
@@ -46,12 +46,12 @@ if scores["hey_livekit"] > 0.5:
 
 ```python
 import asyncio
-from livekit.wakeword import Model, Listener
+from livekit.wakeword import WakeWordModel, WakeWordListener
 
-model = Model(wakeword_models=["hey_livekit.onnx"])
+model = WakeWordModel(wakeword_models=["hey_livekit.onnx"])
 
 async def main():
-    async with Listener(model, threshold=0.5, debounce=2.0) as listener:
+    async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
         while True:
             detection = await listener.wait_for_detection()
             print(f"Detected {detection.name}! ({detection.confidence:.2f})")

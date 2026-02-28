@@ -63,8 +63,8 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
   - `metrics.py` — FPPH (false positives per hour), recall, balanced accuracy
 - **`export/onnx.py`** — Export classifier to ONNX with optional INT8 quantization
 - **`inference/`**
-  - `model.py` — `Model` class for simple prediction API
-  - `listener.py` — `Listener` class for async microphone detection
+  - `model.py` — `WakeWordModel` class for simple prediction API
+  - `listener.py` — `WakeWordListener` class for async microphone detection
 
 ### Key Design Decisions
 

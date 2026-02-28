@@ -3,14 +3,14 @@
 import asyncio
 from pathlib import Path
 
-from livekit.wakeword import Model
-from livekit.wakeword.inference import Listener
+from livekit.wakeword import WakeWordModel
+from livekit.wakeword.inference import WakeWordListener
 
-model = Model(wakeword_models=[Path(__file__).parent / "resources" / "hey_livekit.onnx"])
+model = WakeWordModel(wakeword_models=[Path(__file__).parent / "resources" / "hey_livekit.onnx"])
 
 
 async def main():
-    async with Listener(model, threshold=0.5, debounce=2.0) as listener:
+    async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
         print("Listening... Press Ctrl+C to stop.\n")
         while True:
             detection = await listener.wait_for_detection()

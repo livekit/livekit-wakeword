@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 SAMPLE_RATE = 16000
 
 
-class Model:
+class WakeWordModel:
     """Simple API for wake word detection, similar to openwakeword.
 
     Example usage:
-        from livekit.wakeword import Model
+        from livekit.wakeword import WakeWordModel
 
         # Load wake word model(s)
-        model = Model(wakeword_models=["path/to/model.onnx"])
+        model = WakeWordModel(wakeword_models=["path/to/model.onnx"])
 
         # Get audio frame (16-bit 16kHz PCM, multiples of 80ms recommended)
         frame = get_audio_frame()
@@ -36,17 +36,13 @@ class Model:
     def __init__(
         self,
         wakeword_models: list[str | Path] | None = None,
-        inference_framework: str = "onnx",
     ):
         """Initialize the wake word detection model.
 
         Args:
             wakeword_models: List of paths to wake word ONNX classifier models.
                 If None, no models are loaded (call load_model() later).
-            inference_framework: Inference framework to use (only "onnx" supported).
         """
-        if inference_framework != "onnx":
-            raise ValueError(f"Unsupported inference framework: {inference_framework}")
 
         # Load bundled feature extraction models
         mel_path = get_mel_model_path()
