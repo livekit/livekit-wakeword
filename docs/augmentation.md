@@ -49,18 +49,6 @@ Applied via the `audiomentations` library to individual clips:
 | `SevenBandParametricEQ` | 0.25 | 7-band parametric equalizer |
 | `TanhDistortion` | 0.25 | Tanh-based distortion |
 
-### Batch Augmentations
-
-Applied via `torch_audiomentations` on batches of audio tensors:
-
-| Transform | Parameters | Probability |
-|-----------|-----------|-------------|
-| `PitchShift` | -3 to +3 semitones | 0.25 |
-| `BandStopFilter` | Notch filter | 0.25 |
-| `AddColoredNoise` | Colored noise injection | 0.25 |
-| `AddBackgroundNoise` | SNR: -10 to 15 dB | 0.75 (if background files exist) |
-| `Gain` | max 0.0 dB | 1.0 (normalization, always applied) |
-
 ### RIR Convolution
 
 `apply_rir(audio, p=0.5)` convolves audio with a randomly selected room impulse response using FFT convolution (`scipy.signal.fftconvolve`). The RIR is normalized by its maximum absolute value before convolution. Output is cropped to the original audio length.

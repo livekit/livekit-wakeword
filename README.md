@@ -115,7 +115,7 @@ Or run stages individually:
 
 ```bash
 uv run livekit-wakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
-uv run livekit-wakeword augment configs/hey_livekit.yaml   # Add noise, reverb, pitch shifts
+uv run livekit-wakeword augment configs/hey_livekit.yaml   # Augment + extract features
 uv run livekit-wakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
 uv run livekit-wakeword export configs/hey_livekit.yaml    # Export to ONNX
 ```
@@ -132,7 +132,7 @@ target_phrases:
 n_samples: 10000 # training samples per class
 model:
   model_type: dnn # dnn or rnn
-  model_size: medium # tiny, small, medium, large
+  model_size: small # tiny, small, medium, large
 steps: 50000
 target_fp_per_hour: 0.2
 ```
@@ -155,6 +155,7 @@ from livekit.wakeword import (
     load_config,
     run_generate,
     run_augment,
+    run_extraction,
     run_train,
     run_export,
 )
@@ -171,10 +172,11 @@ config = WakeWordConfig(
 )
 
 # Run individual stages
-run_generate(config)   # TTS synthesis + adversarial negatives
-run_augment(config)    # Augment + feature extraction
-run_train(config)      # 3-phase adaptive training
-run_export(config)     # Export to ONNX
+run_generate(config)     # TTS synthesis + adversarial negatives
+run_augment(config)      # Add noise, reverb, pitch shifts
+run_extraction(config)   # Extract mel spectrograms + speech embeddings → .npy
+run_train(config)        # 3-phase adaptive training
+run_export(config)       # Export to ONNX
 ```
 
 This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.

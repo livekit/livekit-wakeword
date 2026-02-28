@@ -200,7 +200,7 @@ Left-padding places zeros at the **beginning** of the sequence, so the real audi
 
 Each `.npy` file contains a float32 array of shape `(N_clips, 16, 96)`.
 
-Processing is batched (default `batch_size=32`) for efficiency. Audio files are read via `soundfile`, converted to float32, and reduced to mono if stereo.
+Audio files are read via `soundfile`, converted to float32, reduced to mono if stereo, and processed one clip at a time.
 
 ## Memory-Mapped Dataset
 

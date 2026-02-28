@@ -32,7 +32,7 @@ uv run livekit-wakeword generate <config> # VITS TTS + SLERP speaker blending + 
 uv run livekit-wakeword augment <config>  # Augment + extract features → .npy
 uv run livekit-wakeword train <config>    # 3-phase adaptive training
 uv run livekit-wakeword export <config>   # Export classifier to ONNX
-uv run livekit-wakeword run <config>      # Full pipeline (generate→augment→train→export)
+uv run livekit-wakeword run <config>      # Full pipeline (generate→augment→extract→train→export)
 ```
 
 ## Architecture
@@ -45,7 +45,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 
 ### Source Layout (`src/livekit/wakeword/`)
 
-- **`config.py`** — Pydantic models + YAML loading (`WakeWordConfig.load_config()`)
+- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`)
 - **`cli.py`** — Typer CLI with all commands
 - **`models/`**
   - `feature_extractor.py` — `MelSpectrogramFrontend` (ONNX primary, torchaudio fallback) and `SpeechEmbedding` (ONNX only)
@@ -73,7 +73,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 - **Model sizes** (tiny/small/medium/large) map to `layer_dim` and `n_blocks` in config. Factory: `build_classifier(model_type, model_size)`.
 - **Training loss**: BCE with hard example mining (only non-trivial predictions contribute) and linearly increasing negative class weight.
 - **Checkpoint averaging**: final model averages top checkpoints by 90th-pct accuracy and 10th-pct FPPH.
-- **Config format**: YAML loaded via `WakeWordConfig.load_config(path)`. See `configs/hey_livekit.yaml` for reference.
+- **Config format**: YAML loaded via `load_config(path)`. See `configs/hey_livekit.yaml` for reference.
 
 ## Documentation
 

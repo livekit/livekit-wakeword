@@ -52,7 +52,7 @@ The Cartesian product of `slerp_weights`, `length_scales`, `noise_scales`, and `
 
 ### TTS Model
 
-The `en-us-libritts-high.pt` VITS checkpoint (~255 MB) and its `.json` config are downloaded during `livekit-wakeword setup` to `data/piper/`. If the model is missing or generation fails, 1-second silence placeholders are written and a warning is logged.
+The `en-us-libritts-high.pt` VITS checkpoint (~166 MB) and its `.json` config are downloaded during `livekit-wakeword setup` to `data/piper/`. If the model is missing or generation fails, 1-second silence placeholders are written and a warning is logged.
 
 ### Default Sample Counts
 
@@ -75,13 +75,13 @@ The `en-us-libritts-high.pt` VITS checkpoint (~255 MB) and its `.json` config ar
    - Look up the phoneme sequence for each word
    - For each phoneme, try substituting it with similar phonemes from `SIMILAR_PHONEMES`
    - Look up words matching the substituted phoneme sequence (up to 3 per substitution)
-   - Generate partial phrases (one word removed at a time) with probability `include_partial_phrase` (default: 1.0)
+   - With probability `include_partial_phrase` (default: 1.0), generate all partial phrases (each word removed in turn)
    - Include individual words with probability `include_input_words` (default: 0.2)
 4. Deduplicate, shuffle, and limit to `n_phrases` (default: 200)
 
 ### SIMILAR_PHONEMES Map
 
-The `SIMILAR_PHONEMES` dictionary maps 43 ARPAbet phonemes to phonetically similar alternatives. Examples:
+The `SIMILAR_PHONEMES` dictionary maps 39 ARPAbet phonemes to phonetically similar alternatives. Examples:
 
 | Phoneme | Similar |
 |---------|---------|
