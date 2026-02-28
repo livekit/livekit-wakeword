@@ -2,7 +2,7 @@
 
 Feature extraction converts augmented audio clips into fixed-size embedding arrays using two frozen ONNX models: a mel-spectrogram frontend and a speech-embedding CNN.
 
-**Source:** `src/livewakeword/data/features.py`, `src/livewakeword/models/feature_extractor.py`
+**Source:** `src/livekit/wakeword/data/features.py`, `src/livekit/wakeword/models/feature_extractor.py`
 
 ## Overview
 
@@ -25,7 +25,7 @@ Save as .npy
 
 ## MelSpectrogramFrontend
 
-**Source:** `src/livewakeword/models/feature_extractor.py`
+**Source:** `src/livekit/wakeword/models/feature_extractor.py`
 **ONNX model:** `melspectrogram.onnx` (from openWakeWord)
 
 Converts raw audio to normalized mel-spectrogram features.
@@ -95,7 +95,7 @@ If the ONNX model file is not found, `MelSpectrogramFrontend` falls back to `tor
 
 ## SpeechEmbedding
 
-**Source:** `src/livewakeword/models/feature_extractor.py`
+**Source:** `src/livekit/wakeword/models/feature_extractor.py`
 **ONNX model:** `embedding_model.onnx` (Google speech_embedding)
 
 Converts mel-spectrogram windows into 96-dimensional embedding vectors.
@@ -204,7 +204,7 @@ Processing is batched (default `batch_size=32`) for efficiency. Audio files are 
 
 ## Memory-Mapped Dataset
 
-**Source:** `src/livewakeword/data/dataset.py`
+**Source:** `src/livekit/wakeword/data/dataset.py`
 
 The training pipeline loads `.npy` features via memory mapping for efficient access without loading entire arrays into memory.
 

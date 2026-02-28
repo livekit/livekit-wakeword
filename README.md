@@ -2,7 +2,7 @@
   <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
 </a>
 
-# livewakeword
+# livekit-wakeword
 
 An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training — generate synthetic data, augment, train, and export from a single YAML config.
 
@@ -24,15 +24,15 @@ An open-source wake word library for creating voice-enabled applications. Based 
 **Installation:**
 
 ```bash
-pip install git+https://github.com/livekit/livewakeword.git
+pip install git+https://github.com/livekit/livekit-wakeword.git
 # or
-uv add git+https://github.com/livekit/livewakeword
+uv add git+https://github.com/livekit/livekit-wakeword
 ```
 
 **Basic inference:**
 
 ```python
-from livewakeword import Model
+from livekit.wakeword import Model
 
 model = Model(wakeword_models=["hey_livekit.onnx"])
 
@@ -46,7 +46,7 @@ if scores["hey_livekit"] > 0.5:
 
 ```python
 import asyncio
-from livewakeword import Model, Listener
+from livekit.wakeword import Model, Listener
 
 model = Model(wakeword_models=["hey_livekit.onnx"])
 
@@ -68,8 +68,8 @@ asyncio.run(main())
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and install
-git clone https://github.com/livekit/livewakeword
-cd livewakeword
+git clone https://github.com/livekit/livekit-wakeword
+cd livekit-wakeword
 uv sync --all-extras
 ```
 
@@ -86,22 +86,22 @@ sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
 **Download models and data:**
 
 ```bash
-uv run livewakeword setup
+uv run livekit-wakeword setup
 ```
 
 **Train a wake word:**
 
 ```bash
-uv run livewakeword run configs/hey_livekit.yaml
+uv run livekit-wakeword run configs/hey_livekit.yaml
 ```
 
 Or run stages individually:
 
 ```bash
-uv run livewakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
-uv run livewakeword augment configs/hey_livekit.yaml   # Add noise, reverb, pitch shifts
-uv run livewakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
-uv run livewakeword export configs/hey_livekit.yaml    # Export to ONNX
+uv run livekit-wakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
+uv run livekit-wakeword augment configs/hey_livekit.yaml   # Add noise, reverb, pitch shifts
+uv run livekit-wakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
+uv run livekit-wakeword export configs/hey_livekit.yaml    # Export to ONNX
 ```
 
 **Config:**

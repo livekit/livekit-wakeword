@@ -2,8 +2,8 @@
 
 The augmentation stage applies realistic audio transformations to synthetic TTS clips, aligns them within detection windows, and extracts ONNX features into `.npy` files.
 
-**Source:** `src/livewakeword/data/augment.py`
-**CLI:** `livewakeword augment <config>`
+**Source:** `src/livekit/wakeword/data/augment.py`
+**CLI:** `livekit-wakeword augment <config>`
 
 ## Overview
 

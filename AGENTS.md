@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-livewakeword — wake word detection library using frozen ONNX feature extraction with trainable PyTorch classifiers. Hybrid architecture: ONNX mel spectrogram + speech embedding → PyTorch DNN/RNN classifier head.
+livekit-wakeword — wake word detection library using frozen ONNX feature extraction with trainable PyTorch classifiers. Hybrid architecture: ONNX mel spectrogram + speech embedding → PyTorch DNN/RNN classifier head.
 
 ## Commands
 
@@ -19,20 +19,20 @@ uv sync --group dev                  # Dev only
 uv run pytest tests/                 # All 32 tests
 uv run pytest tests/test_config.py   # Single file
 uv run pytest -k "test_name"         # Single test
-uv run pytest --cov=src/livewakeword tests/  # With coverage
+uv run pytest --cov=src/livekit/wakeword tests/  # With coverage
 
 # Lint & format
 uv run ruff check src/ tests/       # Lint (rules: E, F, I, UP)
 uv run ruff format src/ tests/      # Auto-format
-uv run mypy src/livewakeword/       # Type check (strict mode)
+uv run mypy src/livekit/wakeword/       # Type check (strict mode)
 
-# CLI (entry point: livewakeword = livewakeword.cli:app)
-uv run livewakeword setup            # Download frozen ONNX models + VITS TTS checkpoint
-uv run livewakeword generate <config> # VITS TTS + SLERP speaker blending + adversarial negatives
-uv run livewakeword augment <config>  # Augment + extract features → .npy
-uv run livewakeword train <config>    # 3-phase adaptive training
-uv run livewakeword export <config>   # Export classifier to ONNX
-uv run livewakeword run <config>      # Full pipeline (generate→augment→train→export)
+# CLI (entry point: livekit-wakeword = livekit.wakeword.cli:app)
+uv run livekit-wakeword setup            # Download frozen ONNX models + VITS TTS checkpoint
+uv run livekit-wakeword generate <config> # VITS TTS + SLERP speaker blending + adversarial negatives
+uv run livekit-wakeword augment <config>  # Augment + extract features → .npy
+uv run livekit-wakeword train <config>    # 3-phase adaptive training
+uv run livekit-wakeword export <config>   # Export classifier to ONNX
+uv run livekit-wakeword run <config>      # Full pipeline (generate→augment→train→export)
 ```
 
 ## Architecture
@@ -43,7 +43,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
                     n_fft=512, hop=160, n_mels=32     76×32×1 → 96-dim         16×96 → 1 score
 ```
 
-### Source Layout (`src/livewakeword/`)
+### Source Layout (`src/livekit/wakeword/`)
 
 - **`config.py`** — Pydantic models + YAML loading (`WakeWordConfig.load_config()`)
 - **`cli.py`** — Typer CLI with all commands
@@ -68,7 +68,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 
 ### Key Design Decisions
 
-- **Feature extraction is numpy-based** (ONNX runtime), not torch tensors. Both frozen models (`melspectrogram.onnx`, `embedding_model.onnx`) are downloaded via `livewakeword setup` to `data/models/`.
+- **Feature extraction is numpy-based** (ONNX runtime), not torch tensors. Both frozen models (`melspectrogram.onnx`, `embedding_model.onnx`) are downloaded via `livekit-wakeword setup` to `data/models/`.
 - **Embedding shape**: always `(batch, 16, 96)` — 16 timesteps of 96-dim vectors. Last 16 steps taken or left-padded.
 - **Model sizes** (tiny/small/medium/large) map to `layer_dim` and `n_blocks` in config. Factory: `build_classifier(model_type, model_size)`.
 - **Training loss**: BCE with hard example mining (only non-trivial predictions contribute) and linearly increasing negative class weight.
@@ -90,4 +90,4 @@ For detailed documentation on each pipeline stage, see `docs/`:
 
 - Python 3.11+, line length 100
 - Ruff for linting/formatting, mypy strict mode
-- Build system: hatchling, src layout (`src/livewakeword/`)
+- Build system: hatchling, src layout (`src/livekit/wakeword/`)

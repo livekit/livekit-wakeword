@@ -2,8 +2,8 @@
 
 The training stage uses a 3-phase adaptive approach with hard example mining, linearly increasing negative weights, and checkpoint averaging.
 
-**Source:** `src/livewakeword/training/trainer.py`, `src/livewakeword/training/metrics.py`
-**CLI:** `livewakeword train <config>`
+**Source:** `src/livekit/wakeword/training/trainer.py`, `src/livekit/wakeword/training/metrics.py`
+**CLI:** `livekit-wakeword train <config>`
 
 ## Overview
 
@@ -124,7 +124,7 @@ Negative samples are weighted by the current negative weight schedule value. Pos
 
 ### Metrics
 
-**Source:** `src/livewakeword/training/metrics.py`
+**Source:** `src/livekit/wakeword/training/metrics.py`
 
 | Metric | Function | Description |
 |--------|----------|-------------|

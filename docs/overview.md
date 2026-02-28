@@ -1,6 +1,6 @@
 # Architecture Overview
 
-livewakeword uses a hybrid ONNX + PyTorch architecture. Two frozen ONNX models handle feature extraction (mel spectrogram and speech embeddings), while a lightweight PyTorch classifier head is trained per wake word.
+livekit-wakeword uses a hybrid ONNX + PyTorch architecture. Two frozen ONNX models handle feature extraction (mel spectrogram and speech embeddings), while a lightweight PyTorch classifier head is trained per wake word.
 
 ## System Architecture
 
@@ -52,7 +52,7 @@ The embedding model uses a 5-block CNN with separable convolutions (1x3 + 3x1), 
 ## Module Map
 
 ```
-src/livewakeword/
+src/livekit/wakeword/
 ├── config.py                    Pydantic config models + YAML loading
 ├── cli.py                       Typer CLI (setup, generate, augment, train, export, run)
 ├── models/
