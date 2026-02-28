@@ -46,14 +46,9 @@ class TestMelSpectrogramFrontendFallback:
         mel2 = frontend(audio)
         np.testing.assert_allclose(mel1, mel2)
 
-    def test_uses_onnx_flag(self):
-        frontend = MelSpectrogramFrontend(onnx_path=None)
-        assert not frontend.uses_onnx
-
     def test_nonexistent_onnx_falls_back(self, tmp_path):
         """Non-existent ONNX path should fall back to torchaudio."""
         frontend = MelSpectrogramFrontend(onnx_path=tmp_path / "nonexistent.onnx")
-        assert not frontend.uses_onnx
         audio = np.random.randn(1, 16000).astype(np.float32)
         mel = frontend(audio)
         assert mel.shape[2] == 32

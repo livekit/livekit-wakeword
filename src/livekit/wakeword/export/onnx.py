@@ -10,7 +10,6 @@ import torch
 
 from ..config import WakeWordConfig
 from ..models.pipeline import WakeWordClassifier
-from ..resources import get_embedding_model_path, get_mel_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -57,44 +56,6 @@ def export_classifier(
 
     logger.info(f"Exported classifier ONNX to {output_path}")
     return output_path
-
-
-def export_full_pipeline(
-    config: WakeWordConfig,
-    model_path: Path,
-    output_path: Path,
-    opset_version: int = 18,
-) -> Path:
-    """Export classifier ONNX alongside the frozen mel/embedding ONNX models.
-
-    The full pipeline (waveform → score) cannot be a single ONNX graph because
-    the mel-spectrogram and speech-embedding stages are already separate ONNX
-    models (melspectrogram.onnx, embedding_model.onnx). This function exports
-    the classifier head and copies the frozen models into the output directory
-    so that all three ONNX files are co-located for deployment.
-
-    Output directory will contain:
-        - <model_name>.onnx (classifier: embeddings → score)
-        - melspectrogram.onnx (copy from data/models/)
-        - embedding_model.onnx (copy from data/models/)
-    """
-    import shutil
-
-    # Export the classifier head
-    classifier_path = export_classifier(config, model_path, output_path, opset_version)
-
-    # Copy frozen ONNX models alongside the classifier
-    out_dir = output_path.parent
-    for src in [get_mel_model_path(), get_embedding_model_path()]:
-        dst = out_dir / src.name
-        if src.exists() and src != dst:
-            shutil.copy2(src, dst)
-            logger.info(f"Copied {src.name} to {out_dir}")
-        elif not src.exists():
-            logger.warning(f"Bundled model not found: {src}")
-
-    logger.info(f"Exported full pipeline (3 ONNX files) to {out_dir}")
-    return classifier_path
 
 
 def quantize_onnx(input_path: Path, output_path: Path | None = None) -> Path:

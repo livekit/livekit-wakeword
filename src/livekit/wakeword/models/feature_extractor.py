@@ -18,11 +18,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Default ONNX model filenames (relative to data_dir/models/)
-MEL_ONNX_FILENAME = "melspectrogram.onnx"
-EMBEDDING_ONNX_FILENAME = "embedding_model.onnx"
-
-
 class MelSpectrogramFrontend:
     """Stage 1: Raw audio → mel-spectrogram features.
 
@@ -76,10 +71,6 @@ class MelSpectrogramFrontend:
         )
         self._amplitude_to_db = T.AmplitudeToDB(stype="power", top_db=80.0)
         logger.info("Using torchaudio mel fallback (close but not exact match to ONNX)")
-
-    @property
-    def uses_onnx(self) -> bool:
-        return self._onnx_session is not None
 
     def __call__(self, audio: np.ndarray) -> np.ndarray:
         """Compute mel spectrogram features.

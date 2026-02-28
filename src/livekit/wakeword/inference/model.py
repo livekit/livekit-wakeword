@@ -103,11 +103,6 @@ class WakeWordModel:
         self._last_scores[model_name] = 0.0
         logger.info(f"Loaded wake word model '{model_name}' from {model_path}")
 
-    @property
-    def model_names(self) -> list[str]:
-        """Return list of loaded model names."""
-        return list(self._classifiers.keys())
-
     def predict(self, audio_frame: np.ndarray) -> dict[str, float]:
         """Get wake word predictions for an audio frame.
 

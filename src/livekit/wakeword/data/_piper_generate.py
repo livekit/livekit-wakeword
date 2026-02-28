@@ -36,11 +36,6 @@ from ._vits_utils import audio_float_to_int16, generate_path, sequence_mask, sle
 logger = logging.getLogger(__name__)
 
 
-def _get_device() -> torch.device:
-    """Select the best available device."""
-    return get_device()
-
-
 def _to_device(tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
     return tensor.to(device)
 
@@ -131,7 +126,7 @@ def generate_samples(
     # Validate espeak-ng is available before doing anything expensive
     _find_espeak_ng()
 
-    device = _get_device()
+    device = get_device()
 
     logger.debug("Loading VITS model from %s", model)
     model_path = Path(model)

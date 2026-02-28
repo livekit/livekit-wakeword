@@ -8,6 +8,8 @@ from pathlib import Path
 import typer
 from rich.logging import RichHandler
 
+from .config import load_config
+
 app = typer.Typer(
     name="livekit-wakeword",
     help="Simplified pure-PyTorch wake word detection.",
@@ -22,12 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger("livekit.wakeword")
 
 
-def _load_config(config_path: str) -> "WakeWordConfig":  # noqa: F821
-    from .config import load_config
-
-    return load_config(config_path)
-
-
 @app.command()
 def setup(
     data_dir: str = typer.Option("./data", help="Root data directory"),
@@ -36,8 +32,6 @@ def setup(
     ),
 ) -> None:
     """Download external dependencies: VITS TTS model, ACAV100M features, RIRs, backgrounds."""
-    from pathlib import Path
-
     data_path = Path(data_dir)
     data_path.mkdir(parents=True, exist_ok=True)
 
@@ -229,7 +223,7 @@ def generate(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
     """Generate synthetic speech clips (positive + adversarial negative)."""
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     logger.info(f"Generating data for '{config.model_name}'...")
     logger.info(f"Target phrases: {config.target_phrases}")
@@ -245,7 +239,7 @@ def augment(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
     """Augment clips and extract features through frozen pipeline."""
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     logger.info(f"Augmenting data for '{config.model_name}'...")
 
@@ -260,7 +254,7 @@ def train(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
     """Train classifier on extracted features (3-phase adaptive training)."""
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     logger.info(f"Training '{config.model_name}' model...")
     logger.info(f"Model: {config.model.model_type.value} ({config.model.model_size.value})")
@@ -278,7 +272,7 @@ def export(
     quantize: bool = typer.Option(False, "--quantize", help="Apply INT8 quantization"),
 ) -> None:
     """Export trained model to ONNX (optionally quantize for embedded)."""
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     logger.info(f"Exporting '{config.model_name}' to ONNX...")
 
@@ -293,7 +287,7 @@ def run(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
     """Run entire pipeline end-to-end: generate → augment → train → export."""
-    config = _load_config(config_path)
+    config = load_config(config_path)
 
     logger.info(f"Running full pipeline for '{config.model_name}'...")
 
