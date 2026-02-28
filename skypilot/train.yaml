@@ -1,4 +1,4 @@
-name: livewakeword-train-hey-livekit
+name: livekit-wakeword-train-hey-livekit
 
 resources:
   cloud: nebius
@@ -19,11 +19,11 @@ setup: |
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.cargo/bin:$PATH"
   uv sync --extra train --extra export
-  uv run livewakeword setup
+  uv run livekit-wakeword setup
 
 run: |
   export PATH="$HOME/.cargo/bin:$PATH"
-  uv run livewakeword run configs/${CONFIG_FILE}
+  uv run livekit-wakeword run configs/${CONFIG_FILE}
   cp -r output/${MODEL_NAME}/* /outputs/${MODEL_NAME}/
 
 envs:
