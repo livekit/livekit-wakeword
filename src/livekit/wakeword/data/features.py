@@ -69,7 +69,7 @@ def extract_features_from_directory(
     return np.stack(all_features, axis=0)  # (N_clips, 16, 96)
 
 
-def extract_features_for_config(config: WakeWordConfig) -> None:
+def run_extraction(config: WakeWordConfig) -> None:
     """Extract and save features for all splits of a wake word config."""
     mel_frontend = MelSpectrogramFrontend(
         onnx_path=get_mel_model_path(),

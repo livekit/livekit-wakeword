@@ -10,7 +10,6 @@ import numpy as np
 import torch
 
 from ..config import WakeWordConfig
-from .features import extract_features_for_config
 
 logger = logging.getLogger(__name__)
 
@@ -177,10 +176,7 @@ def align_clip_to_end(
 
 
 def run_augment(config: WakeWordConfig) -> None:
-    """Run augmentation pipeline on generated clips.
-
-    Augments clips and then extracts features through the frozen pipeline.
-    """
+    """Run augmentation pipeline on generated clips."""
     target_duration = config.augmentation.clip_duration
 
     model_dir = config.model_output_dir
@@ -203,10 +199,6 @@ def run_augment(config: WakeWordConfig) -> None:
                 round_idx=round_idx,
                 target_duration_s=target_duration,
             )
-
-    # Extract features through frozen pipeline
-    logger.info("Extracting features through frozen embedding pipeline...")
-    extract_features_for_config(config)
 
 
 def _augment_directory(

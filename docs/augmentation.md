@@ -1,6 +1,6 @@
 # Augmentation Pipeline
 
-The augmentation stage applies realistic audio transformations to synthetic TTS clips, aligns them within detection windows, and extracts ONNX features into `.npy` files.
+The augmentation stage applies realistic audio transformations to synthetic TTS clips and aligns them within detection windows.
 
 **Source:** `src/livekit/wakeword/data/augment.py`
 **CLI:** `livekit-wakeword augment <config>`
@@ -22,9 +22,6 @@ Generated .wav clips
     ├──► Alignment
     │    Positive: end-of-window
     │    Negative: center-padded
-    │
-    └──► Feature extraction (ONNX)
-         Mel → embedding → .npy
 ```
 
 ## AudioAugmentor
@@ -113,22 +110,16 @@ For each WAV file in a directory:
 5. Align to window (end-aligned for positives, center-padded for negatives)
 6. Write back to the same file path
 
-## Feature Extraction
-
-After augmentation, `extract_features_for_config()` is called automatically to extract ONNX features from all four splits. See [Feature Extraction](feature-extraction.md) for details.
-
 ## Output
 
-After augmentation and feature extraction:
+After augmentation:
 
 ```
 output/<model_name>/
 ├── positive_train/                 # Augmented .wav files
 ├── positive_test/
 ├── negative_train/
-├── negative_test/
-├── positive_features_train.npy     # (N, 16, 96) float32
-├── positive_features_test.npy
-├── negative_features_train.npy
-└── negative_features_test.npy
+└── negative_test/
 ```
+
+Feature extraction is a separate step — see [Feature Extraction](feature-extraction.md).

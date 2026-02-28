@@ -189,7 +189,7 @@ Left-padding places zeros at the **beginning** of the sequence, so the real audi
 
 ## Feature Extraction for Training
 
-`extract_features_for_config(config)` processes all four data splits:
+`run_extraction(config)` processes all four data splits:
 
 | Clip Directory    | Output File                   |
 | ----------------- | ----------------------------- |

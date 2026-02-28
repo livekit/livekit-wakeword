@@ -2,6 +2,7 @@
 
 from .config import WakeWordConfig, load_config
 from .data.augment import run_augment
+from .data.features import run_extraction
 from .data.generate import run_generate
 from .inference.listener import Detection, WakeWordListener
 from .inference.model import WakeWordModel
@@ -26,6 +27,7 @@ __all__ = [
     "load_config",
     "run_augment",
     "run_export",
+    "run_extraction",
     "run_generate",
     "run_train",
     "__version__",

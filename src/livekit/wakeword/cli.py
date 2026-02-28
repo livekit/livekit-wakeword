@@ -244,9 +244,14 @@ def augment(
     logger.info(f"Augmenting data for '{config.model_name}'...")
 
     from .data.augment import run_augment
+    from .data.features import run_extraction
 
     run_augment(config)
-    logger.info("Augmentation + feature extraction complete!")
+    logger.info("Augmentation complete!")
+
+    logger.info("Extracting features through frozen embedding pipeline...")
+    run_extraction(config)
+    logger.info("Feature extraction complete!")
 
 
 @app.command()
@@ -292,20 +297,24 @@ def run(
     logger.info(f"Running full pipeline for '{config.model_name}'...")
 
     from .data.augment import run_augment
+    from .data.features import run_extraction
     from .data.generate import run_generate
     from .export.onnx import run_export
     from .training.trainer import run_train
 
-    logger.info("Step 1/4: Generate synthetic data")
+    logger.info("Step 1/5: Generate synthetic data")
     run_generate(config)
 
-    logger.info("Step 2/4: Augment + extract features")
+    logger.info("Step 2/5: Augment clips")
     run_augment(config)
 
-    logger.info("Step 3/4: Train classifier")
+    logger.info("Step 3/5: Extract features")
+    run_extraction(config)
+
+    logger.info("Step 4/5: Train classifier")
     run_train(config)
 
-    logger.info("Step 4/4: Export to ONNX")
+    logger.info("Step 5/5: Export to ONNX")
     run_export(config)
 
     logger.info("Full pipeline complete!")
