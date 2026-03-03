@@ -178,6 +178,7 @@ class WakeWordModel:
 
     def reset(self) -> None:
         """Reset internal audio buffers. Call when starting a new audio stream."""
+        logger.debug("Resetting audio and embedding buffers")
         self._audio_buffer = np.zeros(0, dtype=np.float32)
         self._mel_frame_count = 0
         self._embedding_buffer.clear()
