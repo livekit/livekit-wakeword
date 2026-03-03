@@ -10,11 +10,11 @@ target_phrases: ["hey livekit", "hey live kit"]
 
 # Training samples per class (positive + negative)
 # Suggestion: 5000-10000 for quick experiments, 20000+ for production
-n_samples: 10000
+n_samples: 25000
 
 # Validation samples per class
 # Suggestion: 10-20% of n_samples
-n_samples_val: 2000
+n_samples_val: 5000
 
 # VITS TTS batch size (higher = faster, but more VRAM)
 # Suggestion: 50 for 8GB GPU, 100+ for 16GB+
@@ -23,12 +23,26 @@ tts_batch_size: 50
 # Adversarial negatives — phonetically similar phrases that should NOT trigger
 # Suggestion: add words that sound like your wake word, common misheard phrases
 custom_negative_phrases:
+  # Bare wake word without prefix — most common false trigger
+  - "livekit"
+  - "live kit"
+  # Phonetically similar prefixes
   - "hey libby"
   - "hey livid"
   - "hey lidocaine"
+  - "hey liquid"
+  - "hey linux"
+  - "hey lyric"
+  # Partial/adjacent phrases
   - "play live"
   - "they live"
   - "hey look at"
+  - "hey look it"
+  - "a livekit"
+  - "the livekit"
+  - "use livekit"
+  - "say livekit"
+  - "okay livekit"
 
 # ============================================================================
 # Paths
@@ -57,7 +71,7 @@ augmentation:
 
   # Number of augmentation passes per sample
   # Suggestion: 1 for quick training, 2-3 for better generalization
-  rounds: 2
+  rounds: 3
 
   # Background noise directories (downloaded via `setup`)
   background_paths: [./data/backgrounds]
@@ -83,7 +97,7 @@ model:
 
 # Total training steps (phase 1)
 # Suggestion: 30000 for quick experiments, 50000-100000 for production
-steps: 50000
+steps: 100000
 
 # Base learning rate
 # Suggestion: 0.0001 works well for most cases
@@ -92,15 +106,15 @@ learning_rate: 0.0001
 # Max BCE weight for negative class (linearly increases during training)
 # Higher = fewer false positives, but may reduce recall
 # Suggestion: 1000-2000 for balanced, 3000+ for very low false positives
-max_negative_weight: 1500
+max_negative_weight: 3000
 
 # Target false positives per hour on validation set
 # Training stops early if this target is reached with good recall
 # Suggestion: 0.1-0.5 for production, 1.0+ for prototyping
-target_fp_per_hour: 0.2
+target_fp_per_hour: 0.1
 
 # Batch composition per training step
 batch_n_per_class:
-  positive: 50              # wake word samples
-  adversarial_negative: 50  # phonetically similar non-wake-words
-  ACAV100M_sample: 1024     # random speech from ACAV100M dataset
+  positive: 50 # wake word samples
+  adversarial_negative: 50 # phonetically similar non-wake-words
+  ACAV100M_sample: 1024 # random speech from ACAV100M dataset
