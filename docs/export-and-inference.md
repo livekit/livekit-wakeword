@@ -42,15 +42,15 @@ livekit-wakeword export configs/hey_jarvis.yaml --quantize
 
 ### WakeWordModel
 
-The `WakeWordModel` class provides a simple prediction API for wake word detection.
+The `WakeWordModel` class is a stateless prediction API for wake word detection. Pass a complete audio window (~2 seconds) and receive confidence scores.
 
 ```python
 from livekit.wakeword import WakeWordModel
 
 model = WakeWordModel(models=["hey_livekit.onnx"])
 
-# Feed audio frames (16kHz, int16 or float32)
-scores = model.predict(audio_frame)
+# Pass ~2 seconds of 16kHz audio
+scores = model.predict(audio_chunk)
 # Returns: {"hey_livekit": 0.95}
 ```
 
@@ -68,15 +68,14 @@ Feature extraction models (`melspectrogram.onnx`, `embedding_model.onnx`) are bu
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `predict(audio_frame)` | `dict[str, float]` | Scores for each loaded model (0-1) |
+| `predict(audio_chunk)` | `dict[str, float]` | Scores for each loaded model (0-1) |
 | `load_model(path, name)` | `None` | Load additional wake word model |
-| `reset()` | `None` | Clear internal buffers |
 
 #### Audio Input
 
 - **Format:** 16kHz mono, int16 or float32
-- **Frame size:** Multiples of 80ms (1280 samples) recommended
-- **Buffering:** Internal sliding window handles accumulation
+- **Chunk size:** ~2 seconds (32,000 samples) recommended — yields 16 embeddings for the classifier
+- **Stateless:** No internal audio buffering; the caller manages the audio window
 
 ### WakeWordListener
 

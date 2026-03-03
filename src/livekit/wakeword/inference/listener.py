@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
@@ -15,7 +16,10 @@ from .model import WakeWordModel
 logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
-FRAME_SAMPLES = 1280  # 80ms
+FRAME_SAMPLES = 1280  # 80ms per frame
+CHUNK_SECONDS = 2.0
+# Number of frames that fill a ~2-second chunk (25 × 80ms = 2000ms)
+CHUNK_FRAMES = int(CHUNK_SECONDS * SAMPLE_RATE / FRAME_SAMPLES)
 
 
 @dataclass
@@ -29,6 +33,11 @@ class Detection:
 
 class WakeWordListener:
     """Async wake word listener that handles audio capture.
+
+    The listener owns the audio buffer and passes fixed ~2-second chunks
+    to the stateless ``WakeWordModel.predict()``.  After a detection the
+    loop pauses automatically and resumes when the consumer calls
+    ``wait_for_detection()`` again.
 
     Example:
         from livekit.wakeword import WakeWordModel, WakeWordListener
@@ -68,8 +77,7 @@ class WakeWordListener:
         # Error propagation: stored exception from _audio_loop crash
         self._error: BaseException | None = None
 
-        # Single-thread executor serializes predict() and reset() calls,
-        # ensuring thread safety without locks on the model's mutable state.
+        # Single-thread executor keeps predict() off the event loop
         self._executor: concurrent.futures.ThreadPoolExecutor | None = None
 
         # Pause/resume control: cleared after detection, set when consumer
@@ -79,6 +87,9 @@ class WakeWordListener:
         # Signals when _audio_loop exits (success or crash) so
         # wait_for_detection() can raise instead of hanging forever.
         self._done_event = asyncio.Event()
+
+        # Sliding window of recent audio frames (listener owns the buffer)
+        self._frame_buffer: deque[np.ndarray] = deque(maxlen=CHUNK_FRAMES)
 
     async def __aenter__(self) -> WakeWordListener:
         """Start audio capture."""
@@ -96,6 +107,7 @@ class WakeWordListener:
         self._listening.set()
         self._done_event.clear()
         self._error = None
+        self._frame_buffer.clear()
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self._task = asyncio.create_task(self._audio_loop())
         return self
@@ -152,12 +164,18 @@ class WakeWordListener:
                     break
 
                 frame = np.frombuffer(data, dtype=np.int16)
+                self._frame_buffer.append(frame)
 
-                # Run inference in executor to not block event loop (CPU-bound)
+                # Wait until the buffer has enough audio for the model
+                if len(self._frame_buffer) < CHUNK_FRAMES:
+                    continue
+
+                # Build the audio chunk and run inference in executor
+                chunk = np.concatenate(list(self._frame_buffer))
                 scores = await loop.run_in_executor(
                     self._executor,
                     self._model.predict,
-                    frame,
+                    chunk,
                 )
                 if not self._running:
                     break
@@ -169,14 +187,11 @@ class WakeWordListener:
                         if now - self._last_detection_time >= self._debounce:
                             self._last_detection_time = now
 
-                            # Pause the loop so no audio is processed while
-                            # the consumer handles the detection
+                            # Pause the loop and clear the buffer so no stale
+                            # audio is processed while the consumer handles
+                            # the detection.
                             self._listening.clear()
-
-                            # Reset model buffers to clear stale wake word data
-                            await loop.run_in_executor(
-                                self._executor, self._model.reset
-                            )
+                            self._frame_buffer.clear()
 
                             await self._detection_queue.put(
                                 Detection(
