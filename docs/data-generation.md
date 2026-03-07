@@ -85,30 +85,20 @@ Generated audio is silence-trimmed via WebRTC VAD. If the VAD strips too aggress
 ### Algorithm
 
 1. Load the CMU Pronouncing Dictionary via NLTK
-2. Build a reverse phoneme index: phoneme sequence → list of words
-3. For each target phrase:
+2. For each target phrase:
    - **Expand unknown words:** Words not in CMUDict are split into known subwords (e.g., `"livekit"` → `["live", "kit"]`). The split tries all positions and prefers the longest left match. This enables phoneme substitutions on made-up/compound words that CMUDict doesn't contain.
-   - Look up the phoneme sequence for each word (after expansion)
-   - For each phoneme, try substituting it with similar phonemes from `SIMILAR_PHONEMES`
-   - Look up words matching the substituted phoneme sequence (up to 3 per substitution)
+   - Get the phoneme sequence for each word (with regex stress wildcards on vowels)
+   - Generate regex patterns by replacing 1 to `max_replace` phonemes (default: `len(phones) - 2`) with a wildcard `(.){1,3}`
+   - Search CMUDict with each regex pattern via `pronouncing.search()` to find phonetically similar words
+   - Exclude homophones (same pronunciation = not adversarial)
    - With probability `include_partial_phrase` (default: 1.0), generate all partial phrases (each word removed in turn)
    - Include individual words with probability `include_input_words` (default: 0.2)
-4. **Remove exact target phrases** from the adversarial list (safety filter)
-5. Deduplicate, shuffle, and limit to `n_phrases` (default: 200)
+3. **Remove exact target phrases** from the adversarial list (safety filter)
+4. Deduplicate and shuffle. When `n_phrases` is `None` (default), all unique phrases are returned with no cap.
 
-### SIMILAR_PHONEMES Map
+### Regex Phoneme Replacement
 
-The `SIMILAR_PHONEMES` dictionary maps 39 ARPAbet phonemes to phonetically similar alternatives. Examples:
-
-| Phoneme | Similar |
-|---------|---------|
-| AA | AH, AO, AE |
-| IY | IH, EY |
-| T | D, TH |
-| S | Z, SH |
-| K | G, T |
-
-This ensures adversarial phrases sound close to the target but are distinct words.
+For each word, phonemes are replaced with a broad regex wildcard `(.){1,3}` that matches any 1-3 phoneme characters. All combinations of 1 to `max_replace` replacement positions are tried, generating patterns that range from single-phoneme swaps (close neighbors) to multi-phoneme replacements (more distant matches). This is the same approach used by openWakeWord — broad enough to catch phonetically similar words without requiring a hand-curated substitution map.
 
 ### Custom Negatives
 

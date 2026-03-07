@@ -16,48 +16,12 @@ logger = logging.getLogger(__name__)
 # Matches original clips (clip_000000.wav) but NOT augmented variants (clip_000000_r1.wav)
 _ORIGINAL_CLIP_RE = re.compile(r"^clip_\d{6}\.wav$")
 
-# Phoneme substitution map for adversarial generation
-SIMILAR_PHONEMES: dict[str, list[str]] = {
-    "AA": ["AH", "AO", "AE"],
-    "AE": ["EH", "AA", "AH"],
-    "AH": ["AA", "AE", "ER"],
-    "AO": ["AA", "AH", "OW"],
-    "AW": ["OW", "AO"],
-    "AY": ["EY", "OY"],
-    "B": ["P", "D"],
-    "CH": ["SH", "JH"],
-    "D": ["T", "B", "G"],
-    "DH": ["TH", "Z"],
-    "EH": ["AE", "IH", "AH"],
-    "ER": ["AH", "R"],
-    "EY": ["AY", "EH"],
-    "F": ["V", "TH"],
-    "G": ["K", "D"],
-    "HH": [""],
-    "IH": ["EH", "IY", "AH"],
-    "IY": ["IH", "EY"],
-    "JH": ["CH", "ZH"],
-    "K": ["G", "T"],
-    "L": ["R", "W"],
-    "M": ["N", "NG"],
-    "N": ["M", "NG"],
-    "NG": ["N", "M"],
-    "OW": ["AO", "AW"],
-    "OY": ["AY", "OW"],
-    "P": ["B", "T"],
-    "R": ["L", "W"],
-    "S": ["Z", "SH"],
-    "SH": ["S", "CH", "ZH"],
-    "T": ["D", "K", "P"],
-    "TH": ["DH", "F"],
-    "UH": ["UW", "AH"],
-    "UW": ["UH", "OW"],
-    "V": ["F", "B"],
-    "W": ["L", "R"],
-    "Y": ["IY"],
-    "Z": ["S", "ZH"],
-    "ZH": ["SH", "Z"],
-}
+# ARPAbet vowel phonemes (used to add optional stress markers in regex patterns)
+_VOWEL_PHONES = frozenset([
+    "AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY",
+    "EH", "ER", "EY", "IH", "IX", "IY",
+    "OW", "OY", "UH", "UW", "UX",
+])
 
 
 def _get_cmudict() -> dict[str, list[str]]:
@@ -70,20 +34,6 @@ def _get_cmudict() -> dict[str, list[str]]:
     # cmudict.dict() returns {word: [pron1, pron2, ...]} where each pron is list[str]
     # Take the first pronunciation for each word
     return {word: prons[0] for word, prons in cmudict.dict().items()}
-
-
-def _build_reverse_phoneme_index(
-    cmu: dict[str, list[str]],
-) -> dict[str, list[str]]:
-    """Build index from phoneme tuple → list of words."""
-    from collections import defaultdict
-
-    index: dict[str, list[str]] = defaultdict(list)
-    for word, phones in cmu.items():
-        # Strip stress markers
-        stripped = tuple(p.rstrip("012") for p in phones)
-        index[" ".join(stripped)].append(word)
-    return dict(index)
 
 
 def _count_original_clips(directory: Path) -> int:
@@ -123,56 +73,126 @@ def _expand_unknown_words(
     return expanded
 
 
+def _phoneme_replacements(
+    phones: list[str],
+    max_replace: int | None = None,
+) -> list[str]:
+    """Generate regex patterns by replacing 1..max_replace phonemes with a wildcard.
+
+    Each replaced position becomes ``(.){1,3}`` which matches any 1-3
+    phoneme characters in the CMU pronunciation string.  This is the same
+    approach used by openWakeWord — broad enough to catch phonetically
+    similar words that wouldn't be found via a hand-curated substitution map.
+    """
+    from itertools import combinations
+
+    if max_replace is None:
+        max_replace = max(0, len(phones) - 2)
+    max_replace = min(max_replace, len(phones))
+
+    wildcard = "(.){1,3}"
+    results: list[str] = []
+    for r in range(1, max_replace + 1):
+        for positions in combinations(range(len(phones)), r):
+            parts = phones.copy()
+            for pos in positions:
+                parts[pos] = wildcard
+            results.append(" ".join(parts))
+    return results
+
+
+def _get_word_phonemes(word: str) -> list[str]:
+    """Get stress-stripped phonemes for a word, with all stress variants on vowels.
+
+    Returns phoneme strings with regex stress wildcards (e.g. ``"AA[0|1|2]"``)
+    so that ``pronouncing.search()`` matches any stress variant.
+    """
+    import pronouncing
+
+    raw = pronouncing.phones_for_word(word)
+    if not raw:
+        return []
+    # Strip existing stress, then add optional stress for vowels
+    phones = [re.sub(r"\d+", "", p) for p in raw[0].split()]
+    return [
+        p + "[0|1|2]" if p in _VOWEL_PHONES else p
+        for p in phones
+    ]
+
+
 def generate_adversarial_phrases(
     target_phrases: list[str],
-    n_phrases: int = 200,
+    n_phrases: int | None = None,
     include_partial_phrase: float = 1.0,
     include_input_words: float = 0.2,
+    max_replace: int | None = None,
 ) -> list[str]:
-    """Generate phonetically similar phrases to the target using CMUDict.
+    """Generate phonetically similar phrases to the target using CMUDict regex search.
 
-    For each word in target phrases, find words with similar phonemes and
-    combine them to create adversarial negative phrases. Unknown words
-    (not in CMUDict) are split into known subwords when possible, e.g.
-    "livekit" → "live" + "kit", allowing substitutions on both parts.
+    For each word in the target phrase, generates regex patterns by replacing
+    1 to ``max_replace`` phonemes with a broad wildcard, then searches CMUDict
+    for matching words.  This catches both close and moderately-distant phonetic
+    neighbors without requiring a hand-curated substitution map.
+
+    Unknown words (not in CMUDict) are split into known subwords when possible,
+    e.g. "livekit" → "live" + "kit", allowing substitutions on both parts.
+
+    When *n_phrases* is ``None`` (the default) all unique adversarial phrases
+    are returned — no cap is applied.
+
+    Args:
+        target_phrases: Target wake word phrases.
+        n_phrases: Maximum number of adversarial phrases to return
+            (``None`` = no cap).
+        include_partial_phrase: Probability of generating partial phrases
+            (each word removed in turn).
+        include_input_words: Probability of including individual original
+            words as adversarial entries.
+        max_replace: Maximum number of phonemes to replace per word
+            (``None`` = ``len(phones) - 2``).
     """
     import pronouncing
 
     cmu = _get_cmudict()
-    rev_index = _build_reverse_phoneme_index(cmu)
     adversarial: list[str] = []
 
     for phrase in target_phrases:
         raw_words = phrase.lower().split()
         words = _expand_unknown_words(raw_words, cmu)
 
-        # Get phonemes for each word
-        word_phonemes: list[list[str]] = []
-        for word in words:
-            phones = pronouncing.phones_for_word(word)
-            if phones:
-                word_phonemes.append([p.rstrip("012") for p in phones[0].split()])
-            else:
-                word_phonemes.append([])
+        # Get phonemes (with stress wildcards) for each word
+        word_phonemes = [_get_word_phonemes(w) for w in words]
 
         # Generate substitutions for each word position
         for word_idx, (word, phones) in enumerate(zip(words, word_phonemes)):
             if not phones:
                 continue
-            # Try substituting each phoneme
-            for phone_idx, phone in enumerate(phones):
-                subs = SIMILAR_PHONEMES.get(phone, [])
-                for sub in subs:
-                    if not sub:
-                        continue
-                    new_phones = phones.copy()
-                    new_phones[phone_idx] = sub
-                    key = " ".join(new_phones)
-                    if key in rev_index:
-                        for replacement in rev_index[key][:3]:
-                            new_words = words.copy()
-                            new_words[word_idx] = replacement
-                            adversarial.append(" ".join(new_words))
+
+            # Build regex patterns by replacing phonemes with wildcards
+            patterns = _phoneme_replacements(phones, max_replace)
+
+            # For short words (≤2 phonemes), also include the base pattern
+            if len(phones) <= 2:
+                patterns.append(" ".join(phones))
+
+            adversarial_words: list[str] = []
+            for pattern in patterns:
+                try:
+                    matches = pronouncing.search(pattern)
+                except re.error:
+                    continue
+                # Exclude homophones (same pronunciation = not adversarial)
+                for match in matches:
+                    if match.lower() != word:
+                        match_phones = pronouncing.phones_for_word(match)
+                        if match_phones and match_phones[0] != (pronouncing.phones_for_word(word) or [""])[0]:
+                            adversarial_words.append(match)
+
+            # Build adversarial phrases by replacing the current word
+            for replacement in adversarial_words:
+                new_words = words.copy()
+                new_words[word_idx] = replacement
+                adversarial.append(" ".join(new_words))
 
         # Partial phrase adversarials
         if (
@@ -191,11 +211,13 @@ def generate_adversarial_phrases(
                 if random.random() < include_input_words:
                     adversarial.append(word)
 
-    # Deduplicate, remove the original target phrases, and limit
+    # Deduplicate and remove the original target phrases
     target_set = {p.lower() for p in target_phrases}
     adversarial = [p for p in set(adversarial) if p not in target_set]
     random.shuffle(adversarial)
-    return adversarial[:n_phrases]
+    if n_phrases is not None:
+        adversarial = adversarial[:n_phrases]
+    return adversarial
 
 
 def synthesize_clips(
