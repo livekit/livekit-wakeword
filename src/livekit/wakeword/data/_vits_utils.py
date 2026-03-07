@@ -58,18 +58,28 @@ def slerp(
     v2_norm = v2 / torch.norm(v2, dim=zdim, keepdim=True)
     dot = (v1_norm * v2_norm).sum(zdim)
 
-    if (torch.abs(dot) > dot_thr).any():
-        return (1 - t) * v1 + t * v2
+    # Clamp to avoid NaN from acos on values slightly outside [-1, 1]
+    dot = torch.clamp(dot, -1.0, 1.0)
+
+    # Per-element fallback: use linear interp only for near-parallel pairs,
+    # SLERP for the rest (previous code used .any() which made one
+    # near-parallel pair force the entire batch to linear interp)
+    linear_mask = torch.abs(dot) > dot_thr
 
     theta = torch.acos(dot)
     theta_t = theta * t
     sin_theta = torch.sin(theta)
     sin_theta_t = torch.sin(theta_t)
 
-    s1 = torch.sin(theta - theta_t) / sin_theta
-    s2 = sin_theta_t / sin_theta
+    # Safe division: linear_mask entries will be overwritten anyway
+    safe_sin = torch.where(linear_mask, torch.ones_like(sin_theta), sin_theta)
+    s1 = torch.sin(theta - theta_t) / safe_sin
+    s2 = sin_theta_t / safe_sin
 
-    return (s1.unsqueeze(zdim) * v1) + (s2.unsqueeze(zdim) * v2)
+    slerp_result = (s1.unsqueeze(zdim) * v1) + (s2.unsqueeze(zdim) * v2)
+    linear_result = (1 - t) * v1 + t * v2
+
+    return torch.where(linear_mask.unsqueeze(zdim), linear_result, slerp_result)
 
 
 def audio_float_to_int16(
