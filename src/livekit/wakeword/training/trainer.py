@@ -187,13 +187,15 @@ class WakeWordTrainer:
             predictions = self.model(features).squeeze(-1)
             loss_per_sample = criterion(predictions, labels)
 
-            # Hard example mining
+            # Hard example mining: keep samples the model gets wrong or is
+            # uncertain about.  Negatives predicted above 0.1 are potential
+            # false positives; positives predicted below 0.9 need more work.
             with torch.no_grad():
                 hard_mask = torch.ones_like(labels, dtype=torch.bool)
                 neg_mask = labels < 0.5
                 pos_mask = labels >= 0.5
-                hard_mask[neg_mask] = predictions[neg_mask] >= 0.001
-                hard_mask[pos_mask] = predictions[pos_mask] < 0.999
+                hard_mask[neg_mask] = predictions[neg_mask] >= 0.1
+                hard_mask[pos_mask] = predictions[pos_mask] < 0.9
 
             # Negative weighting
             neg_weight = _negative_weight_schedule(step, steps, max_negative_weight)
