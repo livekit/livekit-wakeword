@@ -108,6 +108,7 @@ class WakeWordListener:
         self._done_event.clear()
         self._error = None
         self._frame_buffer.clear()
+        self._detection_queue = asyncio.Queue()
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self._task = asyncio.create_task(self._audio_loop())
         return self
