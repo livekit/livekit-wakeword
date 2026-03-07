@@ -93,6 +93,36 @@ def _count_original_clips(directory: Path) -> int:
     return sum(1 for f in directory.iterdir() if _ORIGINAL_CLIP_RE.match(f.name))
 
 
+def _expand_unknown_words(
+    words: list[str],
+    cmu: dict[str, list[str]],
+) -> list[str]:
+    """Expand words not in CMUDict by splitting into known subwords.
+
+    For example, "livekit" → ["live", "kit"] since both are in CMUDict.
+    Known words are kept as-is.
+    """
+    expanded: list[str] = []
+    for word in words:
+        if word in cmu:
+            expanded.append(word)
+            continue
+        # Try all split points, prefer longest left match
+        best_split: tuple[str, str] | None = None
+        for i in range(2, len(word) - 1):
+            left, right = word[:i], word[i:]
+            if left in cmu and right in cmu:
+                if best_split is None or len(left) > len(best_split[0]):
+                    best_split = (left, right)
+        if best_split is not None:
+            logger.debug("Split unknown word %r → %r", word, best_split)
+            expanded.extend(best_split)
+        else:
+            # Can't split — keep original (will be skipped in substitution)
+            expanded.append(word)
+    return expanded
+
+
 def generate_adversarial_phrases(
     target_phrases: list[str],
     n_phrases: int = 200,
@@ -102,7 +132,9 @@ def generate_adversarial_phrases(
     """Generate phonetically similar phrases to the target using CMUDict.
 
     For each word in target phrases, find words with similar phonemes and
-    combine them to create adversarial negative phrases.
+    combine them to create adversarial negative phrases. Unknown words
+    (not in CMUDict) are split into known subwords when possible, e.g.
+    "livekit" → "live" + "kit", allowing substitutions on both parts.
     """
     import pronouncing
 
@@ -111,7 +143,9 @@ def generate_adversarial_phrases(
     adversarial: list[str] = []
 
     for phrase in target_phrases:
-        words = phrase.lower().split()
+        raw_words = phrase.lower().split()
+        words = _expand_unknown_words(raw_words, cmu)
+
         # Get phonemes for each word
         word_phonemes: list[list[str]] = []
         for word in words:
@@ -157,8 +191,9 @@ def generate_adversarial_phrases(
                 if random.random() < include_input_words:
                     adversarial.append(word)
 
-    # Deduplicate and limit
-    adversarial = list(set(adversarial))
+    # Deduplicate, remove the original target phrases, and limit
+    target_set = {p.lower() for p in target_phrases}
+    adversarial = [p for p in set(adversarial) if p not in target_set]
     random.shuffle(adversarial)
     return adversarial[:n_phrases]
 
