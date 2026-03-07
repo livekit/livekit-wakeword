@@ -187,9 +187,10 @@ def generate_samples(
     texts_iter = it.cycle(text)
 
     # Advance cyclic iterators to maintain speaker/text diversity on resume
+    # speakers and texts are consumed once per sample; settings once per batch
     if start_index > 0:
         logger.info("Resuming generation from clip %d / %d", start_index, max_samples)
-        _consume(settings_iter, start_index)
+        _consume(settings_iter, (start_index + batch_size - 1) // batch_size)
         _consume(speakers_iter, start_index)
         _consume(texts_iter, start_index)
 
@@ -398,4 +399,15 @@ def remove_silence(
     for i in range(min_start, x.shape[0] - step_size, step_size):
         if vad.is_speech(x[i : i + step_size].tobytes(), sample_rate):
             x_new.extend(x[i : i + step_size].tolist())
-    return np.array(x_new, dtype=np.int16)
+
+    result = np.array(x_new, dtype=np.int16)
+
+    # If VAD stripped too much, return the original — don't produce near-silent clips
+    min_speech_samples = int(sample_rate * 0.15)  # at least 150ms of content
+    if len(result) <= min_start + min_speech_samples:
+        logger.debug("VAD stripped too aggressively (%d samples left), keeping original", len(result))
+        if x.dtype != np.int16:
+            x = (x * 32767).astype(np.int16)
+        return x
+
+    return result
