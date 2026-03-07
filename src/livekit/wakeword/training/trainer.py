@@ -104,6 +104,12 @@ class WakeWordTrainer:
             # Reshape 2D (N, 96) → 3D (N//16, 16, 96) if needed
             if val_neg.ndim == 2:
                 n_full = (val_neg.shape[0] // 16) * 16
+                remainder = val_neg.shape[0] - n_full
+                if remainder > 0:
+                    logger.warning(
+                        "Dropping %d/%d validation samples (not divisible by 16)",
+                        remainder, val_neg.shape[0],
+                    )
                 val_neg = val_neg[:n_full].reshape(-1, 16, 96)
             neg = np.concatenate([neg, val_neg], axis=0) if neg.shape[0] > 0 else val_neg
 
