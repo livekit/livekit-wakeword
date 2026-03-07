@@ -27,5 +27,5 @@ run: |
   cp -r output/${MODEL_NAME}/* /outputs/${MODEL_NAME}/
 
 envs:
-  CONFIG_FILE: hey_livekit.yaml
+  CONFIG_FILE: prod.yaml
   MODEL_NAME: hey_livekit
