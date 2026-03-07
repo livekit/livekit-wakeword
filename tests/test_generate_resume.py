@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from livekit.wakeword.data.generate import _count_original_clips, synthesize_clips
 
 
@@ -36,37 +38,23 @@ class TestCountOriginalClips:
         assert _count_original_clips(tmp_path) == 1
 
 
-class TestSynthesizeClipsResume:
-    def test_silence_fallback_starts_from_start_index(self, tmp_path: Path) -> None:
-        """Silence fallback should only generate clips from start_index onward."""
-        # Pre-create first 3 clips (simulating prior run)
-        for i in range(3):
-            (tmp_path / f"clip_{i:06d}.wav").write_text("existing")
+class TestSynthesizeClipsNoModel:
+    def test_raises_when_model_path_is_none(self, tmp_path: Path) -> None:
+        """Must raise FileNotFoundError instead of generating silent placeholders."""
+        with pytest.raises(FileNotFoundError, match="VITS model not found"):
+            synthesize_clips(
+                phrases=["hello"],
+                output_dir=tmp_path,
+                n_samples=5,
+                vits_model_path=None,
+            )
 
-        # Resume from index 3, targeting 5 total
-        result = synthesize_clips(
-            phrases=["hello"],
-            output_dir=tmp_path,
-            n_samples=5,
-            vits_model_path=None,
-            start_index=3,
-        )
-
-        # Should only generate clips 3 and 4
-        assert len(result) == 2
-        assert result[0] == tmp_path / "clip_000003.wav"
-        assert result[1] == tmp_path / "clip_000004.wav"
-
-        # Pre-existing clips should still exist
-        assert (tmp_path / "clip_000000.wav").exists()
-
-    def test_silence_fallback_skip_when_complete(self, tmp_path: Path) -> None:
-        """When start_index == n_samples, no clips should be generated."""
-        result = synthesize_clips(
-            phrases=["hello"],
-            output_dir=tmp_path,
-            n_samples=5,
-            vits_model_path=None,
-            start_index=5,
-        )
-        assert len(result) == 0
+    def test_raises_when_model_path_missing(self, tmp_path: Path) -> None:
+        """Must raise FileNotFoundError for a non-existent model path."""
+        with pytest.raises(FileNotFoundError, match="VITS model not found"):
+            synthesize_clips(
+                phrases=["hello"],
+                output_dir=tmp_path,
+                n_samples=5,
+                vits_model_path=tmp_path / "nonexistent.pt",
+            )

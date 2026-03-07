@@ -8,8 +8,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from ..config import WakeWordConfig
 from ._piper_generate import generate_samples
 
@@ -188,49 +186,28 @@ def synthesize_clips(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if vits_model_path is not None and vits_model_path.exists():
-        try:
-            generated = generate_samples(
-                text=phrases,
-                output_dir=output_dir,
-                max_samples=n_samples,
-                model=vits_model_path,
-                batch_size=batch_size,
-                slerp_weights=slerp_weights,
-                length_scales=length_scales,
-                noise_scales=noise_scales,
-                noise_scale_ws=noise_scale_ws,
-                max_speakers=max_speakers,
-                start_index=start_index,
-            )
-            logger.info(f"Generated {len(generated)} clips in {output_dir}")
-            return generated
-        except Exception as e:
-            logger.warning(f"VITS generation failed: {e}")
-            logger.warning("Falling back to silence placeholders.")
-
-    # Fallback: generate silence placeholders
-    fallback: list[Path] = []
-    for clip_idx in range(start_index, n_samples):
-        out_path = output_dir / f"clip_{clip_idx:06d}.wav"
-        _write_silence(out_path, duration_s=1.0)
-        fallback.append(out_path)
-
-    logger.info(f"Generated {len(fallback)} clips in {output_dir}")
-    if fallback:
-        logger.warning(
-            f"All {len(fallback)} clips are silence placeholders "
-            f"(VITS model unavailable). Model quality will be degraded."
+    if vits_model_path is None or not vits_model_path.exists():
+        raise FileNotFoundError(
+            f"VITS model not found at {vits_model_path}. "
+            "Cannot generate audio — refusing to produce silent placeholders. "
+            "Download the model first: python -m livekit.wakeword.data setup"
         )
-    return fallback
 
-
-def _write_silence(path: Path, duration_s: float = 1.0, sample_rate: int = 16000) -> None:
-    """Write a silent WAV file as a placeholder."""
-    import soundfile as sf
-
-    samples = np.zeros(int(sample_rate * duration_s), dtype=np.float32)
-    sf.write(str(path), samples, sample_rate)
+    generated = generate_samples(
+        text=phrases,
+        output_dir=output_dir,
+        max_samples=n_samples,
+        model=vits_model_path,
+        batch_size=batch_size,
+        slerp_weights=slerp_weights,
+        length_scales=length_scales,
+        noise_scales=noise_scales,
+        noise_scale_ws=noise_scale_ws,
+        max_speakers=max_speakers,
+        start_index=start_index,
+    )
+    logger.info(f"Generated {len(generated)} clips in {output_dir}")
+    return generated
 
 
 def run_generate(config: WakeWordConfig) -> None:
@@ -241,8 +218,12 @@ def run_generate(config: WakeWordConfig) -> None:
     existing count.
     """
     model_dir = config.model_output_dir
-    vits_model = config.data_path / "piper" / "en-us-libritts-high.pt"
-    vits_path = vits_model if vits_model.exists() else None
+    vits_path = config.data_path / "piper" / "en-us-libritts-high.pt"
+    if not vits_path.exists():
+        raise FileNotFoundError(
+            f"VITS model not found at {vits_path}. "
+            "Run setup first: python -m livekit.wakeword.data setup"
+        )
 
     synth_kwargs: dict[str, Any] = {
         "noise_scales": config.noise_scales,

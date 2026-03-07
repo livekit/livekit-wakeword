@@ -197,6 +197,9 @@ def generate_samples(
 
     generated: list[Path] = []
     sample_idx = start_index
+    failed_batches = 0
+    max_consecutive_failures = 5
+    consecutive_failures = 0
     pbar = tqdm(total=max_samples, initial=start_index, desc="Synthesizing clips", unit="clip")
 
     while sample_idx < max_samples:
@@ -207,50 +210,87 @@ def generate_samples(
         current_batch_size = len(speakers_batch)
         sw, ls, ns, nsw = next(settings_iter)
 
-        with torch.no_grad():
-            speaker_1 = _to_device(torch.LongTensor([s[0] for s in speakers_batch]), device)
-            speaker_2 = _to_device(torch.LongTensor([s[1] for s in speakers_batch]), device)
+        try:
+            with torch.no_grad():
+                # Consume texts for this batch (must happen even on failure to keep iterator in sync)
+                batch_texts = [next(texts_iter) for _ in range(current_batch_size)]
 
-            phoneme_ids = [
-                get_phonemes(config, next(texts_iter), voice) for _ in range(current_batch_size)
-            ]
-            phoneme_lengths = [len(ids) for ids in phoneme_ids]
-            phoneme_ids = _right_pad_lists(phoneme_ids)
+                phoneme_ids = [
+                    get_phonemes(config, t, voice) for t in batch_texts
+                ]
+                phoneme_lengths = [len(ids) for ids in phoneme_ids]
+                phoneme_ids = _right_pad_lists(phoneme_ids)
 
-            audio = _generate_audio(
-                vits_model,
-                speaker_1,
-                speaker_2,
-                phoneme_ids,
-                phoneme_lengths,
-                sw,
-                ns,
-                nsw,
-                ls,
-                device,
+                speaker_1 = _to_device(torch.LongTensor([s[0] for s in speakers_batch]), device)
+                speaker_2 = _to_device(torch.LongTensor([s[1] for s in speakers_batch]), device)
+
+                audio = _generate_audio(
+                    vits_model,
+                    speaker_1,
+                    speaker_2,
+                    phoneme_ids,
+                    phoneme_lengths,
+                    sw,
+                    ns,
+                    nsw,
+                    ls,
+                    device,
+                )
+
+                # Resample 22050 → 16000
+                audio_16k = resampler(audio.cpu()).numpy()
+                audio_int16 = audio_float_to_int16(audio_16k)
+
+                for audio_idx in range(audio_int16.shape[0]):
+                    if sample_idx >= max_samples:
+                        break
+                    trimmed = remove_silence(audio_int16[audio_idx].flatten())
+                    wav_path = output_path / f"clip_{sample_idx:06d}.wav"
+                    with wave.open(str(wav_path), "wb") as wav_file:
+                        wav_file.setframerate(16000)
+                        wav_file.setsampwidth(2)
+                        wav_file.setnchannels(1)
+                        wav_file.writeframes(trimmed.tobytes())
+                    generated.append(wav_path)
+                    sample_idx += 1
+                    pbar.update(1)
+
+            consecutive_failures = 0
+            logger.debug("Batch complete — %d / %d clips generated", sample_idx, max_samples)
+
+        except Exception as e:
+            failed_batches += 1
+            consecutive_failures += 1
+            logger.warning(
+                "Batch failed (texts=%r): %s. Skipping %d clips.",
+                batch_texts, e, current_batch_size,
             )
+            # Advance sample_idx past this batch so we don't retry the same indices
+            sample_idx += current_batch_size
+            pbar.update(current_batch_size)
 
-            # Resample 22050 → 16000
-            audio_16k = resampler(audio.cpu()).numpy()
-            audio_int16 = audio_float_to_int16(audio_16k)
-
-            for audio_idx in range(audio_int16.shape[0]):
-                if sample_idx >= max_samples:
-                    break
-                trimmed = remove_silence(audio_int16[audio_idx].flatten())
-                wav_path = output_path / f"clip_{sample_idx:06d}.wav"
-                with wave.open(str(wav_path), "wb") as wav_file:
-                    wav_file.setframerate(16000)
-                    wav_file.setsampwidth(2)
-                    wav_file.setnchannels(1)
-                    wav_file.writeframes(trimmed.tobytes())
-                generated.append(wav_path)
-                sample_idx += 1
-                pbar.update(1)
-
-        logger.debug("Batch complete — %d / %d clips generated", sample_idx, max_samples)
+            if consecutive_failures >= max_consecutive_failures:
+                pbar.close()
+                raise RuntimeError(
+                    f"{consecutive_failures} consecutive batches failed. "
+                    f"Last error: {e}"
+                ) from e
 
     pbar.close()
+
+    expected = max_samples - start_index
+    if failed_batches > 0:
+        logger.warning(
+            "%d/%d batches failed — generated %d/%d clips",
+            failed_batches, failed_batches + len(generated), len(generated), expected,
+        )
+
+    if len(generated) == 0 and expected > 0:
+        raise RuntimeError(
+            f"Generated 0/{expected} clips — all batches failed. "
+            "Check espeak-ng installation and input phrases."
+        )
+
     logger.info("Generated %d clips in %s", len(generated), output_path)
     return generated
 
