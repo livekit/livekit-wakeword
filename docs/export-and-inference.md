@@ -116,6 +116,10 @@ class Detection:
     timestamp: float   # Monotonic time
 ```
 
+#### Lifecycle
+
+The listener is designed as an async context manager. On each `__aenter__`, all internal state is reset — including the audio buffer, error state, and detection queue — so the same listener instance can be safely reused across multiple `async with` blocks without stale detections carrying over.
+
 #### Audio Capture
 
 Uses PyAudio to capture from the default microphone:

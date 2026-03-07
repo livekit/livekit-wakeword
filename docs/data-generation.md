@@ -52,7 +52,22 @@ The Cartesian product of `slerp_weights`, `length_scales`, `noise_scales`, and `
 
 ### TTS Model
 
-The `en-us-libritts-high.pt` VITS checkpoint (~166 MB) and its `.json` config are downloaded during `livekit-wakeword setup` to `data/piper/`. If the model is missing or generation fails, 1-second silence placeholders are written and a warning is logged.
+The `en-us-libritts-high.pt` VITS checkpoint (~166 MB) and its `.json` config are downloaded during `livekit-wakeword setup` to `data/piper/`. The model **must** be present — generation will raise `FileNotFoundError` if the model is missing rather than producing silent placeholders.
+
+### Error Handling
+
+Errors during synthesis are handled **per-batch**, not per-pipeline. If a batch fails (e.g., espeak-ng can't phonemize a phrase), that batch is skipped with a warning and generation continues. The pipeline raises `RuntimeError` if:
+
+- **5 consecutive batches** fail (indicates a systemic problem)
+- **Zero clips** are generated (total failure)
+
+### SLERP Speaker Blending
+
+SLERP interpolation uses per-element fallback: when a speaker pair's embeddings are nearly parallel (dot product > 0.9995), only that pair falls back to linear interpolation — other pairs in the batch still use true SLERP. Dot products are clamped to `[-1, 1]` to prevent NaN from `acos` on float precision overflow.
+
+### Silence Trimming
+
+Generated audio is silence-trimmed via WebRTC VAD. If the VAD strips too aggressively (result shorter than 150ms of content beyond the leading samples), the original untrimmed audio is kept instead.
 
 ### Default Sample Counts
 
@@ -72,12 +87,14 @@ The `en-us-libritts-high.pt` VITS checkpoint (~166 MB) and its `.json` config ar
 1. Load the CMU Pronouncing Dictionary via NLTK
 2. Build a reverse phoneme index: phoneme sequence → list of words
 3. For each target phrase:
-   - Look up the phoneme sequence for each word
+   - **Expand unknown words:** Words not in CMUDict are split into known subwords (e.g., `"livekit"` → `["live", "kit"]`). The split tries all positions and prefers the longest left match. This enables phoneme substitutions on made-up/compound words that CMUDict doesn't contain.
+   - Look up the phoneme sequence for each word (after expansion)
    - For each phoneme, try substituting it with similar phonemes from `SIMILAR_PHONEMES`
    - Look up words matching the substituted phoneme sequence (up to 3 per substitution)
    - With probability `include_partial_phrase` (default: 1.0), generate all partial phrases (each word removed in turn)
    - Include individual words with probability `include_input_words` (default: 0.2)
-4. Deduplicate, shuffle, and limit to `n_phrases` (default: 200)
+4. **Remove exact target phrases** from the adversarial list (safety filter)
+5. Deduplicate, shuffle, and limit to `n_phrases` (default: 200)
 
 ### SIMILAR_PHONEMES Map
 

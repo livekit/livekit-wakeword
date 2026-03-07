@@ -104,14 +104,14 @@ Binary cross-entropy (BCE) with per-sample weighting and hard example mining.
 
 ### Hard Example Mining
 
-Only non-trivial predictions contribute to the loss:
+Only uncertain or misclassified predictions contribute to the loss:
 
 | Sample Type | Kept If | Rationale |
 |-------------|---------|-----------|
-| Negative (label=0) | `prediction >= 0.001` | Already-correct negatives don't help |
-| Positive (label=1) | `prediction < 0.999` | Already-correct positives don't help |
+| Negative (label=0) | `prediction >= 0.1` | Confidently-correct negatives don't help |
+| Positive (label=1) | `prediction < 0.9` | Confidently-correct positives don't help |
 
-Trivial predictions are masked out by zeroing their loss contribution. This focuses training on the decision boundary where mistakes happen.
+Samples that the model has already learned with high confidence are masked out, focusing training on the decision boundary where mistakes happen. The thresholds (0.1/0.9) ensure the mining is effective — previous thresholds of 0.001/0.999 were so extreme that virtually all samples passed the filter, making the mining a no-op.
 
 ### Per-Sample Weighting
 
@@ -122,7 +122,9 @@ Negative samples are weighted by the current negative weight schedule value. Pos
 ### Data Sources
 
 - **Positive:** `positive_features_test.npy`
-- **Negative:** `negative_features_test.npy` + optional `validation_set_features.npy` (from ACAV100M, ~11 hours)
+- **Negative:** `negative_features_test.npy` + optional `validation_set_features.npy` (from ACAV100M)
+
+If the external validation set has a sample count not divisible by 16 (required for the 2D→3D reshape), the remainder samples are dropped with a logged warning.
 
 ### Metrics
 
@@ -134,7 +136,7 @@ Negative samples are weighted by the current negative weight schedule value. Pos
 | Recall | `recall_at_threshold()` | True positive rate: `mean(positive_preds >= threshold)` |
 | Balanced Accuracy | `accuracy()` | `(TPR + TNR) / 2` at the given threshold |
 
-The `evaluate_model()` function computes all metrics at once with a default `validation_hours=11.0`.
+The `evaluate_model()` function computes all metrics at once. Validation hours are computed from the actual negative clip count × clip duration (default 2.0s), not a hardcoded value. This ensures FPPH is accurate regardless of whether the external ACAV100M validation set is present.
 
 ### Validation Schedule
 

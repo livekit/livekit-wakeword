@@ -55,7 +55,7 @@ Applied via the `audiomentations` library to individual clips:
 
 ### Background Mixing
 
-`mix_with_background(audio, snr_db_range=(5.0, 15.0))` mixes audio with a random background noise clip at a randomly selected SNR within the given range.
+`mix_with_background(audio, snr_db_range=(5.0, 15.0))` mixes audio with a random background noise clip at a randomly selected SNR within the given range. The batch augmentations use an SNR range of **0–15 dB** for `AddBackgroundNoise` (signal is always at least as loud as the noise).
 
 The background clip is looped (tiled) if shorter than the audio and randomly cropped to a starting position. The mixing formula scales the background based on:
 
@@ -86,6 +86,8 @@ Negative clips are centered within the target window. If longer than the target,
 ## Augmentation Rounds
 
 The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Round 0 overwrites the original `.wav` files in-place. Subsequent rounds write new files (e.g. `clip_000000_r1.wav`) but read from the round-0 (already augmented) files, not the raw TTS output.
+
+Only original clips (`clip_######.wav`) are read as input — augmented variants (`clip_000000_r1.wav`, etc.) are excluded via a regex filter to prevent compounding augmentation effects across rounds.
 
 ## Per-Clip Processing Order
 
