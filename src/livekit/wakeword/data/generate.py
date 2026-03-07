@@ -221,6 +221,11 @@ def synthesize_clips(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    cmu = _get_cmudict()
+    phrases = [
+        " ".join(_expand_unknown_words(p.lower().split(), cmu)) for p in phrases
+    ]
+
     if vits_model_path is None or not vits_model_path.exists():
         raise FileNotFoundError(
             f"VITS model not found at {vits_model_path}. "

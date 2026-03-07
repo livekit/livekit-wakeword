@@ -1,0 +1,58 @@
+# Minimal config for testing the full pipeline end-to-end
+# Generates a small dataset, trains a tiny model, and exports quickly
+model_name: test_wakeword
+
+target_phrases: ["hey livekit"]
+
+# ============================================================================
+# Data Generation
+# ============================================================================
+
+n_samples: 100
+n_samples_val: 20
+tts_batch_size: 10
+
+custom_negative_phrases:
+  - "livekit"
+  - "hey libby"
+  - "hey liquid"
+
+# ============================================================================
+# Paths
+# ============================================================================
+
+data_dir: ./data
+output_dir: ./output_test
+
+# ============================================================================
+# Augmentation
+# ============================================================================
+
+augmentation:
+  clip_duration: 2.0
+  batch_size: 8
+  rounds: 1
+  background_paths: [./data/backgrounds]
+  rir_paths: [./data/rirs]
+
+# ============================================================================
+# Model Architecture
+# ============================================================================
+
+model:
+  model_type: dnn
+  model_size: tiny
+
+# ============================================================================
+# Training
+# ============================================================================
+
+steps: 500
+learning_rate: 0.001
+max_negative_weight: 1000
+target_fp_per_hour: 1.0
+
+batch_n_per_class:
+  positive: 10
+  adversarial_negative: 10
+  ACAV100M_sample: 64

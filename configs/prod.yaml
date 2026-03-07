@@ -2,7 +2,7 @@
 model_name: hey_livekit
 
 # Wake word phrases to detect (include spelling variations)
-target_phrases: ["hey livekit", "hey live kit"]
+target_phrases: ["hey livekit"]
 
 # ============================================================================
 # Data Generation
@@ -38,11 +38,6 @@ custom_negative_phrases:
   - "they live"
   - "hey look at"
   - "hey look it"
-  - "a livekit"
-  - "the livekit"
-  - "use livekit"
-  - "say livekit"
-  - "okay livekit"
 
 # ============================================================================
 # Paths
