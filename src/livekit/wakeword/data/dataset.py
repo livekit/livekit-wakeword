@@ -39,6 +39,13 @@ def mmap_batch_generator(
         if data.ndim == 2 and data.shape[1] == 96:
             n_full = (data.shape[0] // 16) * 16
             data = data[:n_full].reshape(-1, 16, 96)
+        # Validate embedding dimension matches expected 96-dim vectors
+        if data.ndim == 3 and data.shape[2] != 96:
+            raise ValueError(
+                f"Feature dimension mismatch for '{name}': expected 96, "
+                f"got {data.shape[2]}. The file {path} may have been generated "
+                f"with a different embedding model."
+            )
         mmaps[name] = data
         logger.info(f"Loaded {name}: shape={mmaps[name].shape} from {path}")
 

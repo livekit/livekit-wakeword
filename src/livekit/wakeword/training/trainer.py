@@ -82,6 +82,13 @@ class WakeWordTrainer:
         )
         if acav_path.exists():
             data_files["ACAV100M_sample"] = acav_path
+        else:
+            logger.warning(
+                "ACAV100M features not found at %s. Training without general negative "
+                "speech data — the model may have a high false positive rate. "
+                "Run setup without --skip-acav to download (~16 GB).",
+                acav_path,
+            )
 
         return create_dataloader(
             data_files=data_files,
