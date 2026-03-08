@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import math
+import time
 from pathlib import Path
 from typing import TypedDict
 
@@ -64,6 +66,9 @@ class WakeWordTrainer:
         self.device = device or get_device()
         self.model = WakeWordClassifier(config).to(self.device)
         self.checkpoints: list[_Checkpoint] = []
+        self._metrics_log: list[dict[str, object]] = []
+        self._metrics_path = config.model_output_dir / "metrics.json"
+        self._train_start: float = 0.0
 
     def _build_dataloader(self) -> torch.utils.data.DataLoader:  # type: ignore[type-arg]
         model_dir = self.config.model_output_dir
@@ -140,6 +145,18 @@ class WakeWordTrainer:
         return evaluate_model(
             pos_preds, neg_preds, threshold=0.5, validation_hours=validation_hours,
         )
+
+    def _log_metrics(self, step: int, phase: int, metrics: dict[str, float]) -> None:
+        """Append a metrics entry and flush to disk."""
+        entry: dict[str, object] = {
+            "step": step,
+            "phase": phase,
+            "elapsed_s": round(time.time() - self._train_start, 1),
+            **metrics,
+        }
+        self._metrics_log.append(entry)
+        self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        self._metrics_path.write_text(json.dumps(self._metrics_log, indent=2) + "\n")
 
     def _save_checkpoint(self, step: int, phase: int, metrics: dict[str, float]) -> None:
         """Save checkpoint if it meets quality criteria."""
@@ -234,11 +251,13 @@ class WakeWordTrainer:
                     f"FPPH={metrics['fpph']:.2f}, "
                     f"Recall={metrics['recall']:.3f}, Acc={metrics['accuracy']:.3f}"
                 )
+                self._log_metrics(step, phase, metrics)
                 self._save_checkpoint(step, phase, metrics)
                 self.model.train()
 
     def train(self) -> nn.Module:
         """Run full 3-phase training. Returns the final averaged model."""
+        self._train_start = time.time()
         dataloader = self._build_dataloader()
         steps = self.config.steps
         max_neg_w = self.config.max_negative_weight
@@ -254,6 +273,7 @@ class WakeWordTrainer:
 
         # Phase 2: Refinement
         metrics = self._validate()
+        self._log_metrics(steps, 1, metrics)
         if metrics["fpph"] > self.config.target_fp_per_hour:
             max_neg_w *= 2
             logger.info(f"FP rate too high, doubling max_negative_weight to {max_neg_w}")
@@ -268,6 +288,7 @@ class WakeWordTrainer:
 
         # Phase 3: Fine-tuning
         metrics = self._validate()
+        self._log_metrics(steps + steps // 10, 2, metrics)
         if metrics["fpph"] > self.config.target_fp_per_hour:
             max_neg_w *= 2
             logger.info(f"FP rate still high, doubling max_negative_weight to {max_neg_w}")
@@ -280,8 +301,19 @@ class WakeWordTrainer:
             dataloader=dataloader,
         )
 
+        # Final validation after phase 3
+        metrics = self._validate()
+        total_steps = steps + steps // 10 + steps // 10
+        self._log_metrics(total_steps, 3, metrics)
+
         # Select and average best checkpoints
         final_model = self._average_best_checkpoints()
+
+        # Log final averaged model metrics
+        final_metrics = self._validate()
+        self._log_metrics(total_steps, 0, {**final_metrics, "note": "final_averaged"})  # type: ignore[arg-type]
+        logger.info(f"Metrics saved to {self._metrics_path}")
+
         return final_model
 
     def _average_best_checkpoints(self) -> nn.Module:
