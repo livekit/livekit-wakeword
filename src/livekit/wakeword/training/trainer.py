@@ -13,6 +13,7 @@ from typing import TypedDict
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ..config import WakeWordConfig
 from ..data.dataset import create_dataloader
@@ -51,6 +52,31 @@ def _cosine_warmup_schedule(
 def _negative_weight_schedule(step: int, total_steps: int, max_weight: float) -> float:
     """Linear schedule for negative class weight: 1 → max_weight."""
     return 1.0 + (max_weight - 1.0) * step / max(1, total_steps)
+
+
+def focal_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    gamma: float = 2.0,
+) -> torch.Tensor:
+    """Focal loss for binary classification (per-sample, unreduced).
+
+    Down-weights well-classified examples by (1 - p_t)^gamma, automatically
+    focusing training on hard examples near the decision boundary.  This
+    replaces the manual hard-example mining thresholds (0.1 / 0.9).
+
+    Args:
+        predictions: Model output probabilities (after sigmoid), shape (N,).
+        targets: Ground truth labels 0 or 1, shape (N,).
+        gamma: Focusing parameter. 0 = standard BCE, 2 = typical focal loss.
+
+    Returns:
+        Per-sample focal loss, shape (N,).
+    """
+    bce = F.binary_cross_entropy(predictions, targets, reduction="none")
+    p_t = predictions * targets + (1 - predictions) * (1 - targets)
+    focal_weight = (1 - p_t) ** gamma
+    return focal_weight * bce
 
 
 class WakeWordTrainer:
@@ -190,7 +216,6 @@ class WakeWordTrainer:
         )
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=base_lr)
-        criterion = nn.BCELoss(reduction="none")
 
         warmup_steps = steps // 5 if phase == 1 else 0
         hold_steps = steps // 3 if phase == 1 else 0
@@ -215,27 +240,17 @@ class WakeWordTrainer:
 
             # Forward
             predictions = self.model(features).squeeze(-1)
-            loss_per_sample = criterion(predictions, labels)
 
-            # Hard example mining: keep samples the model gets wrong or is
-            # uncertain about.  Negatives predicted above 0.1 are potential
-            # false positives; positives predicted below 0.9 need more work.
-            with torch.no_grad():
-                hard_mask = torch.ones_like(labels, dtype=torch.bool)
-                neg_mask = labels < 0.5
-                pos_mask = labels >= 0.5
-                hard_mask[neg_mask] = predictions[neg_mask] >= 0.1
-                hard_mask[pos_mask] = predictions[pos_mask] < 0.9
+            # Focal loss replaces BCE + manual hard-example mining.
+            # gamma=2.0 automatically down-weights well-classified samples,
+            # eliminating the need for the 0.1/0.9 threshold heuristics.
+            loss_per_sample = focal_loss(predictions, labels, gamma=2.0)
 
             # Negative weighting
             neg_weight = _negative_weight_schedule(step, steps, max_negative_weight)
             weights = torch.where(labels < 0.5, neg_weight, 1.0)
 
-            if hard_mask.any():
-                masked_loss = loss_per_sample[hard_mask] * weights[hard_mask]
-                loss = masked_loss.mean()
-            else:
-                loss = (loss_per_sample * weights).mean()
+            loss = (loss_per_sample * weights).mean()
 
             # LR schedule
             lr = _cosine_warmup_schedule(step, steps, warmup_steps, hold_steps, base_lr)
