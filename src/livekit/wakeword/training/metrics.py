@@ -82,3 +82,59 @@ def evaluate_model(
         "accuracy": accuracy(positive_preds, negative_preds, threshold),
         "threshold": threshold,
     }
+
+
+def find_best_threshold(
+    positive_preds: np.ndarray,
+    negative_preds: np.ndarray,
+    validation_hours: float = 11.0,
+    target_fpph: float = 0.1,
+    min_recall: float = 0.5,
+) -> dict[str, float]:
+    """Find the threshold that maximizes recall subject to FPPH constraint.
+
+    Scans thresholds from 0.01 to 0.99 and picks the one with the highest
+    recall while keeping FPPH at or below target_fpph.  Falls back to
+    maximizing balanced accuracy if no threshold meets the FPPH target.
+
+    Args:
+        positive_preds: Model scores for positive samples.
+        negative_preds: Model scores for negative samples.
+        validation_hours: Total hours of negative audio.
+        target_fpph: Maximum acceptable false positives per hour.
+        min_recall: Minimum acceptable recall (ignores thresholds below this).
+
+    Returns:
+        Dict with keys: fpph, recall, accuracy, threshold
+    """
+    thresholds = np.arange(0.01, 1.0, 0.01)
+    best: dict[str, float] | None = None
+    best_fallback: dict[str, float] | None = None
+
+    for t in thresholds:
+        t_float = float(t)
+        metrics = evaluate_model(
+            positive_preds, negative_preds,
+            threshold=t_float, validation_hours=validation_hours,
+        )
+        if metrics["recall"] < min_recall:
+            continue
+
+        # Track best that meets FPPH constraint
+        if metrics["fpph"] <= target_fpph:
+            if best is None or metrics["recall"] > best["recall"]:
+                best = metrics
+
+        # Track overall best balanced accuracy as fallback
+        if best_fallback is None or metrics["accuracy"] > best_fallback["accuracy"]:
+            best_fallback = metrics
+
+    if best is not None:
+        return best
+    if best_fallback is not None:
+        return best_fallback
+    # Nothing met min_recall — return default
+    return evaluate_model(
+        positive_preds, negative_preds,
+        threshold=0.5, validation_hours=validation_hours,
+    )

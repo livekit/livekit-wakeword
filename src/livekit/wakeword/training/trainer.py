@@ -19,7 +19,7 @@ from ..config import WakeWordConfig
 from ..data.dataset import create_dataloader
 from ..models.pipeline import WakeWordClassifier
 from ..utils import get_device
-from .metrics import evaluate_model
+from .metrics import evaluate_model, find_best_threshold
 
 logger = logging.getLogger(__name__)
 
@@ -353,9 +353,33 @@ class WakeWordTrainer:
         # Log final averaged model metrics
         final_metrics = self._validate()
         self._log_metrics(total_steps, 0, {**final_metrics, "note": "final_averaged"})  # type: ignore[arg-type]
+
+        # Optimize detection threshold on validation set
+        optimal = self._find_optimal_threshold()
+        self._log_metrics(total_steps, 0, {**optimal, "note": "optimal_threshold"})  # type: ignore[arg-type]
+        logger.info(
+            f"Optimal threshold: {optimal['threshold']:.2f} "
+            f"(FPPH={optimal['fpph']:.2f}, Recall={optimal['recall']:.3f})"
+        )
         logger.info(f"Metrics saved to {self._metrics_path}")
 
         return final_model
+
+    def _find_optimal_threshold(self) -> dict[str, float]:
+        """Find best detection threshold on validation data."""
+        pos_features, neg_features = self._load_validation_data()
+        if pos_features.shape[0] == 0:
+            return {"fpph": 0.0, "recall": 0.0, "accuracy": 0.0, "threshold": 0.5}
+        pos_preds = self._predict(pos_features)
+        neg_preds = self._predict(neg_features) if neg_features.shape[0] > 0 else np.array([])
+
+        clip_duration = self.config.augmentation.clip_duration
+        validation_hours = neg_features.shape[0] * clip_duration / 3600.0
+        return find_best_threshold(
+            pos_preds, neg_preds,
+            validation_hours=validation_hours,
+            target_fpph=self.config.target_fp_per_hour,
+        )
 
     def _average_best_checkpoints(self) -> nn.Module:
         """Average weights of top checkpoints.
