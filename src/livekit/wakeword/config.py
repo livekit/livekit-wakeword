@@ -72,7 +72,7 @@ class WakeWordConfig(BaseModel):
     noise_scales: list[float] = Field(default_factory=lambda: [0.98])
     noise_scale_ws: list[float] = Field(default_factory=lambda: [0.98])
     length_scales: list[float] = Field(default_factory=lambda: [0.75, 1.0, 1.25])
-    slerp_weights: list[float] = Field(default_factory=lambda: [0.5])
+    slerp_weights: list[float] = Field(default_factory=lambda: [0.2, 0.35, 0.5, 0.65, 0.8])
     max_speakers: int | None = None
 
     # Paths
