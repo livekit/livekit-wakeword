@@ -13,6 +13,7 @@ An open-source wake word library for creating voice-enabled applications. Based 
 
 **Features:**
 
+- **Conv-Attention classifier** — 1D temporal convolutions + multi-head self-attention replace openWakeWord's flat DNN head, preserving temporal structure across the 16-frame embedding window for better accuracy and fewer false positives (see [Architecture](#architecture) below)
 - **Backward compatible** with openWakeWord models and library
 - **Train anywhere** — local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
 - **Zero dependency headaches** — uv handles everything
@@ -131,7 +132,7 @@ target_phrases:
 
 n_samples: 10000 # training samples per class
 model:
-  model_type: dnn # dnn or rnn
+  model_type: conv_attention # conv_attention, dnn, or rnn
   model_size: small # tiny, small, medium, large
 steps: 50000
 target_fp_per_hour: 0.2
@@ -180,6 +181,35 @@ run_export(config)       # Export to ONNX
 ```
 
 This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.
+
+## Architecture
+
+Both this library and openWakeWord share the same audio front-end: mel spectrograms are fed through frozen [Google speech embedding](https://github.com/google-research/google-research/tree/master/embedding_fns) and [openWakeWord embedding](https://github.com/dscripka/openWakeWord) models to produce a `(16, 96)` feature matrix (16 timesteps × 96-dim embeddings). The key difference is the classification head that sits on top.
+
+**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN. This discards all temporal ordering — the model cannot distinguish *"kit live hey"* from *"hey live kit"*.
+
+**livekit-wakeword** introduces a **Conv-Attention** (`conv_attention`) classifier:
+
+1. **1D Convolutions** (kernel size 3) slide across the 16 timesteps, capturing local temporal patterns (e.g., syllable transitions).
+2. **Multi-Head Self-Attention** models long-range dependencies across the full temporal window, letting the model learn which timestep relationships matter.
+3. **Mean pooling** aggregates attended features into a fixed-size vector for the final sigmoid output.
+
+```
+Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
+```
+
+Benefits over the flat DNN:
+- **Temporal awareness** — the model sees the *order* of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
+- **Better accuracy at the same model size** — attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
+- **Lower false-positive rates** — temporal structure helps reject partial or reordered matches that a flat DNN would accept.
+
+The conv-attention head is the default. You can switch to the original DNN or an RNN head via `model_type` in your config:
+
+```yaml
+model:
+  model_type: conv_attention  # conv_attention (default) | dnn | rnn
+  model_size: small           # tiny, small, medium, large
+```
 
 ## Detailed Documentation
 

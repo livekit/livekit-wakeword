@@ -44,7 +44,7 @@ class AugmentationConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    model_type: ModelType = ModelType.dnn
+    model_type: ModelType = ModelType.conv_attention
     model_size: ModelSize = ModelSize.small
 
     @property
