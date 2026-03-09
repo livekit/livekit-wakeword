@@ -186,7 +186,7 @@ This is useful for integrating wake word training into larger pipelines, automat
 
 Both this library and openWakeWord share the same audio front-end: mel spectrograms are fed through frozen [Google speech embedding](https://github.com/google-research/google-research/tree/master/embedding_fns) and [openWakeWord embedding](https://github.com/dscripka/openWakeWord) models to produce a `(16, 96)` feature matrix (16 timesteps × 96-dim embeddings). The key difference is the classification head that sits on top.
 
-**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN. This discards all temporal ordering — the model cannot distinguish *"kit live hey"* from *"hey live kit"*.
+**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN. While the positional information is technically still present in the flattened vector, the dense layer has no inductive bias for temporal structure and must learn any sequential patterns from scratch.
 
 **livekit-wakeword** introduces a **Conv-Attention** (`conv_attention`) classifier:
 
