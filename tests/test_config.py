@@ -22,7 +22,7 @@ def test_default_config():
     config = WakeWordConfig(model_name="test", target_phrases=["hey test"])
     assert config.model_name == "test"
     assert config.steps == 50000
-    assert config.model.model_type == ModelType.dnn
+    assert config.model.model_type == ModelType.conv_attention
     assert config.model.model_size == ModelSize.small
 
 
