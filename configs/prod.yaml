@@ -40,6 +40,27 @@ custom_negative_phrases:
   - "hey look it"
 
 # ============================================================================
+# TTS Parameters (VITS + SLERP speaker blending)
+# ============================================================================
+
+# Overall speech variability
+noise_scales: [0.98]
+
+# Phoneme duration variability
+noise_scale_ws: [0.98]
+
+# Speaking rate multipliers (slow / normal / fast)
+length_scales: [0.75, 1.0, 1.25]
+
+# SLERP interpolation weights for speaker blending (0=speaker1, 1=speaker2)
+# Multiple weights create more diverse synthetic voices — values near 0/1
+# sound closer to original speakers, 0.5 is the midpoint blend
+slerp_weights: [0.2, 0.35, 0.5, 0.65, 0.8]
+
+# Cap on speaker IDs (null = all 904 speakers)
+# max_speakers: null
+
+# ============================================================================
 # Paths
 # ============================================================================
 
@@ -79,7 +100,10 @@ augmentation:
 # ============================================================================
 
 model:
-  # Classifier type: "dnn" (faster) or "rnn" (better for variable-length phrases)
+  # Classifier type:
+  #   "dnn"            — fast, flattens temporal structure
+  #   "rnn"            — Bi-LSTM, better for variable-length phrases
+  #   "conv_attention" — 1D conv + self-attention, best temporal awareness
   model_type: dnn
 
   # Model size: tiny (16d), small (32d), medium (128d), large (256d)
@@ -98,13 +122,22 @@ steps: 100000
 # Suggestion: 0.0001 works well for most cases
 learning_rate: 0.0001
 
-# Max BCE weight for negative class (linearly increases during training)
+# AdamW weight decay for L2 regularization
+# Suggestion: 0.01 for most cases, 0.001 for tiny models
+weight_decay: 0.01
+
+# Label smoothing — softens targets from hard 0/1 to ε/1-ε
+# Prevents overconfident predictions and improves threshold calibration
+# Suggestion: 0.05 for production, 0.0 to disable
+label_smoothing: 0.05
+
+# Max weight for negative class (linearly increases during training)
 # Higher = fewer false positives, but may reduce recall
 # Suggestion: 1000-2000 for balanced, 3000+ for very low false positives
 max_negative_weight: 3000
 
 # Target false positives per hour on validation set
-# Training stops early if this target is reached with good recall
+# Used for adaptive negative weight doubling and threshold optimization
 # Suggestion: 0.1-0.5 for production, 1.0+ for prototyping
 target_fp_per_hour: 0.1
 

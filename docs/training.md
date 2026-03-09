@@ -1,6 +1,6 @@
 # Training Pipeline
 
-The training stage uses a 3-phase adaptive approach with hard example mining, linearly increasing negative weights, and checkpoint averaging.
+The training stage uses a 3-phase adaptive approach with focal loss, embedding mixup, AdamW optimization, and checkpoint averaging.
 
 **Source:** `src/livekit/wakeword/training/trainer.py`, `src/livekit/wakeword/training/metrics.py`
 **CLI:** `livekit-wakeword train <config>`
@@ -13,7 +13,7 @@ The training stage uses a 3-phase adaptive approach with hard example mining, li
     ▼
 Phase 1: Full Training
     LR warmup → hold → cosine decay
-    Hard example mining + negative weighting
+    Focal loss + negative weighting + embedding mixup
     │
     ▼
 Phase 2: Refinement
@@ -30,6 +30,10 @@ Checkpoint Averaging
     Average their weights
     │
     ▼
+Threshold Optimization
+    Scan 0.01–0.99 to maximize recall at target FPPH
+    │
+    ▼
 Final model (.pt)
 ```
 
@@ -41,6 +45,7 @@ Final model (.pt)
 |-----------|-------|
 | Steps | `config.steps` (default: 50,000) |
 | Learning rate | `config.learning_rate` (default: 1e-4) |
+| Optimizer | AdamW with `config.weight_decay` (default: 0.01) |
 | Warmup | `steps // 5` linear warmup |
 | Hold | `steps // 3` constant LR |
 | Decay | Cosine decay to 0 |
@@ -86,6 +91,10 @@ LR
 
 Phases 2 and 3 have no warmup or hold (warmup and hold steps are 0).
 
+## Optimizer
+
+AdamW is used instead of plain Adam. AdamW decouples weight decay from the adaptive learning rate, providing proper L2 regularization. This is controlled by `config.weight_decay` (default: 0.01).
+
 ## Negative Weight Schedule
 
 `_negative_weight_schedule(step, total_steps, max_weight)`
@@ -100,22 +109,47 @@ Default `max_negative_weight` is 1500.0, meaning by the end of phase 1 the loss 
 
 ## Loss Function
 
-Binary cross-entropy (BCE) with per-sample weighting and hard example mining.
+### Focal Loss
 
-### Hard Example Mining
+Focal loss replaces the previous BCE + hard example mining approach. It inherently down-weights well-classified examples via a `(1 - p_t)^γ` modulating factor:
 
-Only uncertain or misclassified predictions contribute to the loss:
+```
+FL(p_t) = -(1 - p_t)^γ · log(p_t)
+```
 
-| Sample Type | Kept If | Rationale |
-|-------------|---------|-----------|
-| Negative (label=0) | `prediction >= 0.1` | Confidently-correct negatives don't help |
-| Positive (label=1) | `prediction < 0.9` | Confidently-correct positives don't help |
+where `p_t` is the model's estimated probability for the correct class and `γ = 2.0`.
 
-Samples that the model has already learned with high confidence are masked out, focusing training on the decision boundary where mistakes happen. The thresholds (0.1/0.9) ensure the mining is effective — previous thresholds of 0.001/0.999 were so extreme that virtually all samples passed the filter, making the mining a no-op.
+| γ value | Effect |
+|---------|--------|
+| 0 | Equivalent to standard BCE |
+| 2 (default) | Well-classified examples (p_t > 0.9) contribute ~100x less to the loss |
+| 5 | Even more aggressive down-weighting |
+
+This eliminates the need for the manual hard-example mining thresholds (0.1/0.9) that previously filtered samples. Focal loss achieves the same effect smoothly and with fewer hyperparameters.
 
 ### Per-Sample Weighting
 
-Negative samples are weighted by the current negative weight schedule value. Positive samples always have weight 1.0. The loss is computed with `reduction="none"`, then multiplied by the per-sample weight mask before averaging.
+Negative samples are weighted by the current negative weight schedule value. Positive samples always have weight 1.0. The focal loss is computed per-sample, then multiplied by the per-sample weight before averaging.
+
+## Regularization
+
+### Label Smoothing
+
+Training targets are softened from hard 0/1 to `ε/2` and `1 - ε/2`, where `ε = config.label_smoothing` (default: 0.05). With the default, labels become 0.025 and 0.975.
+
+This prevents the model from producing overconfident sigmoid outputs (very close to 0.0 or 1.0), which improves score calibration and makes threshold-based detection more reliable.
+
+### Embedding Mixup
+
+During training, random pairs of samples within each batch are interpolated in embedding space:
+
+```
+λ ~ Beta(0.2, 0.2)
+features_mixed = λ · features + (1-λ) · features[permutation]
+labels_mixed = λ · labels + (1-λ) · labels[permutation]
+```
+
+The Beta(0.2, 0.2) distribution produces mixing coefficients that are usually close to 0 or 1 (light interpolation), creating virtual training examples near the original data points. This regularizes the classifier without requiring changes to the audio augmentation pipeline.
 
 ## Validation
 
@@ -168,6 +202,17 @@ averaged[key] = mean(stack([ckpt[key] for ckpt in selected]))
 
 This produces a smoother model that generalizes better than any single checkpoint.
 
+## Threshold Optimization
+
+After checkpoint averaging, the trainer searches for the optimal detection threshold on the validation set using `find_best_threshold()`:
+
+1. Scan thresholds from 0.01 to 0.99 in steps of 0.01
+2. For each threshold, compute FPPH and recall
+3. Select the threshold that **maximizes recall** while keeping **FPPH ≤ `target_fp_per_hour`**
+4. If no threshold meets the FPPH target, fall back to the one with the highest balanced accuracy
+
+The optimal threshold and its metrics are logged to `metrics.json` with `"note": "optimal_threshold"`. This threshold can be used at inference time instead of the default 0.5.
+
 ## Training Data Sources
 
 The dataloader loads features from:
@@ -186,11 +231,56 @@ The ACAV100M dataset (if available) provides ~2000 hours of general audio embedd
 |-------|---------|
 | `steps` | 50,000 |
 | `learning_rate` | 1e-4 |
+| `weight_decay` | 0.01 |
+| `label_smoothing` | 0.05 |
 | `max_negative_weight` | 1500.0 |
 | `target_fp_per_hour` | 0.2 |
 | `batch_n_per_class.positive` | 50 |
 | `batch_n_per_class.adversarial_negative` | 50 |
 | `batch_n_per_class.ACAV100M_sample` | 1024 |
+
+## Classifier Architectures
+
+Three classifier types are available, all sharing the same ONNX I/O contract: input `embeddings` (batch, 16, 96) → output `score` (batch, 1).
+
+### DNN (`model_type: dnn`)
+
+Flattens the 16×96 embedding sequence into a single 1536-dim vector, then passes it through fully-connected layers. Fast and simple, but has no architectural bias for temporal structure.
+
+```
+Flatten(16×96=1536) → Linear(1536, dim) → LayerNorm → ReLU
+→ N × FCNBlock(dim) → Linear(dim, 1) → Sigmoid
+```
+
+### RNN (`model_type: rnn`)
+
+Bi-directional LSTM that processes the 16 timesteps sequentially, capturing temporal dependencies. Uses the final hidden state for classification.
+
+```
+Bi-LSTM(96→hidden, 2 layers) → Linear(hidden×2, 1) → Sigmoid
+```
+
+### Conv+Attention (`model_type: conv_attention`)
+
+1D temporal convolutions capture local patterns across adjacent timesteps, followed by multi-head self-attention to model long-range temporal dependencies. Mean-pools over timesteps for the final prediction.
+
+```
+Conv1D(96→dim, k=3) → LayerNorm → ReLU
+→ N × Conv1D(dim, k=3) → LayerNorm → ReLU
+→ MultiheadAttention(dim, heads) → LayerNorm (residual)
+→ MeanPool → Linear(dim, 1) → Sigmoid
+```
+
+This head is best at distinguishing wake words from phonetically similar phrases because it explicitly models the temporal ordering of phoneme embeddings.
+
+### Size Presets
+
+| Size | layer_dim | n_blocks |
+|------|-----------|----------|
+| tiny | 16 | 1 |
+| small | 32 | 1 |
+| medium | 128 | 2 |
+| large | 256 | 3 |
 
 ## Output
 

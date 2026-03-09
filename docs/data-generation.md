@@ -30,8 +30,8 @@ Target phrases (e.g., "hey jarvis")
 The VITS model contains 904 speaker embeddings. For each batch:
 
 1. **Speaker pairs** are cycled through all `(i, j)` combinations of speaker IDs
-2. **SLERP** interpolates the two speaker embeddings at the configured weight (e.g., 0.5 = midpoint)
-3. The blended embedding is used for inference, producing a voice that sounds like neither original speaker
+2. **SLERP** interpolates the two speaker embeddings at each configured weight (e.g., 0.2 = close to speaker 1, 0.5 = midpoint, 0.8 = close to speaker 2)
+3. The blended embedding is used for inference, producing a voice that sounds like neither original speaker. Multiple weights generate more diverse voices from each pair
 4. Audio is resampled from 22050 Hz to 16000 Hz and silence-trimmed via WebRTC VAD
 
 With 904 speakers, there are ~409,000 unique speaker pairs, each producing distinct vocal characteristics.
@@ -45,7 +45,7 @@ Each clip is synthesized with a combination of:
 | `noise_scales` | `[0.98]` | Overall speech variability |
 | `noise_scale_ws` | `[0.98]` | Phoneme duration variability |
 | `length_scales` | `[0.75, 1.0, 1.25]` | Speaking rate (slow/normal/fast) |
-| `slerp_weights` | `[0.5]` | Speaker interpolation weights (0=speaker1, 1=speaker2) |
+| `slerp_weights` | `[0.2, 0.35, 0.5, 0.65, 0.8]` | Speaker interpolation weights (0=speaker1, 1=speaker2) |
 | `max_speakers` | `null` | Cap on speaker IDs (null = all 904) |
 
 The Cartesian product of `slerp_weights`, `length_scales`, `noise_scales`, and `noise_scale_ws` creates multiple prosody variations. Speaker pairs and settings are cycled until `n_samples` clips are generated.

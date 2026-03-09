@@ -16,7 +16,7 @@ The mel-spectrogram and speech-embedding models are pre-trained and frozen — t
 - **Shared feature extractors** across all wake words
 - **Minimal training data** needed since only the small classifier head is trained
 
-The classifier head is trained in PyTorch for flexibility (custom loss, hard example mining, learning rate schedules), then exported to ONNX for deployment.
+The classifier head is trained in PyTorch for flexibility (focal loss, embedding mixup, learning rate schedules), then exported to ONNX for deployment.
 
 ## Data Flow
 
@@ -57,7 +57,7 @@ src/livekit/wakeword/
 ├── cli.py                       Typer CLI (setup, generate, augment, train, export, run)
 ├── models/
 │   ├── feature_extractor.py     MelSpectrogramFrontend + SpeechEmbedding (ONNX)
-│   ├── classifier.py            DNNClassifier, RNNClassifier, build_classifier()
+│   ├── classifier.py            DNNClassifier, RNNClassifier, ConvAttentionClassifier
 │   └── pipeline.py              WakeWordClassifier (training wrapper for classifier head)
 ├── data/
 │   ├── generate.py              VITS TTS + SLERP speaker blending + adversarial negatives
@@ -79,5 +79,5 @@ src/livekit/wakeword/
 1. **[Data Generation](data-generation.md)** — Synthesize positive clips via VITS TTS with SLERP speaker blending + adversarial negatives
 2. **[Augmentation](augmentation.md)** — Apply pitch shift, EQ, RIR convolution, background mixing; align clips to training windows
 3. **[Feature Extraction](feature-extraction.md)** — Extract mel spectrograms and speech embeddings through frozen ONNX models → `.npy` files
-4. **[Training](training.md)** — 3-phase adaptive training with hard example mining and checkpoint averaging
+4. **[Training](training.md)** — 3-phase adaptive training with focal loss, embedding mixup, and checkpoint averaging
 5. **[Export & Inference](export-and-inference.md)** — Export classifier to ONNX and run real-time streaming detection
