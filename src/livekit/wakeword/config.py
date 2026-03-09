@@ -16,6 +16,7 @@ _logger = logging.getLogger(__name__)
 class ModelType(str, Enum):
     dnn = "dnn"
     rnn = "rnn"
+    conv_attention = "conv_attention"
 
 
 class ModelSize(str, Enum):

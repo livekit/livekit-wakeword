@@ -23,6 +23,79 @@ class FCNBlock(nn.Module):
         return self.block(x)
 
 
+class ConvAttentionClassifier(nn.Module):
+    """1D Temporal Convolution + Self-Attention classification head.
+
+    Unlike the DNN head which flattens away temporal structure, this head
+    uses 1D convolutions to capture local temporal patterns and self-attention
+    to model long-range dependencies across the 16 timesteps.
+
+    Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
+    """
+
+    def __init__(
+        self,
+        n_timesteps: int = 16,
+        embedding_dim: int = 96,
+        layer_dim: int = 32,
+        n_blocks: int = 1,
+        n_heads: int = 4,
+    ):
+        super().__init__()
+        # Project embedding dim to layer_dim via 1D conv
+        conv_layers: list[nn.Module] = [
+            nn.Conv1d(embedding_dim, layer_dim, kernel_size=3, padding=1),
+            nn.LayerNorm([layer_dim, n_timesteps]),
+            nn.ReLU(inplace=True),
+        ]
+        for _ in range(n_blocks):
+            conv_layers.extend([
+                nn.Conv1d(layer_dim, layer_dim, kernel_size=3, padding=1),
+                nn.LayerNorm([layer_dim, n_timesteps]),
+                nn.ReLU(inplace=True),
+            ])
+        self.conv = nn.Sequential(*conv_layers)
+
+        # Self-attention over timesteps
+        # Ensure layer_dim is divisible by n_heads, adjust if needed
+        self.n_heads = min(n_heads, layer_dim)
+        while layer_dim % self.n_heads != 0:
+            self.n_heads -= 1
+        self.attention = nn.MultiheadAttention(
+            embed_dim=layer_dim,
+            num_heads=self.n_heads,
+            batch_first=True,
+        )
+        self.attn_norm = nn.LayerNorm(layer_dim)
+
+        # Classification head
+        self.head = nn.Sequential(
+            nn.Linear(layer_dim, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: (batch, 16, 96) embedding sequence
+
+        Returns:
+            (batch, 1) confidence score [0, 1]
+        """
+        # x: (batch, 16, 96) → (batch, 96, 16) for Conv1d
+        x = x.transpose(1, 2)
+        x = self.conv(x)
+        # (batch, layer_dim, 16) → (batch, 16, layer_dim) for attention
+        x = x.transpose(1, 2)
+        # Self-attention with residual
+        attn_out, _ = self.attention(x, x, x)
+        x = self.attn_norm(x + attn_out)
+        # Mean pool over timesteps → (batch, layer_dim)
+        x = x.mean(dim=1)
+        return self.head(x)
+
+
 class DNNClassifier(nn.Module):
     """DNN classification head.
 
@@ -114,5 +187,7 @@ def build_classifier(
         return DNNClassifier(layer_dim=layer_dim, n_blocks=n_blocks)
     elif model_type == ModelType.rnn:
         return RNNClassifier(hidden_dim=layer_dim, num_layers=max(1, n_blocks))
+    elif model_type == ModelType.conv_attention:
+        return ConvAttentionClassifier(layer_dim=layer_dim, n_blocks=n_blocks)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
