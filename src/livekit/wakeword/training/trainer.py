@@ -243,6 +243,16 @@ class WakeWordTrainer:
             features = features.to(self.device)
             labels = labels.to(self.device)
 
+            # Embedding mixup: interpolate random pairs of samples and their
+            # labels to create virtual training examples. This regularizes in
+            # embedding space without touching the audio pipeline.
+            mixup_alpha = 0.2
+            if mixup_alpha > 0:
+                lam = torch.distributions.Beta(mixup_alpha, mixup_alpha).sample().to(self.device)
+                perm = torch.randperm(features.size(0), device=self.device)
+                features = lam * features + (1 - lam) * features[perm]
+                labels = lam * labels + (1 - lam) * labels[perm]
+
             # Label smoothing: 0→ε, 1→1-ε to prevent overconfident predictions
             if label_smoothing > 0:
                 labels = labels * (1 - label_smoothing) + 0.5 * label_smoothing
