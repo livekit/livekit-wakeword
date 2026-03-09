@@ -88,6 +88,8 @@ class WakeWordConfig(BaseModel):
     # Training
     steps: int = 50000
     learning_rate: float = 1e-4
+    weight_decay: float = 1e-2
+    label_smoothing: float = 0.05
     max_negative_weight: float = 1500.0
     target_fp_per_hour: float = 0.2
     batch_n_per_class: dict[str, int] = Field(

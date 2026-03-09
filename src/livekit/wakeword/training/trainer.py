@@ -215,7 +215,12 @@ class WakeWordTrainer:
             f"=== Phase {phase}: {steps} steps, LR={base_lr}, max_neg_w={max_negative_weight} ==="
         )
 
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=base_lr)
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=base_lr,
+            weight_decay=self.config.weight_decay,
+        )
+        label_smoothing = self.config.label_smoothing
 
         warmup_steps = steps // 5 if phase == 1 else 0
         hold_steps = steps // 3 if phase == 1 else 0
@@ -237,6 +242,10 @@ class WakeWordTrainer:
 
             features = features.to(self.device)
             labels = labels.to(self.device)
+
+            # Label smoothing: 0→ε, 1→1-ε to prevent overconfident predictions
+            if label_smoothing > 0:
+                labels = labels * (1 - label_smoothing) + 0.5 * label_smoothing
 
             # Forward
             predictions = self.model(features).squeeze(-1)
