@@ -104,7 +104,7 @@ model:
   #   "dnn"            — fast, flattens temporal structure
   #   "rnn"            — Bi-LSTM, better for variable-length phrases
   #   "conv_attention" — 1D conv + self-attention, best temporal awareness
-  model_type: dnn
+  model_type: conv_attention
 
   # Model size: tiny (16d), small (32d), medium (128d), large (256d)
   # Suggestion: small for embedded, medium for server, large for max accuracy
