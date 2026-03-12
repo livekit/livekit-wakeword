@@ -18,7 +18,7 @@ setup: |
   sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.cargo/bin:$PATH"
-  uv sync --extra train --extra export
+  uv sync --extra train --extra export --extra eval
   uv run livekit-wakeword setup
 
 run: |
@@ -27,7 +27,9 @@ run: |
   mkdir -p /outputs/${MODEL_NAME}
   cp output/${MODEL_NAME}/${MODEL_NAME}.pt /outputs/${MODEL_NAME}/
   cp output/${MODEL_NAME}/${MODEL_NAME}.onnx /outputs/${MODEL_NAME}/
-  cp output/${MODEL_NAME}/metrics.json /outputs/${MODEL_NAME}/
+  cp output/${MODEL_NAME}/${MODEL_NAME}_metrics.json /outputs/${MODEL_NAME}/
+  cp output/${MODEL_NAME}/${MODEL_NAME}_det.png /outputs/${MODEL_NAME}/
+  cp output/${MODEL_NAME}/${MODEL_NAME}_eval.json /outputs/${MODEL_NAME}/
 
 envs:
   CONFIG_FILE: prod.yaml

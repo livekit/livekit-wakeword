@@ -274,6 +274,36 @@ def export(
 
 
 @app.command()
+def eval(
+    config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
+    model_path: str = typer.Option(
+        None, "--model", "-m", help="Path to ONNX model (default: <output_dir>/<model_name>.onnx)"
+    ),
+) -> None:
+    """Evaluate model on validation set: DET curve, AUT, FPPH, recall."""
+    from pathlib import Path
+
+    config = load_config(config_path)
+
+    if model_path is None:
+        resolved_model = config.model_output_dir / f"{config.model_name}.onnx"
+    else:
+        resolved_model = Path(model_path)
+
+    logger.info(f"Evaluating '{config.model_name}' with model {resolved_model}...")
+
+    from .eval.evaluate import run_eval
+
+    results = run_eval(config, resolved_model)
+
+    logger.info(
+        f"AUT={results['aut']:.4f}  FPPH={results['fpph']:.2f}  "
+        f"Recall={results['recall']:.1%}  Threshold={results['threshold']:.2f}"
+    )
+    logger.info(f"DET curve: {config.model_output_dir / f'{config.model_name}_det.png'}")
+
+
+@app.command()
 def run(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
@@ -285,22 +315,30 @@ def run(
     from .data.augment import run_augment
     from .data.features import run_extraction
     from .data.generate import run_generate
+    from .eval.evaluate import run_eval
     from .export.onnx import run_export
     from .training.trainer import run_train
 
-    logger.info("Step 1/5: Generate synthetic data")
+    logger.info("Step 1/6: Generate synthetic data")
     run_generate(config)
 
-    logger.info("Step 2/5: Augment clips")
+    logger.info("Step 2/6: Augment clips")
     run_augment(config)
 
-    logger.info("Step 3/5: Extract features")
+    logger.info("Step 3/6: Extract features")
     run_extraction(config)
 
-    logger.info("Step 4/5: Train classifier")
+    logger.info("Step 4/6: Train classifier")
     run_train(config)
 
-    logger.info("Step 5/5: Export to ONNX")
-    run_export(config)
+    logger.info("Step 5/6: Export to ONNX")
+    onnx_path = run_export(config)
+
+    logger.info("Step 6/6: Evaluate model")
+    results = run_eval(config, onnx_path)
+    logger.info(
+        f"Eval: AUT={results['aut']:.4f}  FPPH={results['fpph']:.2f}  "
+        f"Recall={results['recall']:.1%}"
+    )
 
     logger.info("Full pipeline complete!")

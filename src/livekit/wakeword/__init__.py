@@ -16,6 +16,10 @@ def __getattr__(name: str) -> object:
         from .export.onnx import run_export
 
         return run_export
+    if name == "run_eval":
+        from .eval.evaluate import run_eval
+
+        return run_eval
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -26,6 +30,7 @@ __all__ = [
     "Detection",
     "load_config",
     "run_augment",
+    "run_eval",
     "run_export",
     "run_extraction",
     "run_generate",

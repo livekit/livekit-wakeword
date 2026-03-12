@@ -93,7 +93,7 @@ class WakeWordTrainer:
         self.model = WakeWordClassifier(config).to(self.device)
         self.checkpoints: list[_Checkpoint] = []
         self._metrics_log: list[dict[str, object]] = []
-        self._metrics_path = config.model_output_dir / "metrics.json"
+        self._metrics_path = config.model_output_dir / f"{config.model_name}_metrics.json"
         self._train_start: float = 0.0
 
     def _build_dataloader(self) -> torch.utils.data.DataLoader:  # type: ignore[type-arg]

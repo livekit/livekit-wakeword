@@ -54,7 +54,7 @@ The embedding model uses a 5-block CNN with separable convolutions (1x3 + 3x1), 
 ```
 src/livekit/wakeword/
 ├── config.py                    Pydantic config models + YAML loading
-├── cli.py                       Typer CLI (setup, generate, augment, train, export, run)
+├── cli.py                       Typer CLI (setup, generate, augment, train, export, eval, run)
 ├── models/
 │   ├── feature_extractor.py     MelSpectrogramFrontend + SpeechEmbedding (ONNX)
 │   ├── classifier.py            DNNClassifier, RNNClassifier, ConvAttentionClassifier
@@ -67,6 +67,8 @@ src/livekit/wakeword/
 ├── training/
 │   ├── trainer.py               WakeWordTrainer (3-phase training + checkpoint averaging)
 │   └── metrics.py               FPPH, recall, balanced accuracy
+├── eval/
+│   └── evaluate.py              DET curve, AUT, FPPH evaluation + plotting
 ├── export/
 │   └── onnx.py                  ONNX export + INT8 quantization
 └── inference/
@@ -81,3 +83,4 @@ src/livekit/wakeword/
 3. **[Feature Extraction](feature-extraction.md)** — Extract mel spectrograms and speech embeddings through frozen ONNX models → `.npy` files
 4. **[Training](training.md)** — 3-phase adaptive training with focal loss, embedding mixup, and checkpoint averaging
 5. **[Export & Inference](export-and-inference.md)** — Export classifier to ONNX and run real-time streaming detection
+6. **[Evaluation](evaluation.md)** — DET curves, AUT, FPPH, and model comparison

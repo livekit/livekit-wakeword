@@ -37,6 +37,9 @@ train = [
     "cmudict>=1.0",
     "tqdm>=4.60",
 ]
+eval = [
+    "matplotlib>=3.8",
+]
 export = [
     "onnx>=1.15",
     "onnxruntime>=1.17",
