@@ -223,28 +223,31 @@ Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
 
 ### Results
 
-Both models were evaluated on the same validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio) using the "hey livekit" wake word. The livekit-wakeword model uses `conv_attention` (medium) trained with the [prod config](configs/prod.yaml).
+To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same architecture, better training pipeline), and a livekit-wakeword conv-attention model on the same "hey livekit" validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio). The livekit-wakeword models were trained with the [prod config](configs/prod.yaml).
 
-| Metric | openWakeWord | livekit-wakeword |
-|--------|:---:|:---:|
-| **AUT*** | 0.0720 | **0.0012** |
-| **FPPH*** | 8.50 | **0.08** |
-| **Recall*** | 68.6% | **86.1%** |
-| Optimal Threshold* | 0.01 | 0.68 |
-| Accuracy | 84.0% | 93.1% |
+| Metric | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
+|--------|:---:|:---:|:---:|
+| **AUT*** | 0.0720 | 0.0423 | **0.0012** |
+| **FPPH*** | 8.50 | 3.07 | **0.08** |
+| **Recall*** | 68.6% | 85.3% | **86.1%** |
+| Optimal Threshold* | 0.01 | 0.01 | 0.68 |
 
 <table>
 <tr>
-<td align="center"><strong>openWakeWord</strong></td>
-<td align="center"><strong>livekit-wakeword</strong></td>
+<td align="center"><strong>openWakeWord (DNN)</strong></td>
+<td align="center"><strong>livekit-wakeword (DNN)</strong></td>
+<td align="center"><strong>livekit-wakeword (conv-attention)</strong></td>
 </tr>
 <tr>
-<td><img src=".github/assets/det_openwakeword.png" alt="DET curve — openWakeWord" width="420"></td>
-<td><img src=".github/assets/det_livekit_wakeword.png" alt="DET curve — livekit-wakeword" width="420"></td>
+<td><img src=".github/assets/det_openwakeword.png" alt="DET curve — openWakeWord" width="280"></td>
+<td><img src=".github/assets/det_livekit_wakeword_dnn.png" alt="DET curve — livekit-wakeword DNN" width="280"></td>
+<td><img src=".github/assets/det_livekit_wakeword.png" alt="DET curve — livekit-wakeword conv-attention" width="280"></td>
 </tr>
 </table>
 
-The conv-attention head achieves **60x lower AUT** and **100x fewer false positives per hour** while detecting 17% more wake words. The DET curve (lower-left is better) shows near-perfect separation for livekit-wakeword, while the openWakeWord DNN struggles to distinguish positive and negative examples at any operating point.
+The livekit-wakeword DNN already outperforms openWakeWord's DNN thanks to the improved training pipeline (focal loss, embedding mixup, 3-phase training, checkpoint averaging). However, both DNN models fail to meet the FPPH target — their optimal thresholds fall to 0.01, meaning no operating point can keep false positives low enough.
+
+The conv-attention head is what unlocks the low false positive rate: **60x lower AUT** and **100x fewer false positives per hour** than openWakeWord, while detecting 17% more wake words.
 
 *\***AUT** (Area Under the DET curve) — summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words.*
 
@@ -252,9 +255,9 @@ The conv-attention head achieves **60x lower AUT** and **100x fewer false positi
 
 *\***Recall** — the percentage of actual wake words correctly detected. Higher is better.*
 
-*\***Optimal Threshold** — the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). The openWakeWord model's threshold of 0.01 indicates no threshold could meet the FPPH target — the evaluator fell back to the highest balanced accuracy. In contrast, livekit-wakeword finds a clean operating point at 0.68.*
+*\***Optimal Threshold** — the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target — the evaluator fell back to the highest balanced accuracy.*
 
-### Why the difference?
+### Why conv-attention wins
 
 - **Temporal awareness** — the conv-attention model sees the *order* of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
 - **Better accuracy at the same model size** — attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
