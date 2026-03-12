@@ -22,14 +22,14 @@ def export_classifier(
 ) -> Path:
     """Export classifier head to ONNX.
 
-    Input shape: (1, 16, 96) — pre-extracted embeddings
-    Output shape: (1, 1) — confidence score
+    Input shape: (batch, 16, 96) — pre-extracted embeddings
+    Output shape: (batch, 1) — confidence score
     """
     model = WakeWordClassifier(config)
     model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
     model.eval()
 
-    dummy_input = torch.randn(1, 16, 96)
+    dummy_input = torch.randn(2, 16, 96)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     torch.onnx.export(

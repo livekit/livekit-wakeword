@@ -89,7 +89,7 @@ class ConvAttentionClassifier(nn.Module):
         # (batch, layer_dim, 16) → (batch, 16, layer_dim) for attention
         x = x.transpose(1, 2)
         # Self-attention with residual
-        attn_out, _ = self.attention(x, x, x)
+        attn_out, _ = self.attention(x, x, x, need_weights=False)
         x = self.attn_norm(x + attn_out)
         # Mean pool over timesteps → (batch, layer_dim)
         x = x.mean(dim=1)
