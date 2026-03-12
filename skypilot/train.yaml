@@ -2,10 +2,10 @@ name: livekit-wakeword-train-hey-livekit
 
 resources:
   cloud: nebius
-  accelerators: H100:1
+  accelerators: L40S:1
   cpus: 8+
   memory: 32+
-  disk_size: 100
+  disk_size: 500
 
 workdir: .
 
