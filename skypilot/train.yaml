@@ -43,5 +43,5 @@ run: |
 envs:
   CONFIG_FILE: prod.yaml
   MODEL_NAME: hey_livekit
-  DATA_DIR: /home/skypilot/data
-  OUTPUT_DIR: /home/skypilot/output
+  DATA_DIR: ~/persistent/data
+  OUTPUT_DIR: ~/persistent/output
