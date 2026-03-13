@@ -6,6 +6,9 @@ resources:
   cpus: 8+
   memory: 32+
   disk_size: 500
+  autostop:
+    idle_minutes: 10
+    down: false
 
 workdir: .
 
