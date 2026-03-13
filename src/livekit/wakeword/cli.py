@@ -118,7 +118,7 @@ def _download_validation_features(features_dir: Path) -> None:
 
         logger.info("Downloading validation features (~176 MB, ~11hrs)...")
         hf_hub_download(
-            repo_id="davidscripka/openwakeword_features",
+            repo_id="binhpham/livekit_wakeword_features",
             filename="validation_set_features.npy",
             local_dir=str(features_dir),
             repo_type="dataset",
@@ -139,7 +139,7 @@ def _download_features(features_dir: Path) -> None:
 
         logger.info("Downloading ACAV100M features (~16 GB, ~2000hrs)...")
         hf_hub_download(
-            repo_id="davidscripka/openwakeword_features",
+            repo_id="binhpham/livekit_wakeword_features",
             filename="openwakeword_features_ACAV100M_2000_hrs_16bit.npy",
             local_dir=str(features_dir),
             repo_type="dataset",
