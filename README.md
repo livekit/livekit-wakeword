@@ -42,9 +42,15 @@ sudo apt install portaudio19-dev
 **Installation:**
 
 ```bash
-pip install git+https://github.com/livekit/livekit-wakeword.git
+pip install livekit-wakeword
 # or
-uv add git+https://github.com/livekit/livekit-wakeword
+uv add livekit-wakeword
+```
+
+For microphone listening, install with the `listener` extra:
+
+```bash
+pip install livekit-wakeword[listener]
 ```
 
 **Basic inference:**
@@ -89,7 +95,19 @@ brew install espeak-ng ffmpeg portaudio
 sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
 ```
 
-**Installation:**
+**Installation (with pip):**
+
+```bash
+pip install livekit-wakeword[train,eval,export]
+```
+
+**Installation (with uv):**
+
+```bash
+uv tool install livekit-wakeword[train,eval,export]
+```
+
+**Installation (from source):**
 
 ```bash
 # Install uv (if you don't have it)
@@ -104,29 +122,29 @@ uv sync --all-extras
 **Download models and data:**
 
 ```bash
-uv run livekit-wakeword setup
+livekit-wakeword setup
 ```
 
 **Train a wake word:**
 
 ```bash
-uv run livekit-wakeword run configs/hey_livekit.yaml
+livekit-wakeword run configs/hey_livekit.yaml
 ```
 
 Or run stages individually:
 
 ```bash
-uv run livekit-wakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
-uv run livekit-wakeword augment configs/hey_livekit.yaml   # Augment + extract features
-uv run livekit-wakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
-uv run livekit-wakeword export configs/hey_livekit.yaml    # Export to ONNX
-uv run livekit-wakeword eval configs/hey_livekit.yaml      # Evaluate model (DET curve, AUT, FPPH)
+livekit-wakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
+livekit-wakeword augment configs/hey_livekit.yaml   # Augment + extract features
+livekit-wakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
+livekit-wakeword export configs/hey_livekit.yaml    # Export to ONNX
+livekit-wakeword eval configs/hey_livekit.yaml      # Evaluate model (DET curve, AUT, FPPH)
 ```
 
 You can also evaluate any compatible ONNX model (e.g., one trained with openWakeWord):
 
 ```bash
-uv run livekit-wakeword eval configs/hey_livekit.yaml -m /path/to/other_model.onnx
+livekit-wakeword eval configs/hey_livekit.yaml -m /path/to/other_model.onnx
 ```
 
 Eval produces a DET curve plot and metrics JSON in the output directory. See [Evaluation](docs/evaluation.md) for details.
@@ -239,9 +257,9 @@ To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same archi
 <td align="center"><strong>livekit-wakeword (conv-attention)</strong></td>
 </tr>
 <tr>
-<td><img src=".github/assets/det_openwakeword.png" alt="DET curve — openWakeWord" width="280"></td>
-<td><img src=".github/assets/det_livekit_wakeword_dnn.png" alt="DET curve — livekit-wakeword DNN" width="280"></td>
-<td><img src=".github/assets/det_livekit_wakeword.png" alt="DET curve — livekit-wakeword conv-attention" width="280"></td>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_openwakeword.png" alt="DET curve — openWakeWord" width="280"></td>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword_dnn.png" alt="DET curve — livekit-wakeword DNN" width="280"></td>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword.png" alt="DET curve — livekit-wakeword conv-attention" width="280"></td>
 </tr>
 </table>
 
