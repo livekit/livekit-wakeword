@@ -61,8 +61,6 @@ export = [
     "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
 ]
-dev = ["pytest>=8.0", "pytest-cov>=4.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.8"]
-
 [project.urls]
 Homepage = "https://github.com/livekit/livekit-wakeword"
 Repository = "https://github.com/livekit/livekit-wakeword"
@@ -87,6 +85,9 @@ include = [
     "src/livekit/wakeword/**/*.py",
     "src/livekit/wakeword/resources/*.onnx",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-cov>=4.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.8"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
