@@ -1,5 +1,5 @@
 <a href="https://livekit.io/">
-  <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
+  <img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
 </a>
 
 # livekit-wakeword
