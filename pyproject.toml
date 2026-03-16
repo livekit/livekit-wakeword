@@ -9,7 +9,7 @@ description = "Wake word detection for voice-enabled applications"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-authors = [{ name = "LiveKit" }]
+authors = [{ name = "Binh Pham", email = "binh.pham@livekit.io" }]
 keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx"]
 classifiers = [
     "Development Status :: 4 - Beta",
