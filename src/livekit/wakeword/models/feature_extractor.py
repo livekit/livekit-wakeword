@@ -5,8 +5,6 @@ The original openWakeWord pipeline uses two frozen ONNX models:
 2. embedding_model.onnx — Google's speech_embedding CNN (~330k params)
 
 We use ONNX runtime for both to guarantee output compatibility.
-A pure-torchaudio fallback is provided for the mel stage when the ONNX model
-is unavailable (e.g., during development/testing).
 """
 
 from __future__ import annotations
@@ -30,18 +28,13 @@ class MelSpectrogramFrontend:
     Output: (batch, time_frames, 32)
     """
 
-    def __init__(self, onnx_path: str | Path | None = None):
-        self._onnx_session = None
-        self._torch_frontend = None
-
-        if onnx_path is not None and Path(onnx_path).exists():
-            self._init_onnx(onnx_path)
-        else:
-            if onnx_path is not None:
-                logger.warning(
-                    f"Mel ONNX model not found at {onnx_path}, using torchaudio fallback"
-                )
-            self._init_torch_fallback()
+    def __init__(self, onnx_path: str | Path):
+        if not Path(onnx_path).exists():
+            raise FileNotFoundError(
+                f"Mel ONNX model not found: {onnx_path}\n"
+                "This should not happen - please reinstall livekit-wakeword."
+            )
+        self._init_onnx(onnx_path)
 
     def _init_onnx(self, onnx_path: str | Path) -> None:
         import onnxruntime as ort
@@ -53,25 +46,6 @@ class MelSpectrogramFrontend:
         self._input_name = self._onnx_session.get_inputs()[0].name
         logger.info(f"Loaded mel ONNX model from {onnx_path}")
 
-    def _init_torch_fallback(self) -> None:
-        """Initialize torchaudio fallback with parameters matching the ONNX model."""
-        import torch
-        import torchaudio.transforms as T
-
-        self._mel_spec = T.MelSpectrogram(
-            sample_rate=16000,
-            n_mels=32,
-            n_fft=512,
-            hop_length=160,
-            win_length=400,
-            f_min=60.0,
-            f_max=3800.0,
-            center=False,
-            power=2.0,
-        )
-        self._amplitude_to_db = T.AmplitudeToDB(stype="power", top_db=80.0)
-        logger.info("Using torchaudio mel fallback (close but not exact match to ONNX)")
-
     def __call__(self, audio: np.ndarray) -> np.ndarray:
         """Compute mel spectrogram features.
 
@@ -81,10 +55,7 @@ class MelSpectrogramFrontend:
         Returns:
             (batch, time_frames, 32) normalized mel features
         """
-        if self._onnx_session is not None:
-            return self._forward_onnx(audio)
-        else:
-            return self._forward_torch(audio)
+        return self._forward_onnx(audio)
 
     def _forward_onnx(self, audio: np.ndarray) -> np.ndarray:
         """Run ONNX mel model + post-processing normalization."""
@@ -106,24 +77,6 @@ class MelSpectrogramFrontend:
         # Post-processing: x/10 + 2 (matches openWakeWord's melspec_transform)
         mel = mel / 10.0 + 2.0
         return mel
-
-    def _forward_torch(self, audio: np.ndarray) -> np.ndarray:
-        """Torchaudio fallback with matched parameters."""
-        import torch
-
-        if audio.ndim == 1:
-            audio = audio[np.newaxis, :]
-
-        x = torch.from_numpy(audio)
-        # (batch, n_mels, time_frames)
-        mel = self._mel_spec(x)
-        # power_to_db: 10 * log10(mel) with top_db=80 clipping
-        mel_db = self._amplitude_to_db(mel)
-        # Transpose to (batch, time_frames, n_mels) and normalize
-        mel_db = mel_db.transpose(1, 2)
-        mel_db = mel_db / 10.0 + 2.0
-        return mel_db.numpy()
-
 
 class SpeechEmbedding:
     """Stage 2: Google's speech_embedding CNN via ONNX runtime.
