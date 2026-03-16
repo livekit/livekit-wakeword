@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "livekit-wakeword"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Wake word detection for voice-enabled applications"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -68,6 +68,12 @@ Issues = "https://github.com/livekit/livekit-wakeword/issues"
 
 [project.scripts]
 livekit-wakeword = "livekit.wakeword.cli:app"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/livekit/wakeword/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/livekit"]
