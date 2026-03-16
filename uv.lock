@@ -995,17 +995,8 @@ name = "livekit-wakeword"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "onnxruntime" },
-    { name = "pyaudio" },
-    { name = "pydantic" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "soundfile" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -1024,17 +1015,28 @@ export = [
     { name = "onnxruntime" },
     { name = "onnxscript" },
 ]
+listener = [
+    { name = "pyaudio" },
+]
 train = [
     { name = "audiomentations" },
     { name = "cmudict" },
+    { name = "huggingface-hub" },
     { name = "librosa" },
     { name = "nltk" },
     { name = "pronouncing" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "rich" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "setuptools" },
+    { name = "soundfile" },
+    { name = "torch" },
     { name = "torch-audiomentations" },
+    { name = "torchaudio" },
     { name = "tqdm" },
+    { name = "typer" },
     { name = "webrtcvad" },
 ]
 
@@ -1042,7 +1044,7 @@ train = [
 requires-dist = [
     { name = "audiomentations", marker = "extra == 'train'", specifier = ">=0.36" },
     { name = "cmudict", marker = "extra == 'train'", specifier = ">=1.0" },
-    { name = "huggingface-hub", specifier = ">=0.20" },
+    { name = "huggingface-hub", marker = "extra == 'train'", specifier = ">=0.20" },
     { name = "librosa", marker = "extra == 'train'", specifier = ">=0.10" },
     { name = "matplotlib", marker = "extra == 'eval'", specifier = ">=3.8" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
@@ -1053,26 +1055,26 @@ requires-dist = [
     { name = "onnxruntime", marker = "extra == 'export'", specifier = ">=1.17" },
     { name = "onnxscript", marker = "extra == 'export'", specifier = ">=0.6.2" },
     { name = "pronouncing", marker = "extra == 'train'", specifier = ">=0.2" },
-    { name = "pyaudio", specifier = ">=0.2.14" },
-    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pyaudio", marker = "extra == 'listener'", specifier = ">=0.2.14" },
+    { name = "pydantic", marker = "extra == 'train'", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0" },
+    { name = "pyyaml", marker = "extra == 'train'", specifier = ">=6.0" },
+    { name = "rich", marker = "extra == 'train'", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "scikit-learn", marker = "extra == 'train'", specifier = ">=1.3" },
     { name = "scipy", marker = "extra == 'train'", specifier = ">=1.11" },
     { name = "setuptools", marker = "extra == 'train'", specifier = ">=69.0,<81" },
-    { name = "soundfile", specifier = ">=0.12" },
-    { name = "torch", specifier = ">=2.2" },
+    { name = "soundfile", marker = "extra == 'train'", specifier = ">=0.12" },
+    { name = "torch", marker = "extra == 'train'", specifier = ">=2.2" },
     { name = "torch-audiomentations", marker = "extra == 'train'", specifier = ">=0.11" },
-    { name = "torchaudio", specifier = ">=2.2" },
+    { name = "torchaudio", marker = "extra == 'train'", specifier = ">=2.2" },
     { name = "tqdm", marker = "extra == 'train'", specifier = ">=4.60" },
-    { name = "typer", specifier = ">=0.12" },
+    { name = "typer", marker = "extra == 'train'", specifier = ">=0.12" },
     { name = "webrtcvad", marker = "extra == 'train'", specifier = ">=2.0.10" },
 ]
-provides-extras = ["train", "eval", "export", "dev"]
+provides-extras = ["listener", "train", "eval", "export", "dev"]
 
 [[package]]
 name = "llvmlite"

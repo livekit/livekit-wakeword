@@ -1,25 +1,31 @@
-"""livekit-wakeword — Simplified pure-PyTorch wake word detection."""
+"""livekit-wakeword — Wake word detection for voice-enabled applications."""
 
-from .config import WakeWordConfig, load_config
-from .data.augment import run_augment
-from .data.features import run_extraction
-from .data.generate import run_generate
 from .inference.listener import Detection, WakeWordListener
 from .inference.model import WakeWordModel
-from .training.trainer import run_train
 
 __version__ = "0.1.0"
 
+# Training / CLI imports are lazy-loaded so that the core inference API
+# works with only numpy + onnxruntime (no torch, pydantic, etc.).
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    "WakeWordConfig": (".config", "WakeWordConfig"),
+    "load_config": (".config", "load_config"),
+    "run_augment": (".data.augment", "run_augment"),
+    "run_extraction": (".data.features", "run_extraction"),
+    "run_generate": (".data.generate", "run_generate"),
+    "run_train": (".training.trainer", "run_train"),
+    "run_export": (".export.onnx", "run_export"),
+    "run_eval": (".eval.evaluate", "run_eval"),
+}
+
 
 def __getattr__(name: str) -> object:
-    if name == "run_export":
-        from .export.onnx import run_export
+    if name in _LAZY_IMPORTS:
+        module_path, attr = _LAZY_IMPORTS[name]
+        import importlib
 
-        return run_export
-    if name == "run_eval":
-        from .eval.evaluate import run_eval
-
-        return run_eval
+        mod = importlib.import_module(module_path, __name__)
+        return getattr(mod, attr)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

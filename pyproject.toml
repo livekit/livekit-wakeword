@@ -5,26 +5,42 @@ build-backend = "hatchling.build"
 [project]
 name = "livekit-wakeword"
 version = "0.1.0"
-description = "Simplified pure-PyTorch wake word detection"
+description = "Wake word detection for voice-enabled applications"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+authors = [{ name = "LiveKit" }]
+keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 
 dependencies = [
-    "torch>=2.2",
-    "torchaudio>=2.2",
     "numpy>=1.24",
     "onnxruntime>=1.17",
+]
+
+[project.optional-dependencies]
+listener = [
+    "pyaudio>=0.2.14",
+]
+train = [
+    "torch>=2.2",
+    "torchaudio>=2.2",
     "pydantic>=2.0",
     "typer>=0.12",
     "pyyaml>=6.0",
     "rich>=13.0",
     "huggingface-hub>=0.20",
-    "pyaudio>=0.2.14",
     "soundfile>=0.12",
-]
-
-[project.optional-dependencies]
-train = [
     "torch-audiomentations>=0.11",
     "audiomentations>=0.36",
     "webrtcvad>=2.0.10",
@@ -46,6 +62,11 @@ export = [
     "onnxscript>=0.6.2",
 ]
 dev = ["pytest>=8.0", "pytest-cov>=4.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.8"]
+
+[project.urls]
+Homepage = "https://github.com/livekit/livekit-wakeword"
+Repository = "https://github.com/livekit/livekit-wakeword"
+Issues = "https://github.com/livekit/livekit-wakeword/issues"
 
 [project.scripts]
 livekit-wakeword = "livekit.wakeword.cli:app"
