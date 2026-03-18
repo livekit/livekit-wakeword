@@ -150,6 +150,7 @@ def _plot_det_curve(
         f"FPPH: {metrics['fpph']:.2f}",
         f"Recall: {metrics['recall']:.1%}",
         f"Threshold: {metrics['threshold']:.2f}",
+        f"Optimal Thresh: {metrics['optimal_threshold']:.2f}",
     ]
     ax.text(
         0.97,
@@ -204,11 +205,18 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     # Compute AUT
     aut = _compute_aut(fpr, fnr)
 
-    # Find optimal threshold and compute summary metrics
+    # Compute summary metrics at fixed threshold 0.5 for consistent comparison
     clip_duration = config.augmentation.clip_duration
     validation_hours = neg_features.shape[0] * clip_duration / 3600.0
 
-    from ..training.metrics import find_best_threshold
+    from ..training.metrics import evaluate_model, find_best_threshold
+
+    fixed = evaluate_model(
+        pos_scores,
+        neg_scores,
+        threshold=0.5,
+        validation_hours=validation_hours,
+    )
 
     optimal = find_best_threshold(
         pos_scores,
@@ -220,10 +228,13 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     # Build results
     results = {
         "aut": aut,
-        "fpph": optimal["fpph"],
-        "recall": optimal["recall"],
-        "accuracy": optimal["accuracy"],
-        "threshold": optimal["threshold"],
+        "fpph": fixed["fpph"],
+        "recall": fixed["recall"],
+        "accuracy": fixed["accuracy"],
+        "threshold": fixed["threshold"],
+        "optimal_threshold": optimal["threshold"],
+        "optimal_recall": optimal["recall"],
+        "optimal_fpph": optimal["fpph"],
         "n_positive": int(pos_features.shape[0]),
         "n_negative": int(neg_features.shape[0]),
         "validation_hours": round(validation_hours, 2),
@@ -232,7 +243,8 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     # Save plot
     output_dir = config.model_output_dir
     plot_path = output_dir / f"{config.model_name}_det.png"
-    _plot_det_curve(fpr, fnr, aut, config.model_name, plot_path, optimal)
+    plot_metrics = {**fixed, "optimal_threshold": optimal["threshold"]}
+    _plot_det_curve(fpr, fnr, aut, config.model_name, plot_path, plot_metrics)
 
     # Save metrics JSON
     metrics_path = output_dir / f"{config.model_name}_eval.json"
