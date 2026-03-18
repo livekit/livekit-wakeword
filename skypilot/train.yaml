@@ -22,26 +22,29 @@ setup: |
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.cargo/bin:$PATH"
   # Persist data and output outside workdir so they survive re-syncs
-  mkdir -p ${DATA_DIR} ${OUTPUT_DIR}
-  ln -sfn ${DATA_DIR} data
-  ln -sfn ${OUTPUT_DIR} output
+  mkdir -p ${HOME_DIR}/${DATA_DIR} ${HOME_DIR}/${OUTPUT_DIR}
+  ln -sfn ${HOME_DIR}/${DATA_DIR} data
+  ln -sfn ${HOME_DIR}/${OUTPUT_DIR} output
   uv sync --extra train --extra export --extra eval
-  uv run livekit-wakeword setup --data-dir ${DATA_DIR}
+  uv run livekit-wakeword setup --data-dir ${HOME_DIR}/${DATA_DIR}
 
 run: |
   export PATH="$HOME/.cargo/bin:$PATH"
-  ln -sfn ${DATA_DIR} data
-  ln -sfn ${OUTPUT_DIR} output
+  ln -sfn ${HOME_DIR}/${DATA_DIR} data
+  ln -sfn ${HOME_DIR}/${OUTPUT_DIR} output
   uv run livekit-wakeword run configs/${CONFIG_FILE}
-  mkdir -p /outputs/${MODEL_NAME}
-  cp ${OUTPUT_DIR}/${MODEL_NAME}/${MODEL_NAME}.pt /outputs/${MODEL_NAME}/
-  cp ${OUTPUT_DIR}/${MODEL_NAME}/${MODEL_NAME}.onnx /outputs/${MODEL_NAME}/
-  cp ${OUTPUT_DIR}/${MODEL_NAME}/${MODEL_NAME}_metrics.json /outputs/${MODEL_NAME}/
-  cp ${OUTPUT_DIR}/${MODEL_NAME}/${MODEL_NAME}_det.png /outputs/${MODEL_NAME}/
-  cp ${OUTPUT_DIR}/${MODEL_NAME}/${MODEL_NAME}_eval.json /outputs/${MODEL_NAME}/
+  MODEL_DIR="${HOME_DIR}/${OUTPUT_DIR}/${MODEL_NAME}"
+  ARTIFACT_DIR="/outputs/${MODEL_NAME}"
+  mkdir -p "$ARTIFACT_DIR"
+  cp "$MODEL_DIR/${MODEL_NAME}.pt" "$ARTIFACT_DIR/"
+  cp "$MODEL_DIR/${MODEL_NAME}.onnx" "$ARTIFACT_DIR/"
+  cp "$MODEL_DIR/${MODEL_NAME}_metrics.json" "$ARTIFACT_DIR/"
+  cp "$MODEL_DIR/${MODEL_NAME}_det.png" "$ARTIFACT_DIR/"
+  cp "$MODEL_DIR/${MODEL_NAME}_eval.json" "$ARTIFACT_DIR/"
 
 envs:
   CONFIG_FILE: prod.yaml
   MODEL_NAME: hey_livekit
-  DATA_DIR: ~/persistent/data
-  OUTPUT_DIR: ~/persistent/output
+  HOME_DIR: /home/ubuntu
+  DATA_DIR: persistent/data
+  OUTPUT_DIR: persistent/output
