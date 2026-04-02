@@ -94,6 +94,12 @@ def extract_features_from_long_audio(
             audio = audio[:, 0]
         audio = audio.astype(np.float32)
 
+        # Resample to expected rate if needed
+        if sr != sample_rate:
+            import librosa
+
+            audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
+
         # Slice into non-overlapping chunks
         n_chunks = len(audio) // chunk_samples
         for i in range(n_chunks):
