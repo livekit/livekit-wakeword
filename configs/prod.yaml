@@ -146,3 +146,4 @@ batch_n_per_class:
   positive: 50 # wake word samples
   adversarial_negative: 50 # phonetically similar non-wake-words
   ACAV100M_sample: 1024 # random speech from ACAV100M dataset
+  background_noise: 50 # pure ambient noise (HVAC, music, etc.)

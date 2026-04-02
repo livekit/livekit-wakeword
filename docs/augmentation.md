@@ -64,6 +64,8 @@ scale = sqrt(audio_power / (background_power * 10^(snr_db / 10)))
 output = audio + scale * background
 ```
 
+> **Note:** Background noise files serve double duty — they are used here as augmentation overlays *and* also chunked into standalone negative training samples during feature extraction. See [Training — Background Noise as Standalone Negatives](training.md#background-noise-as-standalone-negatives) for details.
+
 ## Clip Alignment
 
 Positive and negative clips are aligned differently within the target window (default 2.0 seconds = 32,000 samples).

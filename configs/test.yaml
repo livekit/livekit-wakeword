@@ -56,3 +56,4 @@ batch_n_per_class:
   positive: 10
   adversarial_negative: 10
   ACAV100M_sample: 64
+  background_noise: 10

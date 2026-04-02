@@ -222,8 +222,29 @@ The dataloader loads features from:
 | `positive` | `positive_features_train.npy` | 1 |
 | `adversarial_negative` | `negative_features_train.npy` | 0 |
 | `ACAV100M_sample` | `data/features/openwakeword_features_ACAV100M_2000_hrs_16bit.npy` | 0 |
+| `background_noise` | `background_noise_features.npy` | 0 |
 
 The ACAV100M dataset (if available) provides ~2000 hours of general audio embeddings as additional negative examples.
+
+### Background Noise as Standalone Negatives
+
+Background noise audio serves double duty in the pipeline:
+
+1. **Augmentation overlay** — mixed into positive and adversarial clips at random SNR during the augmentation step (see [Augmentation](augmentation.md))
+2. **Standalone negative class** — the same background WAV files are sliced into non-overlapping 2-second chunks, feature-extracted, and fed into training as their own negative class
+
+This teaches the model that pure ambient noise (silence, HVAC, music, etc.) is not a wake word, rather than only seeing noise blended with speech.
+
+To add custom background noise, put `.wav` files in a directory and add the path to `augmentation.background_paths` in your config:
+
+```yaml
+augmentation:
+  background_paths:
+    - ./data/backgrounds        # default MUSAN noise
+    - ./data/my-office-noise    # your custom recordings
+```
+
+All `.wav` files are collected recursively. During feature extraction, they are chunked into `clip_duration`-length segments (default 2s) and saved as `background_noise_features.npy` in the model output directory. If no background files are found, this class is silently skipped.
 
 ## Default Training Configuration
 
@@ -238,6 +259,7 @@ The ACAV100M dataset (if available) provides ~2000 hours of general audio embedd
 | `batch_n_per_class.positive` | 50 |
 | `batch_n_per_class.adversarial_negative` | 50 |
 | `batch_n_per_class.ACAV100M_sample` | 1024 |
+| `batch_n_per_class.background_noise` | 50 |
 
 ## Classifier Architectures
 

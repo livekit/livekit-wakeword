@@ -97,12 +97,13 @@ class WakeWordConfig(BaseModel):
             "positive": 50,
             "adversarial_negative": 50,
             "ACAV100M_sample": 1024,
+            "background_noise": 50,
         }
     )
 
     @model_validator(mode="after")
     def _warn_unknown_batch_keys(self) -> Self:
-        known_keys = {"positive", "adversarial_negative", "ACAV100M_sample"}
+        known_keys = {"positive", "adversarial_negative", "ACAV100M_sample", "background_noise"}
         unknown = set(self.batch_n_per_class) - known_keys
         if unknown:
             _logger.warning(
