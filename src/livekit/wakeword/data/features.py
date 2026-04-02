@@ -17,11 +17,21 @@ logger = logging.getLogger(__name__)
 N_EMBEDDING_TIMESTEPS = 16
 
 
+def _pad_or_truncate(embeddings: np.ndarray) -> np.ndarray:
+    """Take last N_EMBEDDING_TIMESTEPS or left-pad a (n_windows, 96) embedding."""
+    if embeddings.shape[0] >= N_EMBEDDING_TIMESTEPS:
+        return embeddings[-N_EMBEDDING_TIMESTEPS:]
+    pad = np.zeros(
+        (N_EMBEDDING_TIMESTEPS - embeddings.shape[0], 96),
+        dtype=np.float32,
+    )
+    return np.concatenate([pad, embeddings], axis=0)
+
+
 def extract_features_from_directory(
     clip_dir: Path,
     mel_frontend: MelSpectrogramFrontend,
     speech_embedding: SpeechEmbedding,
-    batch_size: int = 32,
 ) -> np.ndarray:
     """Extract (N_clips, 16, 96) features from a directory of WAV files.
 
@@ -44,24 +54,9 @@ def extract_features_from_directory(
             audio = audio[:, 0]
         audio = audio.astype(np.float32)
 
-        # Stage 1: mel spectrogram — (1, time_frames, 32)
         mel = mel_frontend(audio)
-
-        # Stage 2: speech embeddings — (1, n_windows, 96)
         embeddings = speech_embedding.extract_embeddings(mel)
-        clip_emb = embeddings[0]  # (n_windows, 96)
-
-        # Take last N_EMBEDDING_TIMESTEPS or pad on the left
-        if clip_emb.shape[0] >= N_EMBEDDING_TIMESTEPS:
-            clip_emb = clip_emb[-N_EMBEDDING_TIMESTEPS:]
-        else:
-            pad = np.zeros(
-                (N_EMBEDDING_TIMESTEPS - clip_emb.shape[0], 96),
-                dtype=np.float32,
-            )
-            clip_emb = np.concatenate([pad, clip_emb], axis=0)
-
-        all_features.append(clip_emb)
+        all_features.append(_pad_or_truncate(embeddings[0]))
 
     if not all_features:
         return np.zeros((0, N_EMBEDDING_TIMESTEPS, 96), dtype=np.float32)
@@ -78,9 +73,10 @@ def extract_features_from_long_audio(
 ) -> np.ndarray:
     """Extract (N_clips, 16, 96) features from long audio files by chunking.
 
-    Slices each audio file into non-overlapping clips of ``clip_duration``
-    seconds, then extracts features from each chunk.  Useful for turning
-    background-noise recordings into standalone training negatives.
+    Processes each file through the mel frontend in one pass, then slices
+    the mel spectrogram into clip-sized chunks and batches them through
+    the embedding model.  Much faster than per-chunk ONNX inference for
+    long recordings.
     """
     import soundfile as sf
     from tqdm import tqdm
@@ -100,30 +96,34 @@ def extract_features_from_long_audio(
 
             audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
 
-        # Slice into non-overlapping chunks
+        # Truncate to whole number of chunks
         n_chunks = len(audio) // chunk_samples
+        if n_chunks == 0:
+            continue
+        audio = audio[: n_chunks * chunk_samples]
+
+        # Compute mel for entire file in one ONNX call
+        mel = mel_frontend(audio)  # (1, total_frames, 32)
+        mel = mel[0]  # (total_frames, 32)
+
+        # Slice mel frames into per-chunk pieces
+        frames_per_chunk = mel.shape[0] // n_chunks
+        mel_chunks = np.stack(
+            [mel[i * frames_per_chunk : (i + 1) * frames_per_chunk] for i in range(n_chunks)],
+            axis=0,
+        )  # (n_chunks, frames_per_chunk, 32)
+
+        # Batch all chunks through embedding model at once
+        embeddings = speech_embedding.extract_embeddings(mel_chunks)  # (n_chunks, n_windows, 96)
         for i in range(n_chunks):
-            chunk = audio[i * chunk_samples : (i + 1) * chunk_samples]
-
-            mel = mel_frontend(chunk)
-            embeddings = speech_embedding.extract_embeddings(mel)
-            clip_emb = embeddings[0]  # (n_windows, 96)
-
-            if clip_emb.shape[0] >= N_EMBEDDING_TIMESTEPS:
-                clip_emb = clip_emb[-N_EMBEDDING_TIMESTEPS:]
-            else:
-                pad = np.zeros(
-                    (N_EMBEDDING_TIMESTEPS - clip_emb.shape[0], 96),
-                    dtype=np.float32,
-                )
-                clip_emb = np.concatenate([pad, clip_emb], axis=0)
-
-            all_features.append(clip_emb)
+            all_features.append(_pad_or_truncate(embeddings[i]))
 
     if not all_features:
         return np.zeros((0, N_EMBEDDING_TIMESTEPS, 96), dtype=np.float32)
 
-    return np.stack(all_features, axis=0)
+    features = np.stack(all_features, axis=0)
+    np.random.shuffle(features)
+    return features
 
 
 def run_extraction(config: WakeWordConfig) -> None:
@@ -154,7 +154,6 @@ def run_extraction(config: WakeWordConfig) -> None:
             clip_dir=clip_dir,
             mel_frontend=mel_frontend,
             speech_embedding=speech_embedding,
-            batch_size=config.augmentation.batch_size,
         )
 
         out_path = model_dir / feature_filename
