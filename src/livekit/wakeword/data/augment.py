@@ -182,9 +182,25 @@ def align_clip_to_end(
 
 def run_augment(config: WakeWordConfig) -> None:
     """Run augmentation pipeline on generated clips."""
+    import re
+
     target_duration = config.augmentation.clip_duration
 
     model_dir = config.model_output_dir
+
+    # Clean up old augmented files before starting fresh augmentation.
+    # This prevents stale _rN.wav files from previous runs piling up.
+    _aug_re = re.compile(r"^clip_\d{6}_r\d+\.wav$")
+    for split in ["positive_train", "positive_test", "negative_train", "negative_test"]:
+        clip_dir = model_dir / split
+        if not clip_dir.exists():
+            continue
+        old_augs = [p for p in clip_dir.glob("*.wav") if _aug_re.match(p.name)]
+        if old_augs:
+            logger.info(f"Cleaning {len(old_augs)} old augmented files from {split}")
+            for p in old_augs:
+                p.unlink()
+
     augmentor = AudioAugmentor(
         background_paths=[Path(p) for p in config.augmentation.background_paths],
         rir_paths=[Path(p) for p in config.augmentation.rir_paths],
@@ -216,9 +232,9 @@ def _augment_directory(
 ) -> None:
     """Augment all WAV files in a directory.
 
-    Round 0 overwrites originals in-place. Subsequent rounds write to new
-    files (e.g. ``clip_000000_r1.wav``) but still read from the round-0
-    (already augmented) files, not the raw TTS output.
+    All rounds write to separate files (e.g. ``clip_000000_r0.wav``),
+    preserving the original TTS clips. This ensures re-running
+    augmentation doesn't compound noise on already-augmented audio.
     """
     import soundfile as sf
     from tqdm import tqdm
@@ -258,8 +274,5 @@ def _augment_directory(
                 start = (len(audio) - target_length) // 2
                 audio = audio[start : start + target_length]
 
-        if round_idx == 0:
-            out_path = wav_path
-        else:
-            out_path = wav_path.with_name(f"{wav_path.stem}_r{round_idx}.wav")
+        out_path = wav_path.with_name(f"{wav_path.stem}_r{round_idx}.wav")
         sf.write(str(out_path), audio, sample_rate)
