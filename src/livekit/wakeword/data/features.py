@@ -83,7 +83,7 @@ def run_extraction(config: WakeWordConfig) -> None:
         ("positive_test", "positive_features_test.npy"),
         ("negative_train", "negative_features_train.npy"),
         ("negative_test", "negative_features_test.npy"),
-        ("background_train", "background_noise_features.npy"),
+        ("background_train", "background_noise_features_train.npy"),
         ("background_test", "background_noise_features_test.npy"),
     ]
 
