@@ -27,6 +27,12 @@ def _load_validation_features(config: WakeWordConfig) -> tuple[np.ndarray, np.nd
     pos = np.load(str(pos_path)) if pos_path.exists() else np.zeros((0, 16, 96))
     neg = np.load(str(neg_path)) if neg_path.exists() else np.zeros((0, 16, 96))
 
+    # Also include background noise test features if available
+    bg_test_path = model_dir / "background_noise_features_test.npy"
+    if bg_test_path.exists():
+        bg_neg = np.load(str(bg_test_path))
+        neg = np.concatenate([neg, bg_neg], axis=0) if neg.shape[0] > 0 else bg_neg
+
     # Also include general negative validation features if available
     val_path = config.data_path / "features" / "validation_set_features.npy"
     if val_path.exists():
