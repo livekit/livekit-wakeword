@@ -272,6 +272,92 @@ def synthesize_clips(
     return generated
 
 
+def _generate_background_clips(
+    config: WakeWordConfig,
+    split_name: str,
+    n_samples: int,
+) -> None:
+    """Generate background noise clips by randomly sampling from background audio.
+
+    Short source files are tiled with random offsets and occasional reversal
+    to avoid audible periodicity.  Always produces exactly *n_samples* clips
+    regardless of how much source audio is available.
+    """
+    import numpy as np
+    import soundfile as sf
+    from tqdm import tqdm
+
+    bg_paths: list[Path] = []
+    for bg_dir in config.augmentation.background_paths:
+        d = Path(bg_dir)
+        if d.exists():
+            bg_paths.extend(d.glob("**/*.wav"))
+
+    if not bg_paths:
+        logger.info("No background noise files found, skipping %s", split_name)
+        return
+
+    sample_rate = 16000
+    chunk_samples = int(config.augmentation.clip_duration * sample_rate)
+
+    out_dir = config.model_output_dir / split_name
+    existing = _count_original_clips(out_dir)
+    if existing >= n_samples:
+        logger.info(
+            "Split %s already complete (%d/%d clips), skipping",
+            split_name, existing, n_samples,
+        )
+        return
+    if existing > 0:
+        logger.info("Resuming split %s from clip %d / %d", split_name, existing, n_samples)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Pre-load all background audio
+    all_audio: list[np.ndarray] = []
+    for bp in bg_paths:
+        audio, sr = sf.read(str(bp))
+        if audio.ndim > 1:
+            audio = audio[:, 0]
+        audio = audio.astype(np.float32)
+        if sr != sample_rate:
+            import librosa
+
+            audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
+        all_audio.append(audio)
+
+    logger.info(
+        "Generating %d %s clips from %d source files",
+        n_samples - existing, split_name, len(all_audio),
+    )
+
+    for i in tqdm(range(existing, n_samples), desc=f"Background ({split_name})", unit="clip"):
+        # Pick a random source file
+        audio = random.choice(all_audio)
+
+        # Tile short files with varied segments to fill clip duration
+        if len(audio) < chunk_samples:
+            segments: list[np.ndarray] = []
+            n = len(audio)
+            while sum(len(s) for s in segments) < chunk_samples:
+                start = random.randint(0, n - 1)
+                seg = np.roll(audio, -start)
+                if random.random() < 0.5:
+                    seg = seg[::-1]
+                segments.append(seg)
+            audio = np.concatenate(segments)
+
+        # Random offset into the (possibly tiled) audio
+        max_start = len(audio) - chunk_samples
+        start = random.randint(0, max(0, max_start))
+        clip = audio[start : start + chunk_samples]
+
+        out_path = out_dir / f"clip_{i:06d}.wav"
+        sf.write(str(out_path), clip, sample_rate)
+
+    logger.info("Wrote %d background clips to %s", n_samples, out_dir)
+
+
 def run_generate(config: WakeWordConfig) -> None:
     """Run the full generate pipeline for a wake word config.
 
@@ -378,4 +464,12 @@ def run_generate(config: WakeWordConfig) -> None:
                 start_index=existing,
                 **synth_kwargs,
             )
+
+    # --- Background noise splits ---
+    _generate_background_clips(config, "background_train", config.augmentation.background_samples)
+    _generate_background_clips(
+        config,
+        "background_test",
+        max(1, config.augmentation.background_samples // 5),
+    )
 
