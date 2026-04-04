@@ -15,6 +15,7 @@ n_samples: 25000
 # Validation samples per class
 # Suggestion: 10-20% of n_samples
 n_samples_val: 5000
+n_background_samples: 200
 
 # VITS TTS batch size (higher = faster, but more VRAM)
 # Suggestion: 50 for 8GB GPU, 100+ for 16GB+
@@ -91,7 +92,6 @@ augmentation:
 
   # Background noise directories (downloaded via `setup`)
   background_paths: [./data/backgrounds]
-  background_samples: 200
 
   # Room impulse response directories for reverb (downloaded via `setup`)
   rir_paths: [./data/rirs]

@@ -40,7 +40,6 @@ class AugmentationConfig(BaseModel):
     batch_size: int = 16
     rounds: int = 1
     background_paths: list[str] = Field(default_factory=lambda: ["./data/backgrounds"])
-    background_samples: int = 200
     rir_paths: list[str] = Field(default_factory=lambda: ["./data/rirs"])
 
 
@@ -66,6 +65,7 @@ class WakeWordConfig(BaseModel):
     # Data generation
     n_samples: int = 10000
     n_samples_val: int = 2000
+    n_background_samples: int = 200
     tts_batch_size: int = 50
     custom_negative_phrases: list[str] = Field(default_factory=list)
 
