@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 
 from ..config import WakeWordConfig
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AudioAugmentor:
     """Augmentation pipeline for wake word clips.
 
-    Applies per-sample and batched augmentations, RIR convolution,
+    Applies per-sample augmentations, RIR convolution,
     and background noise mixing.
     """
 
@@ -32,7 +31,6 @@ class AudioAugmentor:
         self.background_files = self._collect_wavs(background_paths)
         self.rir_files = self._collect_wavs(rir_paths)
         self._per_sample_aug = None
-        self._batch_aug = None
 
     @staticmethod
     def _collect_wavs(dirs: list[Path]) -> list[Path]:
@@ -55,48 +53,6 @@ class AudioAugmentor:
             )
         return self._per_sample_aug
 
-    def _get_batch_augmentations(self) -> Any:
-        """Lazy-load torch-audiomentations transforms."""
-        if self._batch_aug is None:
-            from torch_audiomentations import (
-                AddBackgroundNoise,
-                AddColoredNoise,
-                BandStopFilter,
-                Compose,
-                Gain,
-                PitchShift,
-            )
-
-            transforms = [
-                PitchShift(
-                    min_transpose_semitones=-3.0,
-                    max_transpose_semitones=3.0,
-                    sample_rate=self.sample_rate,
-                    p=0.25,
-                ),
-                BandStopFilter(p=0.25),
-                AddColoredNoise(p=0.25),
-                Gain(
-                    min_gain_in_db=-6.0,
-                    max_gain_in_db=6.0,
-                    p=0.5,
-                ),
-            ]
-            if self.background_files:
-                # Collect all unique parent directories containing background audio
-                bg_dirs = list({str(p.parent) for p in self.background_files})
-                transforms.insert(
-                    3,
-                    AddBackgroundNoise(
-                        background_paths=bg_dirs,
-                        min_snr_in_db=0.0,
-                        max_snr_in_db=15.0,
-                        sample_rate=self.sample_rate,
-                        p=0.75,
-                    ),
-                )
-            self._batch_aug = Compose(transforms)
-        return self._batch_aug
 
     def apply_rir(self, audio: np.ndarray, p: float = 0.5) -> np.ndarray:
         """Convolve audio with a random room impulse response."""
@@ -118,18 +74,6 @@ class AudioAugmentor:
         """Apply per-sample augmentations to a single clip."""
         aug = self._get_per_sample_augmentations()
         return aug(samples=audio, sample_rate=self.sample_rate)
-
-    def augment_batch(self, batch: torch.Tensor) -> torch.Tensor:
-        """Apply batched augmentations.
-
-        Args:
-            batch: (batch, 1, samples) tensor
-
-        Returns:
-            (batch, 1, samples) augmented tensor
-        """
-        aug = self._get_batch_augmentations()
-        return aug(batch, sample_rate=self.sample_rate).samples
 
     def mix_with_background(
         self,
@@ -232,20 +176,29 @@ def _augment_directory(
 ) -> None:
     """Augment all WAV files in a directory.
 
-    All rounds write to separate files (e.g. ``clip_000000_r0.wav``),
-    preserving the original TTS clips. This ensures re-running
-    augmentation doesn't compound noise on already-augmented audio.
+    Round 0 reads the original TTS clips (``clip_000000.wav``).
+    Subsequent rounds read the previous round's output so that
+    augmentation compounds (stacks) progressively.  Every round
+    writes to its own file (``clip_000000_r0.wav``, ``_r1.wav``, …)
+    so the originals are always preserved.
     """
+    import re
+
     import soundfile as sf
     from tqdm import tqdm
 
     target_length = int(target_duration_s * sample_rate)
-    # Only read original clips (clip_000000.wav) — exclude augmented variants (clip_000000_r1.wav)
-    import re
-    _orig_re = re.compile(r"^clip_\d{6}\.wav$")
-    wav_files = sorted(p for p in clip_dir.glob("*.wav") if _orig_re.match(p.name))
 
-    for wav_path in tqdm(wav_files, desc=f"Augmenting {clip_dir.name}", unit="clip"):
+    if round_idx == 0:
+        # Round 0: read original TTS clips
+        _src_re = re.compile(r"^clip_\d{6}\.wav$")
+    else:
+        # Round N: read previous round's output
+        _src_re = re.compile(rf"^clip_\d{{6}}_r{round_idx - 1}\.wav$")
+
+    wav_files = sorted(p for p in clip_dir.glob("*.wav") if _src_re.match(p.name))
+
+    for wav_path in tqdm(wav_files, desc=f"Augmenting {clip_dir.name} r{round_idx}", unit="clip"):
         audio, sr = sf.read(str(wav_path))
         if audio.ndim > 1:
             audio = audio[:, 0]
@@ -260,19 +213,23 @@ def _augment_directory(
         # Mix with background
         audio = augmentor.mix_with_background(audio)
 
-        # Align positive clips to end of window
-        if is_positive:
-            audio = align_clip_to_end(audio, target_length)
-        else:
-            # Center-pad or crop negatives
-            if len(audio) < target_length:
-                padded = np.zeros(target_length, dtype=np.float32)
-                start = (target_length - len(audio)) // 2
-                padded[start : start + len(audio)] = audio
-                audio = padded
-            elif len(audio) > target_length:
-                start = (len(audio) - target_length) // 2
-                audio = audio[start : start + target_length]
+        # Align to target duration only on round 0 (raw TTS clips vary in
+        # length).  Later rounds already have the correct duration.
+        if round_idx == 0:
+            if is_positive:
+                audio = align_clip_to_end(audio, target_length)
+            else:
+                # Center-pad or crop negatives
+                if len(audio) < target_length:
+                    padded = np.zeros(target_length, dtype=np.float32)
+                    start = (target_length - len(audio)) // 2
+                    padded[start : start + len(audio)] = audio
+                    audio = padded
+                elif len(audio) > target_length:
+                    start = (len(audio) - target_length) // 2
+                    audio = audio[start : start + target_length]
 
-        out_path = wav_path.with_name(f"{wav_path.stem}_r{round_idx}.wav")
+        # Derive output name from the original stem (strip any _rN suffix)
+        orig_stem = re.sub(r"_r\d+$", "", wav_path.stem)
+        out_path = wav_path.with_name(f"{orig_stem}_r{round_idx}.wav")
         sf.write(str(out_path), audio, sample_rate)

@@ -8,20 +8,22 @@ The augmentation stage applies realistic audio transformations to synthetic TTS 
 ## Overview
 
 ```
-Generated .wav clips
+Original TTS clips (clip_000000.wav)
     │
-    ├──► Per-sample augmentations (audiomentations)
-    │    EQ, distortion
-    │
+    ▼  Round 0: reads originals
+    ├──► Per-sample augmentations (EQ, distortion)
     ├──► RIR convolution
-    │    Room impulse responses
-    │
     ├──► Background mixing
-    │    Real-world noise at random SNR
-    │
     ├──► Alignment
-    │    Positive: end-of-window
-    │    Negative: center-padded
+    └──► clip_000000_r0.wav
+              │
+              ▼  Round 1: reads r0 output (stacks)
+              ├──► Per-sample augmentations
+              ├──► RIR convolution
+              ├──► Background mixing
+              └──► clip_000000_r1.wav
+                        │
+                        ▼  ... Round N reads r(N-1)
 ```
 
 ## AudioAugmentor
@@ -55,7 +57,7 @@ Applied via the `audiomentations` library to individual clips:
 
 ### Background Mixing
 
-`mix_with_background(audio, snr_db_range=(5.0, 15.0))` mixes audio with a random background noise clip at a randomly selected SNR within the given range. The batch augmentations use an SNR range of **0–15 dB** for `AddBackgroundNoise` (signal is always at least as loud as the noise).
+`mix_with_background(audio, snr_db_range=(5.0, 15.0))` mixes audio with a random background noise clip at a randomly selected SNR within the given range.
 
 The background clip is looped (tiled) if shorter than the audio and randomly cropped to a starting position. The mixing formula scales the background based on:
 
@@ -87,9 +89,9 @@ Negative clips are centered within the target window. If longer than the target,
 
 ## Augmentation Rounds
 
-The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Round 0 overwrites the original `.wav` files in-place. Subsequent rounds write new files (e.g. `clip_000000_r1.wav`) but read from the round-0 (already augmented) files, not the raw TTS output.
+The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Each round writes to a separate file (`clip_000000_r0.wav`, `clip_000000_r1.wav`, etc.) — originals are never modified.
 
-Only original clips (`clip_######.wav`) are read as input — augmented variants (`clip_000000_r1.wav`, etc.) are excluded via a regex filter to prevent compounding augmentation effects across rounds.
+Rounds **stack**: round 0 reads the clean TTS originals, round 1 reads round 0's output, round 2 reads round 1's output, and so on. This produces progressively more degraded audio as augmentation effects compound across rounds. Old augmented files (`_rN.wav`) are cleaned up at the start of each run so re-running is idempotent.
 
 ## Per-Clip Processing Order
 
@@ -99,8 +101,8 @@ For each WAV file in a directory:
 2. Apply per-sample augmentations (EQ, distortion)
 3. Apply RIR convolution (50% probability)
 4. Mix with background noise
-5. Align to window (end-aligned for positives, center-padded for negatives)
-6. Write back to the same file path
+5. Align to window — round 0 only (end-aligned for positives, center-padded for negatives)
+6. Write to `clip_NNNNNN_r{round}.wav` (originals preserved)
 
 ## Output
 
@@ -108,10 +110,16 @@ After augmentation:
 
 ```
 output/<model_name>/
-├── positive_train/                 # Augmented .wav files
+├── positive_train/
+│   ├── clip_000000.wav             # Original TTS (preserved, not used for training)
+│   ├── clip_000000_r0.wav          # Round 0 augmented
+│   ├── clip_000000_r1.wav          # Round 1 (stacked on r0)
+│   └── ...
 ├── positive_test/
 ├── negative_train/
 └── negative_test/
 ```
+
+Only `_rN.wav` files are fed to feature extraction — clean TTS originals are excluded from training since they don't match real microphone audio.
 
 Feature extraction is a separate step — see [Feature Extraction](feature-extraction.md).

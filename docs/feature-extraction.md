@@ -200,6 +200,8 @@ Left-padding places zeros at the **beginning** of the sequence, so the real audi
 
 Each `.npy` file contains a float32 array of shape `(N_clips, 16, 96)`.
 
+Only augmented clips (`clip_NNNNNN_rN.wav`) are processed — clean TTS originals are excluded via a regex filter so that training data always reflects realistic augmented audio.
+
 Audio files are read via `soundfile`, converted to float32, reduced to mono if stereo, and processed one clip at a time.
 
 ## Memory-Mapped Dataset

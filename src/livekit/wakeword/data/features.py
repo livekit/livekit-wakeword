@@ -38,10 +38,14 @@ def extract_features_from_directory(
     Processes clips through MelSpectrogramFrontend → SpeechEmbedding,
     then takes last 16 embedding timesteps per clip.
     """
+    import re
+
     import soundfile as sf
     from tqdm import tqdm
 
-    wav_files = sorted(clip_dir.glob("*.wav"))
+    # Only process augmented clips (_rN.wav), skip clean TTS originals
+    _aug_re = re.compile(r"^clip_\d{6}_r\d+\.wav$")
+    wav_files = sorted(p for p in clip_dir.glob("*.wav") if _aug_re.match(p.name))
     if not wav_files:
         logger.warning(f"No WAV files in {clip_dir}")
         return np.zeros((0, N_EMBEDDING_TIMESTEPS, 96), dtype=np.float32)

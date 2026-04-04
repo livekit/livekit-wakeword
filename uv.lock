@@ -992,7 +992,6 @@ wheels = [
 
 [[package]]
 name = "livekit-wakeword"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
@@ -1071,7 +1070,7 @@ requires-dist = [
     { name = "typer", marker = "extra == 'train'", specifier = ">=0.12" },
     { name = "webrtcvad", marker = "extra == 'train'", specifier = ">=2.0.10" },
 ]
-provides-extras = ["listener", "train", "eval", "export"]
+provides-extras = ["eval", "export", "listener", "train"]
 
 [package.metadata.requires-dev]
 dev = [
