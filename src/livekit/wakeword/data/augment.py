@@ -124,80 +124,11 @@ def align_clip_to_end(
     return result
 
 
-def _generate_background_clips(config: WakeWordConfig) -> None:
-    """Generate background noise clips by randomly sampling from background audio.
-
-    Produces exactly ``config.augmentation.background_samples`` clips in
-    ``background_train/``.  Short source files are tiled with random offsets
-    and occasional reversal to avoid audible periodicity.
-    """
-    import soundfile as sf
-    from tqdm import tqdm
-
-    bg_paths: list[Path] = []
-    for bg_dir in config.augmentation.background_paths:
-        d = Path(bg_dir)
-        if d.exists():
-            bg_paths.extend(d.glob("**/*.wav"))
-
-    if not bg_paths:
-        logger.info("No background noise files found, skipping background clip generation")
-        return
-
-    n_samples = config.augmentation.background_samples
-    clip_duration = config.augmentation.clip_duration
-    sample_rate = 16000
-    chunk_samples = int(clip_duration * sample_rate)
-
-    out_dir = config.model_output_dir / "background_train"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Clean old clips
-    for old in out_dir.glob("*.wav"):
-        old.unlink()
-
-    # Pre-load all background audio
-    all_audio: list[np.ndarray] = []
-    for bp in bg_paths:
-        audio, sr = sf.read(str(bp))
-        if audio.ndim > 1:
-            audio = audio[:, 0]
-        audio = audio.astype(np.float32)
-        if sr != sample_rate:
-            import librosa
-
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
-        all_audio.append(audio)
-
-    logger.info(
-        f"Generating {n_samples} background clips from {len(all_audio)} source files"
-    )
-
-    for i in tqdm(range(n_samples), desc="Background clips", unit="clip"):
-        # Pick a random source file
-        audio = random.choice(all_audio)
-
-        # Tile short files with varied segments to fill clip duration
-        if len(audio) < chunk_samples:
-            segments: list[np.ndarray] = []
-            n = len(audio)
-            while sum(len(s) for s in segments) < chunk_samples:
-                start = random.randint(0, n - 1)
-                seg = np.roll(audio, -start)
-                if random.random() < 0.5:
-                    seg = seg[::-1]
-                segments.append(seg)
-            audio = np.concatenate(segments)
-
-        # Random offset into the (possibly tiled) audio
-        max_start = len(audio) - chunk_samples
-        start = random.randint(0, max(0, max_start))
-        clip = audio[start : start + chunk_samples]
-
-        out_path = out_dir / f"clip_{i:06d}.wav"
-        sf.write(str(out_path), clip, sample_rate)
-
-    logger.info(f"Wrote {n_samples} background clips to {out_dir}")
+_ALL_SPLITS = [
+    "positive_train", "positive_test",
+    "negative_train", "negative_test",
+    "background_train", "background_test",
+]
 
 
 def run_augment(config: WakeWordConfig) -> None:
@@ -211,7 +142,7 @@ def run_augment(config: WakeWordConfig) -> None:
     # Clean up old augmented files before starting fresh augmentation.
     # This prevents stale _rN.wav files from previous runs piling up.
     _aug_re = re.compile(r"^clip_\d{6}_r\d+\.wav$")
-    for split in ["positive_train", "positive_test", "negative_train", "negative_test"]:
+    for split in _ALL_SPLITS:
         clip_dir = model_dir / split
         if not clip_dir.exists():
             continue
@@ -228,7 +159,7 @@ def run_augment(config: WakeWordConfig) -> None:
 
     for round_idx in range(config.augmentation.rounds):
         logger.info(f"Augmentation round {round_idx + 1}/{config.augmentation.rounds}")
-        for split in ["positive_train", "positive_test", "negative_train", "negative_test"]:
+        for split in _ALL_SPLITS:
             clip_dir = model_dir / split
             if not clip_dir.exists():
                 logger.warning(f"Skipping {split}: directory not found")
@@ -240,9 +171,6 @@ def run_augment(config: WakeWordConfig) -> None:
                 round_idx=round_idx,
                 target_duration_s=target_duration,
             )
-
-    # Generate background noise clips
-    _generate_background_clips(config)
 
 
 def _augment_directory(
