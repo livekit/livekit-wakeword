@@ -1,0 +1,85 @@
+# Wake word config for "Hey Sauna"
+model_name: hey_sauna
+
+target_phrases: ["hey sauna"]
+
+# ============================================================================
+# Data Generation
+# ============================================================================
+
+n_samples: 10000
+n_samples_val: 2000
+tts_batch_size: 50
+
+# Adversarial negatives — phonetically similar phrases that should NOT trigger
+custom_negative_phrases:
+  # Bare wake word without prefix
+  - "sauna"
+  # Phonetically similar prefixes
+  - "hey fauna"
+  - "hey donna"
+  - "hey sawyer"
+  - "hey sonic"
+  - "hey santa"
+  - "hey sana"
+  - "hey sonar"
+  - "hey gonna"
+  - "hey wanna"
+  # Partial/adjacent phrases
+  - "play sauna"
+  - "the sauna"
+  - "in the sauna"
+  - "hey son"
+  - "hey sunny"
+
+# ============================================================================
+# TTS Parameters
+# ============================================================================
+
+noise_scales: [0.98]
+noise_scale_ws: [0.98]
+length_scales: [0.75, 1.0, 1.25]
+slerp_weights: [0.2, 0.35, 0.5, 0.65, 0.8]
+
+# ============================================================================
+# Paths
+# ============================================================================
+
+data_dir: ./data
+output_dir: ./output
+
+# ============================================================================
+# Augmentation
+# ============================================================================
+
+augmentation:
+  clip_duration: 2.0
+  batch_size: 16
+  rounds: 2
+  background_paths: [./data/backgrounds]
+  rir_paths: [./data/rirs]
+
+# ============================================================================
+# Model Architecture
+# ============================================================================
+
+model:
+  model_type: conv_attention
+  model_size: small
+
+# ============================================================================
+# Training
+# ============================================================================
+
+steps: 50000
+learning_rate: 0.0001
+weight_decay: 0.01
+label_smoothing: 0.05
+max_negative_weight: 2000
+target_fp_per_hour: 0.2
+
+batch_n_per_class:
+  positive: 50
+  adversarial_negative: 50
+  ACAV100M_sample: 512
+  background_noise: 50
