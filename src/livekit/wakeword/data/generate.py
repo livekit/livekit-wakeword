@@ -467,7 +467,7 @@ def run_generate(config: WakeWordConfig) -> None:
 
     # --- Background noise splits ---
     if config.n_background_samples > 0:
-        n_bg_val = max(1, config.n_background_samples // 5)
         _generate_background_clips(config, "background_train", config.n_background_samples)
-        _generate_background_clips(config, "background_test", n_bg_val)
+    if config.n_background_samples_val > 0:
+        _generate_background_clips(config, "background_test", config.n_background_samples_val)
 

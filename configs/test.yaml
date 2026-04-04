@@ -11,6 +11,7 @@ target_phrases: ["hey livekit"]
 n_samples: 100
 n_samples_val: 20
 n_background_samples: 50
+n_background_samples_val: 10
 tts_batch_size: 10
 
 custom_negative_phrases:

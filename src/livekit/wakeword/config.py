@@ -66,6 +66,7 @@ class WakeWordConfig(BaseModel):
     n_samples: int = 10000
     n_samples_val: int = 2000
     n_background_samples: int = 200
+    n_background_samples_val: int = 40
     tts_batch_size: int = 50
     custom_negative_phrases: list[str] = Field(default_factory=list)
 
