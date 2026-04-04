@@ -40,6 +40,7 @@ class AugmentationConfig(BaseModel):
     batch_size: int = 16
     rounds: int = 1
     background_paths: list[str] = Field(default_factory=lambda: ["./data/backgrounds"])
+    background_samples: int = 200
     rir_paths: list[str] = Field(default_factory=lambda: ["./data/rirs"])
 
 
