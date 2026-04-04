@@ -15,8 +15,8 @@ n_samples: 25000
 # Validation samples per class
 # Suggestion: 10-20% of n_samples
 n_samples_val: 5000
-n_background_samples: 200
-n_background_samples_val: 40
+n_background_samples: 2000
+n_background_samples_val: 500
 
 # VITS TTS batch size (higher = faster, but more VRAM)
 # Suggestion: 50 for 8GB GPU, 100+ for 16GB+
