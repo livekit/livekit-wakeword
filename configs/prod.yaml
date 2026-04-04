@@ -91,6 +91,7 @@ augmentation:
 
   # Background noise directories (downloaded via `setup`)
   background_paths: [./data/backgrounds]
+  background_samples: 200
 
   # Room impulse response directories for reverb (downloaded via `setup`)
   rir_paths: [./data/rirs]

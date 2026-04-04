@@ -31,8 +31,9 @@ output_dir: ./output
 augmentation:
   clip_duration: 2.0
   batch_size: 8
-  rounds: 1
+  rounds: 3
   background_paths: [./data/backgrounds]
+  background_samples: 50
   rir_paths: [./data/rirs]
 
 # ============================================================================
