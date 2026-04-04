@@ -66,7 +66,7 @@ scale = sqrt(audio_power / (background_power * 10^(snr_db / 10)))
 output = audio + scale * background
 ```
 
-> **Note:** Background noise files serve double duty — they are used here as augmentation overlays *and* also chunked into standalone negative training samples during feature extraction. See [Training — Background Noise as Standalone Negatives](training.md#background-noise-as-standalone-negatives) for details.
+> **Note:** Background noise files serve double duty — they are used here as augmentation overlays *and* also generated as standalone background clips during the [data generation step](data-generation.md#background-noise-clip-generation). Those background clips then pass through this same augmentation pipeline.
 
 ## Clip Alignment
 
@@ -89,7 +89,7 @@ Negative clips are centered within the target window. If longer than the target,
 
 ## Augmentation Rounds
 
-The augmentation pipeline runs `config.augmentation.rounds` passes over all four directories (positive train/test, negative train/test). Each round writes to a separate file (`clip_000000_r0.wav`, `clip_000000_r1.wav`, etc.) — originals are never modified.
+The augmentation pipeline runs `config.augmentation.rounds` passes over all six directories (positive train/test, negative train/test, background train/test). Each round writes to a separate file (`clip_000000_r0.wav`, `clip_000000_r1.wav`, etc.) — originals are never modified.
 
 Rounds **stack**: round 0 reads the clean TTS originals, round 1 reads round 0's output, round 2 reads round 1's output, and so on. This produces progressively more degraded audio as augmentation effects compound across rounds. Old augmented files (`_rN.wav`) are cleaned up at the start of each run so re-running is idempotent.
 
@@ -117,7 +117,9 @@ output/<model_name>/
 │   └── ...
 ├── positive_test/
 ├── negative_train/
-└── negative_test/
+├── negative_test/
+├── background_train/
+└── background_test/
 ```
 
 Only `_rN.wav` files are fed to feature extraction — clean TTS originals are excluded from training since they don't match real microphone audio.

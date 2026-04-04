@@ -189,14 +189,16 @@ Left-padding places zeros at the **beginning** of the sequence, so the real audi
 
 ## Feature Extraction for Training
 
-`run_extraction(config)` processes all four data splits:
+`run_extraction(config)` processes all six data splits:
 
-| Clip Directory    | Output File                   |
-| ----------------- | ----------------------------- |
-| `positive_train/` | `positive_features_train.npy` |
-| `positive_test/`  | `positive_features_test.npy`  |
-| `negative_train/` | `negative_features_train.npy` |
-| `negative_test/`  | `negative_features_test.npy`  |
+| Clip Directory       | Output File                          |
+| -------------------- | ------------------------------------ |
+| `positive_train/`    | `positive_features_train.npy`        |
+| `positive_test/`     | `positive_features_test.npy`         |
+| `negative_train/`    | `negative_features_train.npy`        |
+| `negative_test/`     | `negative_features_test.npy`         |
+| `background_train/`  | `background_noise_features_train.npy`|
+| `background_test/`   | `background_noise_features_test.npy` |
 
 Each `.npy` file contains a float32 array of shape `(N_clips, 16, 96)`.
 
@@ -238,5 +240,6 @@ From `WakeWordConfig.batch_n_per_class`:
 | `positive`             | 50                |
 | `adversarial_negative` | 50                |
 | `ACAV100M_sample`      | 1024              |
+| `background_noise`     | 50                |
 
-Total batch size: 1,124 samples (50 positive + 50 adversarial + 1,024 general negative).
+Total batch size: 1,174 samples (50 positive + 50 adversarial + 1,024 general negative + 50 background noise).

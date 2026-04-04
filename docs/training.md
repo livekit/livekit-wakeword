@@ -222,7 +222,7 @@ The dataloader loads features from:
 | `positive` | `positive_features_train.npy` | 1 |
 | `adversarial_negative` | `negative_features_train.npy` | 0 |
 | `ACAV100M_sample` | `data/features/openwakeword_features_ACAV100M_2000_hrs_16bit.npy` | 0 |
-| `background_noise` | `background_noise_features.npy` | 0 |
+| `background_noise` | `background_noise_features_train.npy` | 0 |
 
 The ACAV100M dataset (if available) provides ~2000 hours of general audio embeddings as additional negative examples.
 
@@ -230,21 +230,24 @@ The ACAV100M dataset (if available) provides ~2000 hours of general audio embedd
 
 Background noise audio serves double duty in the pipeline:
 
-1. **Augmentation overlay** — mixed into positive and adversarial clips at random SNR during the augmentation step (see [Augmentation](augmentation.md))
-2. **Standalone negative class** — the same background WAV files are sliced into non-overlapping 2-second chunks, feature-extracted, and fed into training as their own negative class
+1. **Augmentation overlay** — mixed into all clips at random SNR during the augmentation step (see [Augmentation](augmentation.md))
+2. **Standalone negative class** — background clips are generated during the [data generation step](data-generation.md#background-noise-clip-generation), augmented alongside other splits, feature-extracted, and fed into training as their own negative class
 
 This teaches the model that pure ambient noise (silence, HVAC, music, etc.) is not a wake word, rather than only seeing noise blended with speech.
 
-To add custom background noise, put `.wav` files in a directory and add the path to `augmentation.background_paths` in your config:
+The number of background clips is controlled by `n_background_samples` (train) and `n_background_samples_val` (test) in the top-level config. To add custom background noise sources, add paths to `augmentation.background_paths`:
 
 ```yaml
+n_background_samples: 200
+n_background_samples_val: 40
+
 augmentation:
   background_paths:
     - ./data/backgrounds        # default MUSAN noise
     - ./data/my-office-noise    # your custom recordings
 ```
 
-All `.wav` files are collected recursively. During feature extraction, they are chunked into `clip_duration`-length segments (default 2s) and saved as `background_noise_features.npy` in the model output directory. If no background files are found, this class is silently skipped.
+All `.wav` files are collected recursively. Set `n_background_samples: 0` and `n_background_samples_val: 0` to disable background noise training entirely. Background test features are included in the validation negative pool for both training and evaluation.
 
 ## Default Training Configuration
 

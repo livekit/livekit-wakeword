@@ -78,8 +78,8 @@ src/livekit/wakeword/
 
 ## Pipeline Stages
 
-1. **[Data Generation](data-generation.md)** — Synthesize positive clips via VITS TTS with SLERP speaker blending + adversarial negatives
-2. **[Augmentation](augmentation.md)** — Apply pitch shift, EQ, RIR convolution, background mixing; align clips to training windows
+1. **[Data Generation](data-generation.md)** — Synthesize positive clips via VITS TTS with SLERP speaker blending + adversarial negatives + background noise clips
+2. **[Augmentation](augmentation.md)** — Apply EQ, distortion, RIR convolution, background mixing to all splits; align clips to training windows
 3. **[Feature Extraction](feature-extraction.md)** — Extract mel spectrograms and speech embeddings through frozen ONNX models → `.npy` files
 4. **[Training](training.md)** — 3-phase adaptive training with focal loss, embedding mixup, and checkpoint averaging
 5. **[Export & Inference](export-and-inference.md)** — Export classifier to ONNX and run real-time streaming detection
