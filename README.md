@@ -24,6 +24,7 @@ An open-source wake word library for creating voice-enabled applications. Based 
 - [Training New Models Using The CLI](#training-new-models-using-the-cli)
 - [Training New Models Using The Python API](#training-new-models-using-the-python-api)
 - [openWakeWord vs livekit-wakeword](#openwakeword-vs-livekit-wakeword)
+- [Example: Wake Word–Triggered Agent](https://github.com/livekit-examples/hello-wakeword)
 
 ## Quick Start
 
@@ -243,12 +244,12 @@ Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
 
 To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same architecture, better training pipeline), and a livekit-wakeword conv-attention model on the same "hey livekit" validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio). The livekit-wakeword models were trained with the [prod config](configs/prod.yaml).
 
-| Metric | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
-|--------|:---:|:---:|:---:|
-| **AUT*** | 0.0720 | 0.0423 | **0.0012** |
-| **FPPH*** | 8.50 | 3.07 | **0.08** |
-| **Recall*** | 68.6% | 85.3% | **86.1%** |
-| Optimal Threshold* | 0.01 | 0.01 | 0.68 |
+| Metric              | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
+| ------------------- | :----------------: | :--------------------: | :-------------------------------: |
+| **AUT\***           |       0.0720       |         0.0423         |            **0.0012**             |
+| **FPPH\***          |        8.50        |          3.07          |             **0.08**              |
+| **Recall\***        |       68.6%        |         85.3%          |             **86.1%**             |
+| Optimal Threshold\* |        0.01        |          0.01          |               0.68                |
 
 <table>
 <tr>
@@ -267,17 +268,17 @@ The livekit-wakeword DNN already outperforms openWakeWord's DNN thanks to the im
 
 The conv-attention head is what unlocks the low false positive rate: **60x lower AUT** and **100x fewer false positives per hour** than openWakeWord, while detecting 17% more wake words.
 
-*\***AUT** (Area Under the DET curve) — summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words.*
+_\***AUT** (Area Under the DET curve) — summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words._
 
-*\***FPPH** (False Positives Per Hour) — how many times the model falsely triggers per hour of non-wake-word audio. Lower is better. For production use, < 0.5 FPPH is typical.*
+_\***FPPH** (False Positives Per Hour) — how many times the model falsely triggers per hour of non-wake-word audio. Lower is better. For production use, < 0.5 FPPH is typical._
 
-*\***Recall** — the percentage of actual wake words correctly detected. Higher is better.*
+_\***Recall** — the percentage of actual wake words correctly detected. Higher is better._
 
-*\***Optimal Threshold** — the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target — the evaluator fell back to the highest balanced accuracy.*
+_\***Optimal Threshold** — the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target — the evaluator fell back to the highest balanced accuracy._
 
 ### Why conv-attention wins
 
-- **Temporal awareness** — the conv-attention model sees the *order* of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
+- **Temporal awareness** — the conv-attention model sees the _order_ of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
 - **Better accuracy at the same model size** — attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
 - **Lower false-positive rates** — temporal structure helps reject partial or reordered matches that a flat DNN would accept.
 
@@ -285,9 +286,34 @@ The conv-attention head is the default. You can switch to the original DNN or an
 
 ```yaml
 model:
-  model_type: conv_attention  # conv_attention (default) | dnn | rnn
-  model_size: small           # tiny, small, medium, large
+  model_type: conv_attention # conv_attention (default) | dnn | rnn
+  model_size: small # tiny, small, medium, large
 ```
+
+## Other Runtimes
+
+### Rust
+
+For Rust applications, use the [`livekit-wakeword`](https://crates.io/crates/livekit-wakeword) crate:
+
+```toml
+[dependencies]
+livekit-wakeword = "0.1"
+```
+
+```rust
+use livekit_wakeword::WakeWordModel;
+
+let mut model = WakeWordModel::new(&["hey_livekit.onnx"], 16000)?;
+
+// Feed ~2s PCM audio chunks (i16, at configured sample rate)
+let scores = model.predict(&audio_chunk)?;
+if scores["hey_livekit"] > 0.5 {
+    println!("Wake word detected!");
+}
+```
+
+The mel spectrogram and speech embedding models are compiled into the binary, only the wake word classifier ONNX file is loaded at runtime. Audio at supported sample rates (22050–384000 Hz) is automatically resampled to 16 kHz.
 
 ## Detailed Documentation
 
