@@ -5,7 +5,7 @@ Source: https://github.com/dscripka/piper-sample-generator (generate_samples.py)
 License: MIT
 
 Adaptations from dscripka's original:
-- Import from local ``_vits_utils`` instead of ``piper_train.vits.commons``
+- Import from local ``vits_utils`` instead of ``piper_train.vits.commons``
 - Use ``espeak-ng`` CLI for phonemization (cross-platform, no C binding issues)
 - Add MPS device support (Apple Silicon)
 - Load via state_dict + config JSON (no pickle, no piper_train dependency)
@@ -29,9 +29,9 @@ import numpy as np
 import torch
 import torchaudio
 
-from ..utils import get_device
-from ._vits.models import SynthesizerTrn
-from ._vits_utils import audio_float_to_int16, generate_path, sequence_mask, slerp
+from ...utils import get_device
+from .vits.models import SynthesizerTrn
+from .vits_utils import audio_float_to_int16, generate_path, sequence_mask, slerp
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +51,6 @@ def _load_vits_model(model_path: Path, device: torch.device) -> SynthesizerTrn:
     synth_config: dict[str, Any] = config["synthesizer"]
     model = SynthesizerTrn(**synth_config)
 
-    # The state_dict was saved with weight_norm removed on dec (Generator)
-    # and flow, but NOT on enc_q.  Match that before loading.
     model.dec.remove_weight_norm()
     for flow in model.flow.flows:
         remove_fn = getattr(flow, "remove_weight_norm", None)
@@ -82,11 +80,7 @@ def _find_espeak_ng() -> str:
 
 
 def _espeak_phonemize(text: str, voice: str = "en-us") -> str:
-    """Phonemize text using the espeak-ng CLI.
-
-    This avoids the ``espeak_phonemizer`` C binding which has
-    ``libespeak-ng.so`` vs ``.dylib`` issues on macOS.
-    """
+    """Phonemize text using the espeak-ng CLI."""
     espeak = _find_espeak_ng()
     result = subprocess.run(
         [espeak, "--ipa", "-q", "-v", voice, text],
@@ -116,28 +110,7 @@ def generate_samples(
     max_speakers: int | None = None,
     start_index: int = 0,
 ) -> list[Path]:
-    """Generate synthetic speech clips with SLERP speaker blending.
-
-    Cycles through all speaker pairs, blending each pair with SLERP at the
-    given weights while varying prosody parameters. Outputs are resampled
-    to 16 kHz and silence-trimmed via webrtcvad.
-
-    Args:
-        text: Phrases to synthesize.
-        output_dir: Directory for output ``.wav`` files.
-        max_samples: Stop after this many clips (default: ``len(text)``).
-        model: Path to VITS state_dict ``.pt`` file (with matching ``.json`` config).
-        batch_size: Inference batch size.
-        slerp_weights: SLERP interpolation weights (0=speaker1, 1=speaker2).
-        length_scales: Speaking rate multipliers.
-        noise_scales: Overall speech variability.
-        noise_scale_ws: Phoneme duration variability.
-        max_speakers: Cap on speaker IDs to use from the model.
-        start_index: Resume generation from this clip index (skips already-generated clips).
-
-    Returns:
-        List of paths to generated ``.wav`` files.
-    """
+    """Generate synthetic speech clips with SLERP speaker blending."""
     if slerp_weights is None:
         slerp_weights = [0.5]
     if length_scales is None:
@@ -150,7 +123,6 @@ def generate_samples(
     if max_samples is None:
         max_samples = len(text)
 
-    # Validate espeak-ng is available before doing anything expensive
     _find_espeak_ng()
 
     device = get_device()
@@ -172,7 +144,6 @@ def generate_samples(
     if max_speakers is not None:
         num_speakers = min(num_speakers, max_speakers)
 
-    # 22050 → 16000 Hz resampler (Kaiser best params from torchaudio tutorial)
     resampler = torchaudio.transforms.Resample(
         22050,
         16000,
@@ -186,8 +157,6 @@ def generate_samples(
     speakers_iter = it.cycle(it.product(range(num_speakers), range(num_speakers)))
     texts_iter = it.cycle(text)
 
-    # Advance cyclic iterators to maintain speaker/text diversity on resume
-    # speakers and texts are consumed once per sample; settings once per batch
     if start_index > 0:
         logger.info("Resuming generation from clip %d / %d", start_index, max_samples)
         _consume(settings_iter, (start_index + batch_size - 1) // batch_size)
@@ -213,12 +182,9 @@ def generate_samples(
 
         try:
             with torch.no_grad():
-                # Consume texts for this batch (must happen even on failure to keep iterator in sync)
                 batch_texts = [next(texts_iter) for _ in range(current_batch_size)]
 
-                phoneme_ids = [
-                    get_phonemes(config, t, voice) for t in batch_texts
-                ]
+                phoneme_ids = [get_phonemes(config, t, voice) for t in batch_texts]
                 phoneme_lengths = [len(ids) for ids in phoneme_ids]
                 phoneme_ids = _right_pad_lists(phoneme_ids)
 
@@ -238,7 +204,6 @@ def generate_samples(
                     device,
                 )
 
-                # Resample 22050 → 16000
                 audio_16k = resampler(audio.cpu()).numpy()
                 audio_int16 = audio_float_to_int16(audio_16k)
 
@@ -264,17 +229,17 @@ def generate_samples(
             consecutive_failures += 1
             logger.warning(
                 "Batch failed (texts=%r): %s. Skipping %d clips.",
-                batch_texts, e, current_batch_size,
+                batch_texts,
+                e,
+                current_batch_size,
             )
-            # Advance sample_idx past this batch so we don't retry the same indices
             sample_idx += current_batch_size
             pbar.update(current_batch_size)
 
             if consecutive_failures >= max_consecutive_failures:
                 pbar.close()
                 raise RuntimeError(
-                    f"{consecutive_failures} consecutive batches failed. "
-                    f"Last error: {e}"
+                    f"{consecutive_failures} consecutive batches failed. Last error: {e}"
                 ) from e
 
     pbar.close()
@@ -283,7 +248,10 @@ def generate_samples(
     if failed_batches > 0:
         logger.warning(
             "%d/%d batches failed — generated %d/%d clips",
-            failed_batches, failed_batches + len(generated), len(generated), expected,
+            failed_batches,
+            failed_batches + len(generated),
+            len(generated),
+            expected,
         )
 
     if len(generated) == 0 and expected > 0:
@@ -347,16 +315,7 @@ def _generate_audio(
 
 
 def get_phonemes(config: dict[str, Any], text: str, voice: str = "en-us") -> list[int]:
-    """Convert text to phoneme IDs using espeak-ng CLI.
-
-    Args:
-        config: VITS model config dict (must contain ``phoneme_id_map``).
-        text: Input text to phonemize.
-        voice: espeak-ng voice name.
-
-    Returns:
-        List of integer phoneme IDs.
-    """
+    """Convert text to phoneme IDs using espeak-ng CLI."""
     phonemes_str = _espeak_phonemize(text, voice)
     phonemes = list(unicodedata.normalize("NFD", phonemes_str))
 
@@ -377,17 +336,7 @@ def remove_silence(
     sample_rate: int = 16000,
     min_start: int = 2000,
 ) -> np.ndarray:
-    """Trim silence from audio using WebRTC VAD.
-
-    Args:
-        x: Audio samples (int16 or float).
-        frame_duration: VAD frame length in seconds.
-        sample_rate: Audio sample rate.
-        min_start: Always keep this many leading samples.
-
-    Returns:
-        Trimmed int16 audio array.
-    """
+    """Trim silence from audio using WebRTC VAD."""
     import webrtcvad
 
     vad = webrtcvad.Vad(0)
@@ -402,10 +351,11 @@ def remove_silence(
 
     result = np.array(x_new, dtype=np.int16)
 
-    # If VAD stripped too much, return the original — don't produce near-silent clips
-    min_speech_samples = int(sample_rate * 0.15)  # at least 150ms of content
+    min_speech_samples = int(sample_rate * 0.15)
     if len(result) <= min_start + min_speech_samples:
-        logger.debug("VAD stripped too aggressively (%d samples left), keeping original", len(result))
+        logger.debug(
+            "VAD stripped too aggressively (%d samples left), keeping original", len(result)
+        )
         if x.dtype != np.int16:
             x = (x * 32767).astype(np.int16)
         return x

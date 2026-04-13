@@ -82,9 +82,7 @@ def slerp(
     return torch.where(linear_mask.unsqueeze(zdim), linear_result, slerp_result)
 
 
-def audio_float_to_int16(
-    audio: np.ndarray, max_wav_value: float = 32767.0
-) -> np.ndarray:
+def audio_float_to_int16(audio: np.ndarray, max_wav_value: float = 32767.0) -> np.ndarray:
     """Normalize audio and convert to int16 range."""
     audio_norm = audio * (max_wav_value / max(0.01, float(np.max(np.abs(audio)))))
     audio_norm = np.clip(audio_norm, -max_wav_value, max_wav_value)

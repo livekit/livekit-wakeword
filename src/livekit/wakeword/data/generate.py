@@ -1,4 +1,4 @@
-"""Synthetic data generation: VITS TTS with SLERP speaker blending + adversarial negatives."""
+"""Synthetic data generation: pluggable TTS + adversarial negatives (default: Piper VITS)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ import logging
 import random
 import re
 from pathlib import Path
-from typing import Any
 
 from ..config import WakeWordConfig
-from ._piper_generate import generate_samples
+from .piper.text import expand_unknown_words, get_cmudict
+from .tts import get_tts_backend
+from .tts.piper_backend import PiperVitsBackend
 
 logger = logging.getLogger(__name__)
 
@@ -17,23 +18,29 @@ logger = logging.getLogger(__name__)
 _ORIGINAL_CLIP_RE = re.compile(r"^clip_\d{6}\.wav$")
 
 # ARPAbet vowel phonemes (used to add optional stress markers in regex patterns)
-_VOWEL_PHONES = frozenset([
-    "AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY",
-    "EH", "ER", "EY", "IH", "IX", "IY",
-    "OW", "OY", "UH", "UW", "UX",
-])
-
-
-def _get_cmudict() -> dict[str, list[str]]:
-    """Load CMU Pronouncing Dictionary via nltk."""
-    import nltk
-
-    nltk.download("cmudict", quiet=True)
-    from nltk.corpus import cmudict
-
-    # cmudict.dict() returns {word: [pron1, pron2, ...]} where each pron is list[str]
-    # Take the first pronunciation for each word
-    return {word: prons[0] for word, prons in cmudict.dict().items()}
+_VOWEL_PHONES = frozenset(
+    [
+        "AA",
+        "AE",
+        "AH",
+        "AO",
+        "AW",
+        "AX",
+        "AXR",
+        "AY",
+        "EH",
+        "ER",
+        "EY",
+        "IH",
+        "IX",
+        "IY",
+        "OW",
+        "OY",
+        "UH",
+        "UW",
+        "UX",
+    ]
+)
 
 
 def _count_original_clips(directory: Path) -> int:
@@ -41,36 +48,6 @@ def _count_original_clips(directory: Path) -> int:
     if not directory.is_dir():
         return 0
     return sum(1 for f in directory.iterdir() if _ORIGINAL_CLIP_RE.match(f.name))
-
-
-def _expand_unknown_words(
-    words: list[str],
-    cmu: dict[str, list[str]],
-) -> list[str]:
-    """Expand words not in CMUDict by splitting into known subwords.
-
-    For example, "livekit" → ["live", "kit"] since both are in CMUDict.
-    Known words are kept as-is.
-    """
-    expanded: list[str] = []
-    for word in words:
-        if word in cmu:
-            expanded.append(word)
-            continue
-        # Try all split points, prefer longest left match
-        best_split: tuple[str, str] | None = None
-        for i in range(2, len(word) - 1):
-            left, right = word[:i], word[i:]
-            if left in cmu and right in cmu:
-                if best_split is None or len(left) > len(best_split[0]):
-                    best_split = (left, right)
-        if best_split is not None:
-            logger.debug("Split unknown word %r → %r", word, best_split)
-            expanded.extend(best_split)
-        else:
-            # Can't split — keep original (will be skipped in substitution)
-            expanded.append(word)
-    return expanded
 
 
 def _phoneme_replacements(
@@ -114,10 +91,7 @@ def _get_word_phonemes(word: str) -> list[str]:
         return []
     # Strip existing stress, then add optional stress for vowels
     phones = [re.sub(r"\d+", "", p) for p in raw[0].split()]
-    return [
-        p + "[0|1|2]" if p in _VOWEL_PHONES else p
-        for p in phones
-    ]
+    return [p + "[0|1|2]" if p in _VOWEL_PHONES else p for p in phones]
 
 
 def generate_adversarial_phrases(
@@ -153,12 +127,12 @@ def generate_adversarial_phrases(
     """
     import pronouncing
 
-    cmu = _get_cmudict()
+    cmu = get_cmudict()
     adversarial: list[str] = []
 
     for phrase in target_phrases:
         raw_words = phrase.lower().split()
-        words = _expand_unknown_words(raw_words, cmu)
+        words = expand_unknown_words(raw_words, cmu)
 
         # Get phonemes (with stress wildcards) for each word
         word_phonemes = [_get_word_phonemes(w) for w in words]
@@ -185,7 +159,10 @@ def generate_adversarial_phrases(
                 for match in matches:
                     if match.lower() != word:
                         match_phones = pronouncing.phones_for_word(match)
-                        if match_phones and match_phones[0] != (pronouncing.phones_for_word(word) or [""])[0]:
+                        if (
+                            match_phones
+                            and match_phones[0] != (pronouncing.phones_for_word(word) or [""])[0]
+                        ):
                             adversarial_words.append(match)
 
             # Build adversarial phrases by replacing the current word
@@ -233,43 +210,32 @@ def synthesize_clips(
     batch_size: int = 50,
     start_index: int = 0,
 ) -> list[Path]:
-    """Synthesize speech clips using VITS with SLERP speaker blending.
-
-    Uses the vendored piper-sample-generator to produce diverse synthetic
-    voices by interpolating between speaker embeddings (904 speakers in the
-    libritts-high model).
+    """Synthesize speech clips using Piper VITS + SLERP (library / test helper).
 
     Returns list of paths to generated .wav files.
     """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    cmu = _get_cmudict()
-    phrases = [
-        " ".join(_expand_unknown_words(p.lower().split(), cmu)) for p in phrases
-    ]
-
     if vits_model_path is None or not vits_model_path.exists():
         raise FileNotFoundError(
             f"VITS model not found at {vits_model_path}. "
             "Cannot generate audio — refusing to produce silent placeholders. "
-            "Download the model first: python -m livekit.wakeword.data setup"
+            "Download the model first: livekit-wakeword setup"
         )
 
-    generated = generate_samples(
-        text=phrases,
-        output_dir=output_dir,
-        max_samples=n_samples,
-        model=vits_model_path,
-        batch_size=batch_size,
-        slerp_weights=slerp_weights,
-        length_scales=length_scales,
-        noise_scales=noise_scales,
-        noise_scale_ws=noise_scale_ws,
+    backend = PiperVitsBackend(
+        model_path=vits_model_path,
+        noise_scales=noise_scales if noise_scales is not None else [0.98],
+        noise_scale_ws=noise_scale_ws if noise_scale_ws is not None else [0.98],
+        length_scales=length_scales if length_scales is not None else [0.75, 1.0, 1.25],
+        slerp_weights=slerp_weights if slerp_weights is not None else [0.2, 0.35, 0.5, 0.65, 0.8],
         max_speakers=max_speakers,
-        start_index=start_index,
     )
-    logger.info(f"Generated {len(generated)} clips in {output_dir}")
-    return generated
+    return backend.synthesize_clips(
+        phrases=phrases,
+        output_dir=output_dir,
+        n_samples=n_samples,
+        start_index=start_index,
+        batch_size=batch_size,
+    )
 
 
 def _generate_background_clips(
@@ -305,7 +271,9 @@ def _generate_background_clips(
     if existing >= n_samples:
         logger.info(
             "Split %s already complete (%d/%d clips), skipping",
-            split_name, existing, n_samples,
+            split_name,
+            existing,
+            n_samples,
         )
         return
     if existing > 0:
@@ -328,7 +296,9 @@ def _generate_background_clips(
 
     logger.info(
         "Generating %d %s clips from %d source files",
-        n_samples - existing, split_name, len(all_audio),
+        n_samples - existing,
+        split_name,
+        len(all_audio),
     )
 
     for i in tqdm(range(existing, n_samples), desc=f"Background ({split_name})", unit="clip"):
@@ -366,20 +336,8 @@ def run_generate(config: WakeWordConfig) -> None:
     existing count.
     """
     model_dir = config.model_output_dir
-    vits_path = config.data_path / "piper" / "en-us-libritts-high.pt"
-    if not vits_path.exists():
-        raise FileNotFoundError(
-            f"VITS model not found at {vits_path}. "
-            "Run setup first: python -m livekit.wakeword.data setup"
-        )
-
-    synth_kwargs: dict[str, Any] = {
-        "noise_scales": config.noise_scales,
-        "noise_scale_ws": config.noise_scale_ws,
-        "length_scales": config.length_scales,
-        "slerp_weights": config.slerp_weights,
-        "max_speakers": config.max_speakers,
-    }
+    tts = get_tts_backend(config)
+    tts.validate_artifacts()
 
     # --- Positive splits ---
     splits: list[tuple[str, list[str], int]] = [
@@ -393,24 +351,26 @@ def run_generate(config: WakeWordConfig) -> None:
         if existing >= n_target:
             logger.info(
                 "Split %s already complete (%d/%d clips), skipping",
-                split_name, existing, n_target,
+                split_name,
+                existing,
+                n_target,
             )
             continue
         if existing > 0:
             logger.info(
                 "Resuming split %s from clip %d / %d",
-                split_name, existing, n_target,
+                split_name,
+                existing,
+                n_target,
             )
         else:
             logger.info("Generating %d %s clips...", n_target, split_name)
-        synthesize_clips(
+        tts.synthesize_clips(
             phrases=phrases,
             output_dir=split_dir,
             n_samples=n_target,
-            vits_model_path=vits_path,
-            batch_size=config.tts_batch_size,
             start_index=existing,
-            **synth_kwargs,
+            batch_size=config.tts_batch_size,
         )
 
     # --- Adversarial negative splits ---
@@ -445,24 +405,26 @@ def run_generate(config: WakeWordConfig) -> None:
             if existing >= n_target:
                 logger.info(
                     "Split %s already complete (%d/%d clips), skipping",
-                    split_name, existing, n_target,
+                    split_name,
+                    existing,
+                    n_target,
                 )
                 continue
             if existing > 0:
                 logger.info(
                     "Resuming split %s from clip %d / %d",
-                    split_name, existing, n_target,
+                    split_name,
+                    existing,
+                    n_target,
                 )
             else:
                 logger.info("Synthesizing %d %s clips...", n_target, split_name)
-            synthesize_clips(
+            tts.synthesize_clips(
                 phrases=adv_phrases,
                 output_dir=split_dir,
                 n_samples=n_target,
-                vits_model_path=vits_path,
-                batch_size=config.tts_batch_size,
                 start_index=existing,
-                **synth_kwargs,
+                batch_size=config.tts_batch_size,
             )
 
     # --- Background noise splits ---
@@ -470,4 +432,3 @@ def run_generate(config: WakeWordConfig) -> None:
         _generate_background_clips(config, "background_train", config.n_background_samples)
     if config.n_background_samples_val > 0:
         _generate_background_clips(config, "background_test", config.n_background_samples_val)
-

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Self
 
@@ -13,17 +13,23 @@ from pydantic import BaseModel, Field, model_validator
 _logger = logging.getLogger(__name__)
 
 
-class ModelType(str, Enum):
+class ModelType(StrEnum):
     dnn = "dnn"
     rnn = "rnn"
     conv_attention = "conv_attention"
 
 
-class ModelSize(str, Enum):
+class ModelSize(StrEnum):
     tiny = "tiny"
     small = "small"
     medium = "medium"
     large = "large"
+
+
+class TtsBackend(StrEnum):
+    """Synthetic speech engine for the generate stage."""
+
+    piper_vits = "piper_vits"
 
 
 # Preset mapping: size -> (layer_dim, n_blocks)
@@ -68,9 +74,10 @@ class WakeWordConfig(BaseModel):
     n_background_samples: int = 200
     n_background_samples_val: int = 40
     tts_batch_size: int = 50
+    tts_backend: TtsBackend = TtsBackend.piper_vits
     custom_negative_phrases: list[str] = Field(default_factory=list)
 
-    # TTS parameters (VITS + SLERP speaker blending)
+    # TTS parameters (Piper VITS + SLERP speaker blending)
     noise_scales: list[float] = Field(default_factory=lambda: [0.98])
     noise_scale_ws: list[float] = Field(default_factory=lambda: [0.98])
     length_scales: list[float] = Field(default_factory=lambda: [0.75, 1.0, 1.25])

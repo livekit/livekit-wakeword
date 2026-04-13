@@ -38,7 +38,9 @@ def setup(
     logger.info("Setting up livekit-wakeword data dependencies...")
 
     # Download VITS TTS model (.pt checkpoint + config)
-    piper_dir = data_path / "piper"
+    from .data.piper.defaults import PIPER_DATA_SUBDIR
+
+    piper_dir = data_path / PIPER_DATA_SUBDIR
     piper_dir.mkdir(exist_ok=True)
     _download_piper(piper_dir)
 
@@ -70,16 +72,22 @@ def _download_piper(piper_dir: Path) -> None:
 
     from rich.progress import Progress
 
-    base_url = "https://github.com/livekit/livekit-wakeword/releases/download/v0.1.0"
+    from .data.piper.defaults import (
+        DEFAULT_RELEASE_BASE_URL,
+        DEFAULT_STATE_DICT_FILENAME,
+        RELEASE_CONFIG_JSON_ASSET,
+        RELEASE_STATE_DICT_ASSET,
+    )
 
-    # 1) Download state_dict .pt
-    pt_url = f"{base_url}/en-us-libritts-high.state_dict.pt"
-    pt_dest = piper_dir / "en-us-libritts-high.pt"
+    base_url = DEFAULT_RELEASE_BASE_URL
+
+    pt_url = f"{base_url}/{RELEASE_STATE_DICT_ASSET}"
+    pt_dest = piper_dir / DEFAULT_STATE_DICT_FILENAME
     if not pt_dest.exists():
-        logger.info("Downloading en-us-libritts-high.pt (~166 MB)...")
+        logger.info("Downloading %s (~166 MB)...", DEFAULT_STATE_DICT_FILENAME)
         try:
             with Progress() as progress:
-                task = progress.add_task("[cyan]en-us-libritts-high.pt", total=None)
+                task = progress.add_task(f"[cyan]{DEFAULT_STATE_DICT_FILENAME}", total=None)
                 tmp_path = pt_dest.with_suffix(".tmp")
 
                 def _reporthook(block_num: int, block_size: int, total: int) -> None:
@@ -88,7 +96,7 @@ def _download_piper(piper_dir: Path) -> None:
 
                 urllib.request.urlretrieve(pt_url, str(tmp_path), reporthook=_reporthook)
                 tmp_path.rename(pt_dest)
-            logger.info("Downloaded en-us-libritts-high.pt")
+            logger.info("Downloaded %s", DEFAULT_STATE_DICT_FILENAME)
         except Exception as e:
             logger.warning(f"Failed to download VITS checkpoint: {e}")
             tmp_path = pt_dest.with_suffix(".tmp")
@@ -97,9 +105,8 @@ def _download_piper(piper_dir: Path) -> None:
     else:
         logger.info(f"VITS checkpoint already exists: {pt_dest}")
 
-    # 2) Download config JSON (must be next to .pt with .json suffix)
-    json_url = f"{base_url}/en-us-libritts-high.config.json"
-    json_dest = piper_dir / "en-us-libritts-high.json"
+    json_url = f"{base_url}/{RELEASE_CONFIG_JSON_ASSET}"
+    json_dest = pt_dest.with_suffix(".json")
     if not json_dest.exists():
         logger.info("Downloading VITS config JSON...")
         try:
