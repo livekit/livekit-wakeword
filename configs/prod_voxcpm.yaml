@@ -1,0 +1,199 @@
+# =============================================================================
+# Production wake-word config — VoxCPM2 TTS (voice design, no reference audio)
+# =============================================================================
+#
+# Install:   uv sync --extra train --extra voxcpm
+# Prefetch:  livekit-wakeword setup --config configs/prod_voxcpm.yaml
+# Pipeline:  livekit-wakeword run configs/prod_voxcpm.yaml
+#
+# Schema:    WakeWordConfig in src/livekit/wakeword/config.py
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# model_name (required)
+# -----------------------------------------------------------------------------
+# Used for output/<model_name>/, checkpoint basename, and exported ONNX filename.
+
+model_name: hey_livekit_voxcpm
+
+# -----------------------------------------------------------------------------
+# target_phrases (required)
+# -----------------------------------------------------------------------------
+# Exact phrases to synthesize as positives and to defend against via adversarial
+# negatives. Include spelling variants users might say.
+
+target_phrases:
+  - "hey livekit"
+
+# =============================================================================
+# Data generation (top-level)
+# =============================================================================
+
+# tts_backend — Synthetic speech engine for clip generation.
+#   piper_vits — VITS + SLERP (904 speakers); uses piper_tts + noise_* / slerp_* below.
+#   voxcpm     — VoxCPM2 voice-design TTS; uses voxcpm_tts below.
+tts_backend: voxcpm
+
+# n_samples — Training clips per synthetic class (positive + adversarial negative).
+# Each class gets this many clips before augmentation rounds multiply variants.
+n_samples: 25000
+
+# n_samples_val — Validation clips per synthetic class (~10–20% of n_samples).
+n_samples_val: 5000
+
+# n_background_samples / n_background_samples_val — Count of tiled background-noise clips.
+n_background_samples: 2000
+n_background_samples_val: 500
+
+# tts_batch_size — Piper: GPU batch size for VITS. VoxCPM: ignored (sequential synthesis).
+tts_batch_size: 50
+
+# custom_negative_phrases — Extra adversarial phrases (in addition to auto phoneme edits).
+custom_negative_phrases:
+  - "livekit"
+  - "live kit"
+  - "hey libby"
+  - "hey livid"
+  - "hey lidocaine"
+  - "hey liquid"
+  - "hey linux"
+  - "hey lyric"
+  - "play live"
+  - "they live"
+  - "hey look at"
+  - "hey look it"
+
+# -----------------------------------------------------------------------------
+# Piper-only TTS controls (ignored when tts_backend is voxcpm; kept for schema parity)
+# -----------------------------------------------------------------------------
+# noise_scales       — VITS decoder noise (overall variability).
+# noise_scale_ws     — VITS duration noise.
+# length_scales      — Speaking-rate multipliers.
+# slerp_weights      — Speaker-blend weights for SLERP pairs.
+# max_speakers       — Cap Piper speaker IDs (null = all 904).
+noise_scales: [0.98]
+noise_scale_ws: [0.98]
+length_scales: [0.75, 1.0, 1.25]
+slerp_weights: [0.2, 0.35, 0.5, 0.65, 0.8]
+# max_speakers: null
+
+# -----------------------------------------------------------------------------
+# piper_tts — Piper checkpoint layout (only used when tts_backend is piper_vits)
+# -----------------------------------------------------------------------------
+# checkpoint_relpath — Path to en-us-libritts-high.pt relative to data_dir; JSON beside it.
+piper_tts:
+  checkpoint_relpath: piper/en-us-libritts-high.pt
+
+# -----------------------------------------------------------------------------
+# voxcpm_tts — VoxCPM2 settings (only used when tts_backend is voxcpm)
+# -----------------------------------------------------------------------------
+# model_id             — Hugging Face repo id for `setup` snapshot_download.
+# model_cache_relpath  — Directory under data_dir for the snapshot (default voxcpm/VoxCPM2).
+# local_model_path     — Optional: absolute path or path relative to data_dir with weights.
+#                        If set and directory is non-empty, setup skips download.
+# load_denoiser        — Pass-through to VoxCPM.from_pretrained (heavier load if true).
+# voice_design_prompts — Text personas; clip index cycles (prompt × cfg × timesteps).
+# cfg_values           — Classifier-free guidance scales per clip (higher = stronger conditioning).
+# inference_timesteps_list — Diffusion denoising steps at inference (more = slower, often cleaner).
+voxcpm_tts:
+  model_id: openbmb/VoxCPM2
+  model_cache_relpath: voxcpm/VoxCPM2
+  local_model_path: null
+  load_denoiser: false
+  cfg_values: [1.5, 2.0, 2.5, 3.0]
+  inference_timesteps_list: [8, 10, 12]
+  voice_design_prompts:
+    - "A young adult woman, clear mid-pitch voice, moderate pace, calm and professional"
+    - "A young adult man, warm baritone, steady pace, friendly and articulate"
+    - "A middle-aged woman, slightly low pitch, measured pace, confident tone"
+    - "A middle-aged man, deep resonant voice, slow deliberate pace"
+    - "An older adult woman, soft gentle voice, slower pace, kind tone"
+    - "An older adult man, gravelly tenor, moderate pace, matter-of-fact"
+    - "A young woman, bright energetic tone, slightly faster pace"
+    - "A young man, light tenor, quick conversational pace"
+    - "A woman in her thirties, smooth alto, neutral American accent, even pace"
+    - "A man in his thirties, clear baritone, businesslike pace"
+    - "A speaker with a higher pitch, enthusiastic and upbeat, medium-fast pace"
+    - "A speaker with a lower pitch, relaxed and laid-back, slower pace"
+    - "A young adult, gender-neutral delivery, soft volume, careful enunciation"
+    - "A confident presenter voice, strong projection, moderate speed"
+    - "A quiet intimate voice, close-mic feel, slow and clear"
+    - "A news-anchor style voice, authoritative, even rhythm"
+    - "A friendly customer-service tone, slightly smiling, medium pace"
+    - "A tired but clear voice, subdued energy, steady pace"
+    - "A cheerful animated voice, wide pitch range, lively pace"
+    - "A serious formal voice, minimal emotion, precise articulation"
+    - "A Southern US English accent, warm tone, conversational pace"
+    - "A British English accent, clear RP-like delivery, moderate pace"
+    - "A speaker with slight vocal fry, casual young adult, medium pace"
+    - "A very smooth polished voice, studio quality, slow to medium pace"
+    - "A nasal bright tone, energetic, faster than average pace"
+    - "A breathy soft voice, gentle, slower pace"
+    - "A robust athletic-sounding voice, strong and direct, medium pace"
+    - "A scholarly tone, thoughtful pauses, slower academic pace"
+    - "A teenager-sounding voice, casual, slightly fast, light pitch"
+    - "A mature executive voice, controlled low dynamics, steady"
+    - "A sing-song playful tone, varied pitch, medium pace"
+    - "A monotone flat delivery, robotic clarity, even speed"
+    - "A husky voice, low energy, medium-slow pace"
+    - "A crisp precise voice, minimal accent, fast clear speech"
+
+# =============================================================================
+# Paths
+# =============================================================================
+
+# data_dir  — Root for downloads (setup), backgrounds, RIRs, VoxCPM snapshot, Piper if used.
+data_dir: ./data
+
+# output_dir — Root for generated clips, features, checkpoints, exports (per model_name).
+output_dir: ./output
+
+# =============================================================================
+# augmentation (AugmentationConfig)
+# =============================================================================
+# clip_duration    — Seconds; fixed window for embedding pipeline (default 2.0 matches ONNX head).
+# batch_size       — Augmentation batch size.
+# rounds           — Augmentation passes per sample (more = stronger regularization, slower).
+# background_paths — Dirs of raw noise (MUSAN subset from setup).
+# rir_paths        — Room impulse response dirs (from setup).
+
+augmentation:
+  clip_duration: 2.0
+  batch_size: 16
+  rounds: 3
+  background_paths: [./data/backgrounds]
+  rir_paths: [./data/rirs]
+
+# =============================================================================
+# model (ModelConfig)
+# =============================================================================
+# model_type — dnn | rnn | conv_attention
+# model_size — tiny | small | medium | large  (layer width × depth presets)
+
+model:
+  model_type: conv_attention
+  model_size: medium
+
+# =============================================================================
+# Training
+# =============================================================================
+# steps                 — Phase-1 step budget (trainer uses multi-phase schedule).
+# learning_rate         — AdamW base LR.
+# weight_decay          — AdamW L2-style decay.
+# label_smoothing       — BCE target smoothing (0–0.1 typical).
+# max_negative_weight   — Upper cap for negative-class loss weight ramp.
+# target_fp_per_hour    — Validation FPPH target for adaptive weighting / thresholding.
+# batch_n_per_class     — Samples per class per training step (keys must match trainer).
+
+steps: 100000
+learning_rate: 0.0001
+weight_decay: 0.01
+label_smoothing: 0.05
+max_negative_weight: 3000
+target_fp_per_hour: 0.1
+
+batch_n_per_class:
+  positive: 50
+  adversarial_negative: 50
+  ACAV100M_sample: 1024
+  background_noise: 50
