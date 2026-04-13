@@ -27,7 +27,7 @@ uv run ruff format src/ tests/      # Auto-format
 uv run mypy src/livekit/wakeword/       # Type check (strict mode)
 
 # CLI (entry point: livekit-wakeword = livekit.wakeword.cli:app)
-uv run livekit-wakeword setup            # Download frozen ONNX models + VITS TTS checkpoint
+uv run livekit-wakeword setup [--config YAML]   # Data deps; Piper only if tts_backend is piper_vits (or no --config)
 uv run livekit-wakeword generate <config> # VITS TTS + SLERP speaker blending + adversarial negatives
 uv run livekit-wakeword augment <config>  # Augment + extract features → .npy
 uv run livekit-wakeword train <config>    # 3-phase adaptive training
@@ -45,7 +45,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 
 ### Source Layout (`src/livekit/wakeword/`)
 
-- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`)
+- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`); `TtsBackend`, `PiperTtsConfig`, `piper_checkpoint_path`
 - **`cli.py`** — Typer CLI with all commands
 - **`models/`**
   - `feature_extractor.py` — `MelSpectrogramFrontend` (ONNX primary, torchaudio fallback) and `SpeechEmbedding` (ONNX only)

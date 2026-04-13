@@ -7,7 +7,6 @@ from pathlib import Path
 
 from ...config import WakeWordConfig
 from ..piper import generate_samples, normalize_phrases_for_piper
-from ..piper.defaults import default_checkpoint_path
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class PiperVitsBackend:
     @classmethod
     def from_config(cls, config: WakeWordConfig) -> PiperVitsBackend:
         return cls(
-            model_path=default_checkpoint_path(config.data_path),
+            model_path=config.piper_checkpoint_path,
             noise_scales=config.noise_scales,
             noise_scale_ws=config.noise_scale_ws,
             length_scales=config.length_scales,
@@ -47,7 +46,7 @@ class PiperVitsBackend:
         if not self._model_path.exists():
             raise FileNotFoundError(
                 f"VITS model not found at {self._model_path}. "
-                "Run setup first: livekit-wakeword setup"
+                "Run setup with your config: livekit-wakeword setup --config <your.yaml>"
             )
 
     def synthesize_clips(

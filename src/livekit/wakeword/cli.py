@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 from rich.logging import RichHandler
 
-from .config import load_config
+from .config import TtsBackend, load_config
 
 app = typer.Typer(
     name="livekit-wakeword",
@@ -26,23 +26,47 @@ logger = logging.getLogger("livekit.wakeword")
 
 @app.command()
 def setup(
-    data_dir: str = typer.Option("./data", help="Root data directory"),
+    data_dir: str = typer.Option(
+        "./data",
+        help="Root data directory when --config is omitted",
+    ),
+    config_path: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help=(
+            "Wake word YAML: data_dir from config; Piper download only if "
+            "tts_backend is piper_vits"
+        ),
+    ),
     skip_acav: bool = typer.Option(
         False, "--skip-acav", help="Skip downloading ACAV100M features (~16 GB)"
     ),
 ) -> None:
-    """Download external dependencies: VITS TTS model, ACAV100M features, RIRs, backgrounds."""
-    data_path = Path(data_dir)
-    data_path.mkdir(parents=True, exist_ok=True)
+    """Download external dependencies: optional Piper VITS, ACAV100M features, RIRs, backgrounds."""
+    from .data.piper.defaults import default_checkpoint_path
 
-    logger.info("Setting up livekit-wakeword data dependencies...")
-
-    # Download VITS TTS model (.pt checkpoint + config)
-    from .data.piper.defaults import PIPER_DATA_SUBDIR
-
-    piper_dir = data_path / PIPER_DATA_SUBDIR
-    piper_dir.mkdir(exist_ok=True)
-    _download_piper(piper_dir)
+    if config_path is not None:
+        cfg = load_config(config_path)
+        data_path = cfg.data_path.resolve()
+        data_path.mkdir(parents=True, exist_ok=True)
+        logger.info("Setting up data dependencies (from %s)...", config_path)
+        if cfg.tts_backend is TtsBackend.piper_vits:
+            pt_dest = cfg.piper_checkpoint_path
+            pt_dest.parent.mkdir(parents=True, exist_ok=True)
+            _download_piper_checkpoint(pt_dest)
+        else:
+            logger.info(
+                "Skipping Piper VITS download (tts_backend=%s).",
+                cfg.tts_backend.value,
+            )
+    else:
+        data_path = Path(data_dir).resolve()
+        data_path.mkdir(parents=True, exist_ok=True)
+        logger.info("Setting up livekit-wakeword data dependencies...")
+        pt_dest = default_checkpoint_path(data_path)
+        pt_dest.parent.mkdir(parents=True, exist_ok=True)
+        _download_piper_checkpoint(pt_dest)
 
     # Download ACAV100M features
     features_dir = data_path / "features"
@@ -66,15 +90,14 @@ def setup(
     logger.info("Setup complete!")
 
 
-def _download_piper(piper_dir: Path) -> None:
-    """Download VITS state_dict and config JSON."""
+def _download_piper_checkpoint(pt_dest: Path) -> None:
+    """Download bundled Piper VITS state_dict and JSON config next to *pt_dest*."""
     import urllib.request
 
     from rich.progress import Progress
 
     from .data.piper.defaults import (
         DEFAULT_RELEASE_BASE_URL,
-        DEFAULT_STATE_DICT_FILENAME,
         RELEASE_CONFIG_JSON_ASSET,
         RELEASE_STATE_DICT_ASSET,
     )
@@ -82,12 +105,12 @@ def _download_piper(piper_dir: Path) -> None:
     base_url = DEFAULT_RELEASE_BASE_URL
 
     pt_url = f"{base_url}/{RELEASE_STATE_DICT_ASSET}"
-    pt_dest = piper_dir / DEFAULT_STATE_DICT_FILENAME
+    pt_name = pt_dest.name
     if not pt_dest.exists():
-        logger.info("Downloading %s (~166 MB)...", DEFAULT_STATE_DICT_FILENAME)
+        logger.info("Downloading %s (~166 MB)...", pt_name)
         try:
             with Progress() as progress:
-                task = progress.add_task(f"[cyan]{DEFAULT_STATE_DICT_FILENAME}", total=None)
+                task = progress.add_task(f"[cyan]{pt_name}", total=None)
                 tmp_path = pt_dest.with_suffix(".tmp")
 
                 def _reporthook(block_num: int, block_size: int, total: int) -> None:
@@ -96,7 +119,7 @@ def _download_piper(piper_dir: Path) -> None:
 
                 urllib.request.urlretrieve(pt_url, str(tmp_path), reporthook=_reporthook)
                 tmp_path.rename(pt_dest)
-            logger.info("Downloaded %s", DEFAULT_STATE_DICT_FILENAME)
+            logger.info("Downloaded %s", pt_name)
         except Exception as e:
             logger.warning(f"Failed to download VITS checkpoint: {e}")
             tmp_path = pt_dest.with_suffix(".tmp")

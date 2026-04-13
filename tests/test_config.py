@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 from livekit.wakeword.config import (
     MODEL_SIZE_PRESETS,
-    AugmentationConfig,
     ModelConfig,
     ModelSize,
     ModelType,
+    TtsBackend,
     WakeWordConfig,
     load_config,
 )
@@ -71,3 +70,36 @@ def test_batch_n_per_class_default():
     assert config.batch_n_per_class["positive"] == 50
     assert config.batch_n_per_class["adversarial_negative"] == 50
     assert config.batch_n_per_class["ACAV100M_sample"] == 1024
+
+
+def test_piper_checkpoint_path_default(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    config = WakeWordConfig(
+        model_name="test",
+        target_phrases=["hey"],
+        data_dir=str(data),
+    )
+    assert config.piper_checkpoint_path == (data / "piper" / "en-us-libritts-high.pt").resolve()
+
+
+def test_piper_checkpoint_path_custom_relpath(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    config = WakeWordConfig(
+        model_name="test",
+        target_phrases=["hey"],
+        data_dir=str(data),
+        piper_tts={"checkpoint_relpath": "models/custom.pt"},
+    )
+    assert config.piper_checkpoint_path == (data / "models" / "custom.pt").resolve()
+
+
+def test_tts_backend_enum_in_yaml(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "cfg.yaml"
+    yaml_path.write_text(
+        "model_name: t\n"
+        "target_phrases: [a]\n"
+        "tts_backend: piper_vits\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(yaml_path)
+    assert cfg.tts_backend is TtsBackend.piper_vits

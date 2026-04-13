@@ -10,6 +10,8 @@ from typing import Annotated, Self
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
+from .tts_constants import DEFAULT_CHECKPOINT_RELPATH
+
 _logger = logging.getLogger(__name__)
 
 
@@ -62,6 +64,15 @@ class ModelConfig(BaseModel):
         return MODEL_SIZE_PRESETS[self.model_size][1]
 
 
+class PiperTtsConfig(BaseModel):
+    """Piper VITS artifact layout under ``data_dir`` (when ``tts_backend`` is ``piper_vits``)."""
+
+    checkpoint_relpath: str = Field(
+        default=DEFAULT_CHECKPOINT_RELPATH,
+        description="Path to the VITS state_dict .pt file, relative to data_dir",
+    )
+
+
 class WakeWordConfig(BaseModel):
     """Top-level config for a wake word model."""
 
@@ -75,6 +86,7 @@ class WakeWordConfig(BaseModel):
     n_background_samples_val: int = 40
     tts_batch_size: int = 50
     tts_backend: TtsBackend = TtsBackend.piper_vits
+    piper_tts: PiperTtsConfig = Field(default_factory=PiperTtsConfig)
     custom_negative_phrases: list[str] = Field(default_factory=list)
 
     # TTS parameters (Piper VITS + SLERP speaker blending)
@@ -128,6 +140,11 @@ class WakeWordConfig(BaseModel):
     @property
     def data_path(self) -> Path:
         return Path(self.data_dir)
+
+    @property
+    def piper_checkpoint_path(self) -> Path:
+        """Absolute path to the Piper VITS .pt checkpoint (JSON sits alongside)."""
+        return (self.data_path / Path(self.piper_tts.checkpoint_relpath)).resolve()
 
 
 def load_config(path: str | Path) -> WakeWordConfig:

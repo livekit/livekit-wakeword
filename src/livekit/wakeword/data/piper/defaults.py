@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# Directory under data_path where Piper artifacts live (matches ``livekit-wakeword setup``).
-PIPER_DATA_SUBDIR = "piper"
+from livekit.wakeword.tts_constants import (
+    DEFAULT_CHECKPOINT_RELPATH,
+    DEFAULT_CHECKPOINT_STEM,
+    DEFAULT_PIPER_STATE_DICT_FILENAME,
+)
 
-# Default English LibriTTS-high checkpoint from project releases.
-DEFAULT_CHECKPOINT_STEM = "en-us-libritts-high"
-DEFAULT_STATE_DICT_FILENAME = f"{DEFAULT_CHECKPOINT_STEM}.pt"
+# On-disk basename for the default checkpoint (same as release asset base name + .pt).
+DEFAULT_STATE_DICT_FILENAME = DEFAULT_PIPER_STATE_DICT_FILENAME
 DEFAULT_CONFIG_JSON_FILENAME = f"{DEFAULT_CHECKPOINT_STEM}.json"
 
 # GitHub release asset names (may differ from on-disk filenames).
@@ -22,6 +24,11 @@ DEFAULT_RELEASE_BASE_URL = (
 )
 
 
-def default_checkpoint_path(data_path: Path) -> Path:
-    """Path to the default VITS state_dict used by setup and generation."""
-    return data_path / PIPER_DATA_SUBDIR / DEFAULT_STATE_DICT_FILENAME
+def default_checkpoint_path(
+    data_path: Path,
+    *,
+    checkpoint_relpath: str | None = None,
+) -> Path:
+    """Resolve VITS state_dict path under *data_path* (used by tools without full config)."""
+    rel = checkpoint_relpath or DEFAULT_CHECKPOINT_RELPATH
+    return (data_path / Path(rel)).resolve()

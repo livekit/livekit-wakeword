@@ -218,7 +218,7 @@ def synthesize_clips(
         raise FileNotFoundError(
             f"VITS model not found at {vits_model_path}. "
             "Cannot generate audio — refusing to produce silent placeholders. "
-            "Download the model first: livekit-wakeword setup"
+            "Download the model first: livekit-wakeword setup --config <your.yaml>"
         )
 
     backend = PiperVitsBackend(
