@@ -60,7 +60,9 @@ src/livekit/wakeword/
 │   ├── classifier.py            DNNClassifier, RNNClassifier, ConvAttentionClassifier
 │   └── pipeline.py              WakeWordClassifier (training wrapper for classifier head)
 ├── data/
-│   ├── generate.py              VITS TTS + SLERP speaker blending + adversarial negatives
+│   ├── generate.py              TTS orchestration (default Piper VITS) + adversarial negatives
+│   ├── piper/                   Piper VITS + SLERP synthesis stack
+│   ├── tts/                     Pluggable SpeechSynthesizer backends
 │   ├── augment.py               AudioAugmentor + clip alignment
 │   ├── dataset.py               WakeWordDataset (memory-mapped .npy batch generator)
 │   └── features.py              ONNX feature extraction → .npy files
