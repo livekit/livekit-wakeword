@@ -52,9 +52,9 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
   - `classifier.py` — `DNNClassifier` (FC+LayerNorm), `RNNClassifier` (Bi-LSTM), `build_classifier()` factory
   - `pipeline.py` — `WakeWordClassifier` (training wrapper for classifier head)
 - **`data/`**
-  - `generate.py` — VITS TTS synthesis with SLERP speaker blending + adversarial negatives + background noise clip generation
-  - `_piper_generate.py` — Vendored VITS generation from dscripka/piper-sample-generator (904-speaker SLERP)
-  - `_vits_utils.py` — Vendored VITS utilities (sequence_mask, generate_path, slerp, audio_float_to_int16)
+  - `generate.py` — Synthetic clip orchestration (`run_generate`); default TTS via `tts/` backends (`tts_backend` in config)
+  - `tts/` — `SpeechSynthesizer` protocol, `get_tts_backend()`, `PiperVitsBackend`
+  - `piper/` — Piper-style VITS: `generate_samples` (904-speaker SLERP), `vits/` model, `vits_utils.py`, `defaults.py` (checkpoint paths/URLs), `text.py` (CMUDict phrase prep)
   - `augment.py` — `AudioAugmentor` (EQ, distortion, RIR, background mixing) for all 6 splits; positives aligned to END of window, negatives/backgrounds center-padded
   - `dataset.py` — `WakeWordDataset` (memory-mapped .npy, mixed-class batch generator)
   - `features.py` — Extract features through ONNX pipeline → .npy files
