@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 from rich.logging import RichHandler
 
-from .config import TtsBackend, load_config
+from .config import TtsBackend, WakeWordConfig, load_config
 
 app = typer.Typer(
     name="livekit-wakeword",
@@ -35,8 +35,8 @@ def setup(
         "--config",
         "-c",
         help=(
-            "Wake word YAML: data_dir from config; Piper download only if "
-            "tts_backend is piper_vits"
+            "Wake word YAML: data_dir from config; Piper weights if "
+            "tts_backend is piper_vits; VoxCPM HF snapshot if tts_backend is voxcpm"
         ),
     ),
     skip_acav: bool = typer.Option(
@@ -55,9 +55,11 @@ def setup(
             pt_dest = cfg.piper_checkpoint_path
             pt_dest.parent.mkdir(parents=True, exist_ok=True)
             _download_piper_checkpoint(pt_dest)
+        elif cfg.tts_backend is TtsBackend.voxcpm:
+            _download_voxcpm_model(cfg)
         else:
             logger.info(
-                "Skipping Piper VITS download (tts_backend=%s).",
+                "Skipping TTS weight download (tts_backend=%s).",
                 cfg.tts_backend.value,
             )
     else:
@@ -139,6 +141,31 @@ def _download_piper_checkpoint(pt_dest: Path) -> None:
             logger.warning(f"Failed to download VITS config JSON: {e}")
     else:
         logger.info(f"VITS config already exists: {json_dest}")
+
+
+def _download_voxcpm_model(cfg: WakeWordConfig) -> None:
+    """Fetch the VoxCPM HF snapshot during ``setup`` (same idea as Piper: download if missing).
+
+    Uses ``voxcpm_tts.model_id`` and ``voxcpm_local_model_path`` from config. Only runs
+    ``snapshot_download`` if that directory is missing or empty, so re-running setup does
+    not redownload gigabytes.
+    """
+    dest = cfg.voxcpm_local_model_path
+    if dest.is_dir() and any(dest.iterdir()):
+        logger.info("VoxCPM weights already present at %s", dest)
+        return
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        logger.warning(
+            "huggingface-hub not installed; cannot download VoxCPM. "
+            "Install train extras or: uv pip install huggingface-hub"
+        )
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    repo = cfg.voxcpm_tts.model_id
+    logger.info("Downloading VoxCPM snapshot %s → %s (large; may take a while)...", repo, dest)
+    snapshot_download(repo_id=repo, local_dir=str(dest))
 
 
 def _download_validation_features(features_dir: Path) -> None:

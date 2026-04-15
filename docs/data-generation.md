@@ -1,6 +1,6 @@
 # Data Generation Pipeline
 
-The generation stage synthesizes positive and negative audio clips using a pluggable TTS backend (default: **Piper VITS** with SLERP speaker blending) and phoneme-based adversarial phrase generation. Select the engine with `tts_backend` in the YAML config (`piper_vits` today).
+The generation stage synthesizes positive and negative audio clips using a pluggable TTS backend (default: **Piper VITS** with SLERP speaker blending, or **VoxCPM2** voice design) and phoneme-based adversarial phrase generation. Select the engine with `tts_backend` in the YAML config (`piper_vits` or `voxcpm`). **Multilingual wake words require `tts_backend: voxcpm`** — Piper follows a single checkpoint locale (bundled default is English–US). See `configs/test_voxcpm.yaml` and `configs/prod_voxcpm.yaml` for Chinese (`你好 livekit`) examples.
 
 **Source:** `src/livekit/wakeword/data/generate.py`, `src/livekit/wakeword/data/piper/synthesis.py`, `src/livekit/wakeword/data/tts/`
 **CLI:** `livekit-wakeword generate <config>`
@@ -15,8 +15,8 @@ The generation stage synthesizes positive and negative audio clips using a plugg
 
 Pass your wake word YAML so setup aligns with generation:
 
-- **`data_dir`** from the config is the root for all downloads (features, RIRs, backgrounds, Piper).
-- **Piper** is downloaded **only if** `tts_backend` is `piper_vits`. If you use another backend (once available), Piper is skipped.
+- **`data_dir`** from the config is the root for all downloads (features, RIRs, backgrounds, Piper checkpoint, VoxCPM snapshot).
+- **Piper** is downloaded **only if** `tts_backend` is `piper_vits`. **VoxCPM** weights are fetched with `snapshot_download` **only if** `tts_backend` is `voxcpm` and the configured target directory is missing or empty (see **VoxCPM2** below). Otherwise TTS-specific downloads are skipped.
 - **Checkpoint path:** `piper_tts.checkpoint_relpath` is the path to the `.pt` state_dict **relative to `data_dir`**. The matching JSON config is always `same_basename.json` next to that file. Defaults to `piper/en-us-libritts-high.pt`.
 
 Example:
@@ -27,7 +27,15 @@ livekit-wakeword setup --config configs/prod.yaml
 
 ### Without `--config`
 
-If you omit `--config`, setup uses `--data-dir` (default `./data`) and **always** downloads the default Piper bundle to `piper/en-us-libritts-high.pt` under that root—handy when you do not have a YAML yet. Prefer `--config` for projects that use a non-default `data_dir`, a custom `piper_tts.checkpoint_relpath`, or a future non-Piper `tts_backend`.
+If you omit `--config`, setup uses `--data-dir` (default `./data`) and **always** downloads the default Piper bundle to `piper/en-us-libritts-high.pt` under that root—handy when you do not have a YAML yet. Prefer `--config` for projects that use a non-default `data_dir`, a custom `piper_tts.checkpoint_relpath`, or **VoxCPM** (VoxCPM is not downloaded without `--config`).
+
+## VoxCPM2 (`tts_backend: voxcpm`)
+
+[VoxCPM2](https://github.com/OpenBMB/VoxCPM) is used in **voice design** mode only: each clip uses a text persona description plus the wake phrase (no reference-audio cloning in this integration). The Python package is optional: install with `uv sync --extra train --extra voxcpm` (upstream recommends **PyTorch ≥ 2.5**; see their docs for CUDA).
+
+**Weights on disk:** `livekit-wakeword setup --config your.yaml` runs `snapshot_download(repo_id=voxcpm_tts.model_id, ...)` into `voxcpm_local_model_path` — by default `data_dir/voxcpm/VoxCPM2` (`voxcpm_tts.model_cache_relpath`), or `voxcpm_tts.local_model_path` if set (relative to `data_dir` or absolute). If that directory is already non-empty, setup skips the download (e.g. you prefetched or copied weights there).
+
+**Diversification:** Defaults cover many `voice_design_prompts` × `cfg_values` × `inference_timesteps_list` (see `VoxCpmTtsConfig` in `config.py`). Clip *i* cycles through that Cartesian product so resumes stay aligned with `start_index`. Output is **16 kHz** `clip_%06d.wav` (model native rate is resampled with librosa).
 
 ## Overview
 

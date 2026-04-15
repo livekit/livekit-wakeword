@@ -16,7 +16,7 @@ uv sync                              # All deps including optional groups
 uv sync --group dev                  # Dev only
 
 # Test
-uv run pytest tests/                 # All 32 tests
+uv run pytest tests/                 # All tests
 uv run pytest tests/test_config.py   # Single file
 uv run pytest -k "test_name"         # Single test
 uv run pytest --cov=src/livekit/wakeword tests/  # With coverage
@@ -27,7 +27,7 @@ uv run ruff format src/ tests/      # Auto-format
 uv run mypy src/livekit/wakeword/       # Type check (strict mode)
 
 # CLI (entry point: livekit-wakeword = livekit.wakeword.cli:app)
-uv run livekit-wakeword setup [--config YAML]   # Data deps; Piper only if tts_backend is piper_vits (or no --config)
+uv run livekit-wakeword setup [--config YAML]   # Data deps; Piper if piper_vits / VoxCPM snapshot if voxcpm; else always Piper when no --config
 uv run livekit-wakeword generate <config> # VITS TTS + SLERP speaker blending + adversarial negatives
 uv run livekit-wakeword augment <config>  # Augment + extract features → .npy
 uv run livekit-wakeword train <config>    # 3-phase adaptive training
@@ -45,7 +45,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
 
 ### Source Layout (`src/livekit/wakeword/`)
 
-- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`); `TtsBackend`, `PiperTtsConfig`, `piper_checkpoint_path`
+- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`); `TtsBackend`, `PiperTtsConfig`, `VoxCpmTtsConfig`, `piper_checkpoint_path`, `voxcpm_local_model_path`
 - **`cli.py`** — Typer CLI with all commands
 - **`models/`**
   - `feature_extractor.py` — `MelSpectrogramFrontend` (ONNX primary, torchaudio fallback) and `SpeechEmbedding` (ONNX only)
@@ -53,7 +53,7 @@ Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) �
   - `pipeline.py` — `WakeWordClassifier` (training wrapper for classifier head)
 - **`data/`**
   - `generate.py` — Synthetic clip orchestration (`run_generate`); default TTS via `tts/` backends (`tts_backend` in config)
-  - `tts/` — `SpeechSynthesizer` protocol, `get_tts_backend()`, `PiperVitsBackend`
+  - `tts/` — `SpeechSynthesizer` protocol, `get_tts_backend()`, `PiperVitsBackend`, `VoxCpmBackend`
   - `piper/` — Piper-style VITS: `generate_samples` (904-speaker SLERP), `vits/` model, `vits_utils.py`, `defaults.py` (checkpoint paths/URLs), `text.py` (CMUDict phrase prep)
   - `augment.py` — `AudioAugmentor` (EQ, distortion, RIR, background mixing) for all 6 splits; positives aligned to END of window, negatives/backgrounds center-padded
   - `dataset.py` — `WakeWordDataset` (memory-mapped .npy, mixed-class batch generator)

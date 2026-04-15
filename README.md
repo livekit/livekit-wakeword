@@ -15,6 +15,7 @@ An open-source wake word library for creating voice-enabled applications. Based 
 
 - **Conv-Attention classifier** — 1D temporal convolutions + multi-head self-attention replace openWakeWord's flat DNN head, preserving temporal structure across the 16-frame embedding window for better accuracy and fewer false positives (see [comparison](#openwakeword-vs-livekit-wakeword) below)
 - **Backward compatible** with openWakeWord models and library
+- **Multilingual support** — support over 30 languages with VoxCPM synthetic data generation
 - **Train anywhere** — local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
 - **Zero dependency headaches** — uv handles everything
 
@@ -129,30 +130,40 @@ livekit-wakeword setup
 **Train a wake word:**
 
 ```bash
-livekit-wakeword run configs/hey_livekit.yaml
+livekit-wakeword run configs/prod.yaml
 ```
 
 Or run stages individually:
 
 ```bash
-livekit-wakeword generate configs/hey_livekit.yaml  # TTS synthesis + adversarial negatives
-livekit-wakeword augment configs/hey_livekit.yaml   # Augment + extract features
-livekit-wakeword train configs/hey_livekit.yaml     # 3-phase adaptive training
-livekit-wakeword export configs/hey_livekit.yaml    # Export to ONNX
-livekit-wakeword eval configs/hey_livekit.yaml      # Evaluate model (DET curve, AUT, FPPH)
+livekit-wakeword generate configs/prod.yaml  # TTS synthesis + adversarial negatives
+livekit-wakeword augment configs/prod.yaml   # Augment + extract features
+livekit-wakeword train configs/prod.yaml     # 3-phase adaptive training
+livekit-wakeword export configs/prod.yaml    # Export to ONNX
+livekit-wakeword eval configs/prod.yaml      # Evaluate model (DET curve, AUT, FPPH)
 ```
 
 You can also evaluate any compatible ONNX model (e.g., one trained with openWakeWord):
 
 ```bash
-livekit-wakeword eval configs/hey_livekit.yaml -m /path/to/other_model.onnx
+livekit-wakeword eval configs/prod.yaml -m /path/to/other_model.onnx
 ```
 
 Eval produces a DET curve plot and metrics JSON in the output directory. See [Evaluation](docs/evaluation.md) for details.
 
-**Config:**
+### Configuration
 
-See [configs/hey_livekit.yaml](configs/hey_livekit.yaml) for all options.
+YAML drives the full pipeline. Example configs:
+
+| Config | Use |
+|--------|-----|
+| [configs/prod.yaml](configs/prod.yaml) | Production-scale, default TTS (**Piper** / English–US) |
+| [configs/test.yaml](configs/test.yaml) | Small end-to-end test run |
+| [configs/prod_voxcpm.yaml](configs/prod_voxcpm.yaml) | Production-scale **VoxCPM** (Chinese example: 你好 livekit) |
+| [configs/test_voxcpm.yaml](configs/test_voxcpm.yaml) | Small **VoxCPM** run (same Chinese phrase) |
+
+
+Minimal shape:
 
 ```yaml
 model_name: hey_livekit
@@ -166,6 +177,13 @@ model:
 steps: 50000
 target_fp_per_hour: 0.2
 ```
+
+**TTS backend (`tts_backend` in YAML):**
+
+- **`piper_vits`** (default) — VITS + SLERP; checkpoint under `data_dir` (see `piper_tts.checkpoint_relpath`). Language follows the Piper model (bundled default is English–US). **Not suitable for arbitrary multilingual synthesis.**
+- **`voxcpm`** — Use this backend for **multilingual** wake words (required if your phrase is not covered by your Piper model). VoxCPM2 voice-design synthesis; install with `uv sync --extra train --extra voxcpm`, prefetch weights with `livekit-wakeword setup --config <your.yaml>`. Write `target_phrases` and manual `custom_negative_phrases` in the target language (see `*_voxcpm.yaml` configs for a Chinese example).
+
+More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
 
 **Train on cloud GPUs with SkyPilot:**
 
@@ -192,7 +210,7 @@ from livekit.wakeword import (
 )
 
 # Load from YAML or construct directly
-config = load_config("configs/hey_livekit.yaml")
+config = load_config("configs/prod.yaml")
 
 # Or build a config programmatically
 config = WakeWordConfig(

@@ -7,6 +7,7 @@ from typing import Protocol, runtime_checkable
 
 from ...config import TtsBackend, WakeWordConfig
 from .piper_backend import PiperVitsBackend
+from .voxcpm_backend import VoxCpmBackend
 
 
 @runtime_checkable
@@ -14,7 +15,7 @@ class SpeechSynthesizer(Protocol):
     """Contract for engines that write training clips under ``run_generate``.
 
     Implementations apply **voice/speaker diversification** appropriate to the
-    engine (e.g. Piper SLERP, future Qwen controls). Orchestration only passes
+    engine (e.g. Piper SLERP, VoxCPM voice design). Orchestration only passes
     phrases, paths, counts, and batching.
     """
 
@@ -39,4 +40,6 @@ def get_tts_backend(config: WakeWordConfig) -> SpeechSynthesizer:
     """Construct the configured TTS backend."""
     if config.tts_backend is TtsBackend.piper_vits:
         return PiperVitsBackend.from_config(config)
+    if config.tts_backend is TtsBackend.voxcpm:
+        return VoxCpmBackend.from_config(config)
     raise ValueError(f"Unsupported tts_backend: {config.tts_backend!r}")

@@ -103,3 +103,40 @@ def test_tts_backend_enum_in_yaml(tmp_path: Path) -> None:
     )
     cfg = load_config(yaml_path)
     assert cfg.tts_backend is TtsBackend.piper_vits
+
+
+def test_tts_backend_voxcpm_in_yaml(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "cfg.yaml"
+    yaml_path.write_text(
+        "model_name: t\n"
+        "target_phrases: [a]\n"
+        "data_dir: ./d\n"
+        "tts_backend: voxcpm\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(yaml_path)
+    assert cfg.tts_backend is TtsBackend.voxcpm
+
+
+def test_voxcpm_local_model_path_default_cache(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    cfg = WakeWordConfig(
+        model_name="t",
+        target_phrases=["hey"],
+        data_dir=str(data),
+        tts_backend=TtsBackend.voxcpm,
+    )
+    assert "voxcpm" in str(cfg.voxcpm_local_model_path)
+    assert cfg.voxcpm_local_model_path == (data / "voxcpm" / "VoxCPM2").resolve()
+
+
+def test_voxcpm_local_model_path_override(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    cfg = WakeWordConfig(
+        model_name="t",
+        target_phrases=["hey"],
+        data_dir=str(data),
+        tts_backend=TtsBackend.voxcpm,
+        voxcpm_tts={"local_model_path": "models/vox"},
+    )
+    assert cfg.voxcpm_local_model_path == (data / "models" / "vox").resolve()
