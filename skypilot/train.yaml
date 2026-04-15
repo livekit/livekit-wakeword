@@ -1,4 +1,4 @@
-name: livekit-wakeword-train-hey-livekit
+name: livekit-wakeword-train
 
 resources:
   cloud: nebius
@@ -25,8 +25,8 @@ setup: |
   mkdir -p ${HOME_DIR}/${DATA_DIR} ${HOME_DIR}/${OUTPUT_DIR}
   ln -sfn ${HOME_DIR}/${DATA_DIR} data
   ln -sfn ${HOME_DIR}/${OUTPUT_DIR} output
-  uv sync --extra train --extra export --extra eval
-  uv run livekit-wakeword setup --data-dir ${HOME_DIR}/${DATA_DIR}
+  uv sync --all-extras
+  uv run livekit-wakeword setup --config configs/${CONFIG_FILE}
 
 run: |
   export PATH="$HOME/.cargo/bin:$PATH"

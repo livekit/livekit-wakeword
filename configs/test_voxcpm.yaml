@@ -1,26 +1,41 @@
-# Minimal config for testing the full pipeline end-to-end
-# Generates a small dataset, trains a tiny model, and exports quickly
+# Minimal end-to-end config using VoxCPM2 (voice design) for TTS.
+# Use with: livekit-wakeword setup --config configs/test_voxcpm.yaml
+# SkyPilot: see skypilot/train.yaml (CONFIG_FILE=test_voxcpm.yaml).
 #
-# Multilingual wake words: you must use tts_backend: voxcpm (Piper is English–US only).
-# See configs/test_voxcpm.yaml for a VoxCPM example with a non-English phrase.
-model_name: test_wakeword
+# Multilingual wake words require tts_backend: voxcpm (default Piper is English–US only).
+# This file uses a Chinese wake phrase (你好 livekit ≈ "nihao livekit"). Put positives and
+# manual negatives in your target script; auto adversarial negatives are English/CMUdict-biased.
 
-target_phrases: ["hey livekit"]
+model_name: test_voxcpm
+
+target_phrases:
+  - "你好 livekit" # Chinese; pinyin: nihao livekit
 
 # ============================================================================
 # Data Generation
 # ============================================================================
 
-n_samples: 100
-n_samples_val: 20
-n_background_samples: 50
-n_background_samples_val: 10
-tts_batch_size: 10
+tts_backend: voxcpm
+
+# Small diversification grid for faster smoke runs (defaults are much larger).
+voxcpm_tts:
+  voice_design_prompts:
+    - "A young adult woman, clear mid-pitch voice, moderate pace, calm tone"
+    - "A young adult man, warm baritone, steady pace, friendly tone"
+  cfg_values: [2.0]
+  inference_timesteps_list: [10]
+
+n_samples: 24
+n_samples_val: 8
+n_background_samples: 40
+n_background_samples_val: 8
+tts_batch_size: 4
 
 custom_negative_phrases:
   - "livekit"
+  - "你好"
+  - "嘿 livekit"
   - "hey libby"
-  - "hey liquid"
 
 # ============================================================================
 # Paths
@@ -36,7 +51,7 @@ output_dir: ./output
 augmentation:
   clip_duration: 2.0
   batch_size: 8
-  rounds: 3
+  rounds: 2
   background_paths: [./data/backgrounds]
   rir_paths: [./data/rirs]
 

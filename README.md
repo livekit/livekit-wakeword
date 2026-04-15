@@ -24,6 +24,7 @@ An open-source wake word library for creating voice-enabled applications. Based 
 - [Using Existing Models](#using-existing-models-and-library)
 - [Training New Models Using The CLI](#training-new-models-using-the-cli)
 - [Training New Models Using The Python API](#training-new-models-using-the-python-api)
+- [Training Multilingual Wake Words](#multilingual-support)
 - [openWakeWord vs livekit-wakeword](#openwakeword-vs-livekit-wakeword)
 - [Example: Wake Word–Triggered Agent](https://github.com/livekit-examples/hello-wakeword)
 
@@ -153,17 +154,16 @@ Eval produces a DET curve plot and metrics JSON in the output directory. See [Ev
 
 ### Configuration
 
-YAML drives the full pipeline. Example configs:
+The full pipeline runs based on a single YAML configuration file. You can find example configs here:
 
-| Config | Use |
-|--------|-----|
-| [configs/prod.yaml](configs/prod.yaml) | Production-scale, default TTS (**Piper** / English–US) |
-| [configs/test.yaml](configs/test.yaml) | Small end-to-end test run |
-| [configs/prod_voxcpm.yaml](configs/prod_voxcpm.yaml) | Production-scale **VoxCPM** (Chinese example: 你好 livekit) |
-| [configs/test_voxcpm.yaml](configs/test_voxcpm.yaml) | Small **VoxCPM** run (same Chinese phrase) |
+| Config                                               | Wake word      | Use                                                      |
+| ---------------------------------------------------- | -------------- | -------------------------------------------------------- |
+| [configs/prod.yaml](configs/prod.yaml)               | "hey livekit"  | Production-scale for English with **Piper TTS** backbone |
+| [configs/test.yaml](configs/test.yaml)               | "hey livekit"  | Small end-to-end test run with **Piper TTS** backbone    |
+| [configs/prod_voxcpm.yaml](configs/prod_voxcpm.yaml) | "你好 livekit" | Production-scale multilingual with **VoxCPM** backbone   |
+| [configs/test_voxcpm.yaml](configs/test_voxcpm.yaml) | "你好 livekit" | Small end-to-end test run with **VoxCPM** backbone       |
 
-
-Minimal shape:
+The bare minimum configuration required is as follows:
 
 ```yaml
 model_name: hey_livekit
@@ -178,20 +178,29 @@ steps: 50000
 target_fp_per_hour: 0.2
 ```
 
-**TTS backend (`tts_backend` in YAML):**
+### Multilingual Support
 
-- **`piper_vits`** (default) — VITS + SLERP; checkpoint under `data_dir` (see `piper_tts.checkpoint_relpath`). Language follows the Piper model (bundled default is English–US). **Not suitable for arbitrary multilingual synthesis.**
-- **`voxcpm`** — Use this backend for **multilingual** wake words (required if your phrase is not covered by your Piper model). VoxCPM2 voice-design synthesis; install with `uv sync --extra train --extra voxcpm`, prefetch weights with `livekit-wakeword setup --config <your.yaml>`. Write `target_phrases` and manual `custom_negative_phrases` in the target language (see `*_voxcpm.yaml` configs for a Chinese example).
+We support training wake words in 30 languages with [VoxCPM2 TTS](https://github.com/OpenBMB/VoxCPM) synthetic data generation:
 
-More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
+```
+Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese
 
-**Train on cloud GPUs with SkyPilot:**
+Chinese Dialect: 四川话, 粤语, 吴语, 东北话, 河南话, 陕西话, 山东话, 天津话, 闽南话
+```
 
-See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training job on Nebius.
+To use this, add `tts_backend` in your configuration YAML:
+
+```yaml
+tts_backend: voxcpm
+```
+
+And install `livekit-wakeword` with `voxcpm` optional dependency:
 
 ```bash
-sky launch skypilot/train.yaml
+pip install livekit-wakeword[train,eval,export,voxcpm]
 ```
+
+More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
 
 ### Training New Models Using The Python API
 
@@ -233,6 +242,14 @@ print(f"AUT={results['aut']:.4f}  FPPH={results['fpph']:.2f}  Recall={results['r
 ```
 
 This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.
+
+### Train on cloud GPUs with SkyPilot
+
+See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training job on Nebius.
+
+```bash
+sky launch skypilot/train.yaml
+```
 
 ## openWakeWord vs livekit-wakeword
 

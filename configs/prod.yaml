@@ -1,4 +1,7 @@
 # Model name — used for output directory and exported model filename
+#
+# Multilingual wake words: you must use tts_backend: voxcpm — Piper cannot synthesize
+# arbitrary languages. See configs/prod_voxcpm.yaml (Chinese example: 你好 livekit / nihao livekit).
 model_name: hey_livekit
 
 # Wake word phrases to detect (include spelling variations)

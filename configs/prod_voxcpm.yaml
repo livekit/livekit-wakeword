@@ -6,6 +6,11 @@
 # Prefetch:  livekit-wakeword setup --config configs/prod_voxcpm.yaml
 # Pipeline:  livekit-wakeword run configs/prod_voxcpm.yaml
 #
+# Multilingual wake words require tts_backend: voxcpm (Piper is English–US only). This example
+# uses Chinese 你好 livekit ("nihao livekit"). Write target_phrases and custom_negative_phrases in
+# your language; localize voice_design_prompts if you like. Auto adversarial negatives are
+# English/CMUdict-biased — add manual negatives for non-English.
+#
 # Schema:    WakeWordConfig in src/livekit/wakeword/config.py
 # =============================================================================
 
@@ -14,7 +19,7 @@
 # -----------------------------------------------------------------------------
 # Used for output/<model_name>/, checkpoint basename, and exported ONNX filename.
 
-model_name: hey_livekit_voxcpm
+model_name: nihao_livekit_voxcpm
 
 # -----------------------------------------------------------------------------
 # target_phrases (required)
@@ -23,7 +28,7 @@ model_name: hey_livekit_voxcpm
 # negatives. Include spelling variants users might say.
 
 target_phrases:
-  - "hey livekit"
+  - "你好 livekit" # Chinese wake phrase; pinyin: nihao livekit
 
 # =============================================================================
 # Data generation (top-level)
@@ -31,7 +36,8 @@ target_phrases:
 
 # tts_backend — Synthetic speech engine for clip generation.
 #   piper_vits — VITS + SLERP (904 speakers); uses piper_tts + noise_* / slerp_* below.
-#   voxcpm     — VoxCPM2 voice-design TTS; uses voxcpm_tts below.
+#   voxcpm     — VoxCPM2 voice-design TTS; uses voxcpm_tts below. Prefer this backend for
+#                multilingual wake words (phrases in target language; no extra language field).
 tts_backend: voxcpm
 
 # n_samples — Training clips per synthetic class (positive + adversarial negative).
@@ -49,19 +55,17 @@ n_background_samples_val: 500
 tts_batch_size: 50
 
 # custom_negative_phrases — Extra adversarial phrases (in addition to auto phoneme edits).
+# Tuned for Chinese 你好 livekit; add English false friends if users might mix languages.
 custom_negative_phrases:
   - "livekit"
+  - "你好"
+  - "您好 livekit"
+  - "嘿 livekit"
+  - "嗨 livekit"
+  - "你好吗 livekit"
   - "live kit"
   - "hey libby"
-  - "hey livid"
-  - "hey lidocaine"
   - "hey liquid"
-  - "hey linux"
-  - "hey lyric"
-  - "play live"
-  - "they live"
-  - "hey look at"
-  - "hey look it"
 
 # -----------------------------------------------------------------------------
 # Piper-only TTS controls (ignored when tts_backend is voxcpm; kept for schema parity)
