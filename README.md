@@ -9,28 +9,102 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.1-green)](https://github.com/livekit/livekit-wakeword)
 
-An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training — generate synthetic data, augment, train, and export from a single YAML config.
+An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training: generate synthetic data, augment, train, and export from a single YAML config.
 
 **Features:**
 
-- **Conv-Attention classifier** — 1D temporal convolutions + multi-head self-attention replace openWakeWord's flat DNN head, preserving temporal structure across the 16-frame embedding window for better accuracy and fewer false positives (see [comparison](#openwakeword-vs-livekit-wakeword) below)
+- **Conv-Attention classifier**: 1D temporal convolutions + multi-head self-attention replace openWakeWord's flat DNN head, preserving temporal structure across the 16-frame embedding window for better accuracy and fewer false positives (see [comparison](#why-livekit-wakeword) below)
 - **Backward compatible** with openWakeWord models and library
-- **Multilingual support** — support over 30 languages with VoxCPM synthetic data generation
-- **Train anywhere** — local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
-- **Zero dependency headaches** — uv handles everything
+- **Multilingual support**: over 30 languages via VoxCPM synthetic data generation
+- **Train anywhere**: local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
+- **Zero dependency headaches**: uv handles everything
 
 **Quick Links:**
 
-- [Using Existing Models](#using-existing-models-and-library)
-- [Training New Models Using The CLI](#training-new-models-using-the-cli)
-- [Training New Models Using The Python API](#training-new-models-using-the-python-api)
-- [Training Multilingual Wake Words](#multilingual-support)
-- [openWakeWord vs livekit-wakeword](#openwakeword-vs-livekit-wakeword)
+- [Why livekit-wakeword](#why-livekit-wakeword)
+- [Using a Pre-trained Model](#using-a-pre-trained-model)
+- [Training a Custom Wake Word](#training-a-custom-wake-word)
+- [Multilingual Support](#multilingual)
+- [Python API](#python-api)
 - [Example: Wake Word–Triggered Agent](https://github.com/livekit-examples/hello-wakeword)
 
-## Quick Start
+## Why livekit-wakeword
 
-### Using Existing Models and Library
+Both livekit-wakeword and openWakeWord share the same audio front-end: mel spectrograms are fed through frozen [Google speech embedding](https://github.com/google-research/google-research/tree/master/embedding_fns) and [openWakeWord embedding](https://github.com/dscripka/openWakeWord) models to produce a `(16, 96)` feature matrix (16 timesteps × 96-dim embeddings). The difference is the classification head that sits on top.
+
+### Architecture
+
+**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN:
+
+```
+Flatten(16×96=1536) → Dense → Dense → Sigmoid
+```
+
+While the positional information is technically still present in the flattened vector, the dense layer has no inductive bias for temporal structure and must learn any sequential patterns from scratch.
+
+**livekit-wakeword** introduces a **Conv-Attention** (`conv_attention`) classifier:
+
+```
+Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
+```
+
+1. **1D Convolutions** (kernel size 3) slide across the 16 timesteps, capturing local temporal patterns (e.g., syllable transitions).
+2. **Multi-Head Self-Attention** models long-range dependencies across the full temporal window, letting the model learn which timestep relationships matter.
+3. **Mean pooling** aggregates attended features into a fixed-size vector for the final sigmoid output.
+
+### Results
+
+To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same architecture, better training pipeline), and a livekit-wakeword conv-attention model on the same "hey livekit" validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio). The livekit-wakeword models were trained with the [prod config](configs/prod.yaml).
+
+| Metric              | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
+| ------------------- | :----------------: | :--------------------: | :-------------------------------: |
+| **AUT\***           |       0.0720       |         0.0423         |            **0.0012**             |
+| **FPPH\***          |        8.50        |          3.07          |             **0.08**              |
+| **Recall\***        |       68.6%        |         85.3%          |             **86.1%**             |
+| Optimal Threshold\* |        0.01        |          0.01          |               0.68                |
+
+<table>
+<tr>
+<td align="center"><strong>openWakeWord (DNN)</strong></td>
+<td align="center"><strong>livekit-wakeword (DNN)</strong></td>
+<td align="center"><strong>livekit-wakeword (conv-attention)</strong></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_openwakeword.png" alt="DET curve: openWakeWord" width="280"></td>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword_dnn.png" alt="DET curve: livekit-wakeword DNN" width="280"></td>
+<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword.png" alt="DET curve: livekit-wakeword conv-attention" width="280"></td>
+</tr>
+</table>
+
+The livekit-wakeword DNN already outperforms openWakeWord's DNN thanks to the improved training pipeline (focal loss, embedding mixup, 3-phase training, checkpoint averaging). However, both DNN models fail to meet the FPPH target: their optimal thresholds fall to 0.01, meaning no operating point can keep false positives low enough.
+
+The conv-attention head is what unlocks the low false positive rate: **60x lower AUT** and **100x fewer false positives per hour** than openWakeWord, while detecting 17% more wake words.
+
+_\***AUT** (Area Under the DET curve): summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words._
+
+_\***FPPH** (False Positives Per Hour): how many times the model falsely triggers per hour of non-wake-word audio. Lower is better. For production use, < 0.5 FPPH is typical._
+
+_\***Recall**: the percentage of actual wake words correctly detected. Higher is better._
+
+_\***Optimal Threshold**: the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target; the evaluator fell back to the highest balanced accuracy._
+
+### Why conv-attention wins
+
+- **Temporal awareness**: the conv-attention model sees the _order_ of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
+- **Better accuracy at the same model size**: attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
+- **Lower false-positive rates**: temporal structure helps reject partial or reordered matches that a flat DNN would accept.
+
+The conv-attention head is the default. You can switch to the original DNN or an RNN head via `model_type` in your config:
+
+```yaml
+model:
+  model_type: conv_attention # conv_attention (default) | dnn | rnn
+  model_size: small # tiny, small, medium, large
+```
+
+## Using a Pre-trained Model
+
+### Python
 
 **System dependencies (for microphone listener):**
 
@@ -86,7 +160,32 @@ async def main():
 asyncio.run(main())
 ```
 
-### Training New Models Using The CLI
+### Rust
+
+For Rust applications, use the [`livekit-wakeword`](https://crates.io/crates/livekit-wakeword) crate:
+
+```toml
+[dependencies]
+livekit-wakeword = "0.1"
+```
+
+```rust
+use livekit_wakeword::WakeWordModel;
+
+let mut model = WakeWordModel::new(&["hey_livekit.onnx"], 16000)?;
+
+// Feed ~2s PCM audio chunks (i16, at configured sample rate)
+let scores = model.predict(&audio_chunk)?;
+if scores["hey_livekit"] > 0.5 {
+    println!("Wake word detected!");
+}
+```
+
+The mel spectrogram and speech embedding models are compiled into the binary; only the wake word classifier ONNX file is loaded at runtime. Audio at supported sample rates (22050–384000 Hz) is automatically resampled to 16 kHz.
+
+## Training a Custom Wake Word
+
+### CLI quick start
 
 **System dependencies:**
 
@@ -125,7 +224,7 @@ uv sync --all-extras
 **Download models and data:**
 
 ```bash
-livekit-wakeword setup
+livekit-wakeword setup --config configs/prod.yaml
 ```
 
 **Train a wake word:**
@@ -154,7 +253,7 @@ Eval produces a DET curve plot and metrics JSON in the output directory. See [Ev
 
 ### Configuration
 
-The full pipeline runs based on a single YAML configuration file. You can find example configs here:
+The full pipeline runs based on a single YAML configuration file. Example configs:
 
 | Config                                               | Wake word      | Use                                                      |
 | ---------------------------------------------------- | -------------- | -------------------------------------------------------- |
@@ -178,7 +277,7 @@ steps: 50000
 target_fp_per_hour: 0.2
 ```
 
-### Multilingual Support
+### Multilingual
 
 We support training wake words in 30 languages with [VoxCPM2 TTS](https://github.com/OpenBMB/VoxCPM) synthetic data generation:
 
@@ -194,7 +293,7 @@ To use this, add `tts_backend` in your configuration YAML:
 tts_backend: voxcpm
 ```
 
-And install `livekit-wakeword` with `voxcpm` optional dependency:
+And install `livekit-wakeword` with the `voxcpm` optional dependency:
 
 ```bash
 pip install livekit-wakeword[train,eval,export,voxcpm]
@@ -202,7 +301,7 @@ pip install livekit-wakeword[train,eval,export,voxcpm]
 
 More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
 
-### Training New Models Using The Python API
+### Python API
 
 The full training pipeline is available as a Python API, so you can import and drive it from your own code instead of using the CLI:
 
@@ -243,125 +342,24 @@ print(f"AUT={results['aut']:.4f}  FPPH={results['fpph']:.2f}  Recall={results['r
 
 This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.
 
-### Train on cloud GPUs with SkyPilot
+### Cloud GPUs with SkyPilot
 
-See [skypilot/train.yaml](skypilot/train.yaml) for SkyPilot's example training job on Nebius.
+See [skypilot/train.yaml](skypilot/train.yaml) for an example training job on Nebius.
 
 ```bash
 sky launch skypilot/train.yaml
 ```
 
-## openWakeWord vs livekit-wakeword
+## Further Reading
 
-Both libraries share the same audio front-end: mel spectrograms are fed through frozen [Google speech embedding](https://github.com/google-research/google-research/tree/master/embedding_fns) and [openWakeWord embedding](https://github.com/dscripka/openWakeWord) models to produce a `(16, 96)` feature matrix (16 timesteps × 96-dim embeddings). The difference is the classification head that sits on top.
-
-### Architecture
-
-**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN:
-
-```
-Flatten(16×96=1536) → Dense → Dense → Sigmoid
-```
-
-While the positional information is technically still present in the flattened vector, the dense layer has no inductive bias for temporal structure and must learn any sequential patterns from scratch.
-
-**livekit-wakeword** introduces a **Conv-Attention** (`conv_attention`) classifier:
-
-```
-Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
-```
-
-1. **1D Convolutions** (kernel size 3) slide across the 16 timesteps, capturing local temporal patterns (e.g., syllable transitions).
-2. **Multi-Head Self-Attention** models long-range dependencies across the full temporal window, letting the model learn which timestep relationships matter.
-3. **Mean pooling** aggregates attended features into a fixed-size vector for the final sigmoid output.
-
-### Results
-
-To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same architecture, better training pipeline), and a livekit-wakeword conv-attention model on the same "hey livekit" validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio). The livekit-wakeword models were trained with the [prod config](configs/prod.yaml).
-
-| Metric              | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
-| ------------------- | :----------------: | :--------------------: | :-------------------------------: |
-| **AUT\***           |       0.0720       |         0.0423         |            **0.0012**             |
-| **FPPH\***          |        8.50        |          3.07          |             **0.08**              |
-| **Recall\***        |       68.6%        |         85.3%          |             **86.1%**             |
-| Optimal Threshold\* |        0.01        |          0.01          |               0.68                |
-
-<table>
-<tr>
-<td align="center"><strong>openWakeWord (DNN)</strong></td>
-<td align="center"><strong>livekit-wakeword (DNN)</strong></td>
-<td align="center"><strong>livekit-wakeword (conv-attention)</strong></td>
-</tr>
-<tr>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_openwakeword.png" alt="DET curve — openWakeWord" width="280"></td>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword_dnn.png" alt="DET curve — livekit-wakeword DNN" width="280"></td>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword.png" alt="DET curve — livekit-wakeword conv-attention" width="280"></td>
-</tr>
-</table>
-
-The livekit-wakeword DNN already outperforms openWakeWord's DNN thanks to the improved training pipeline (focal loss, embedding mixup, 3-phase training, checkpoint averaging). However, both DNN models fail to meet the FPPH target — their optimal thresholds fall to 0.01, meaning no operating point can keep false positives low enough.
-
-The conv-attention head is what unlocks the low false positive rate: **60x lower AUT** and **100x fewer false positives per hour** than openWakeWord, while detecting 17% more wake words.
-
-_\***AUT** (Area Under the DET curve) — summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words._
-
-_\***FPPH** (False Positives Per Hour) — how many times the model falsely triggers per hour of non-wake-word audio. Lower is better. For production use, < 0.5 FPPH is typical._
-
-_\***Recall** — the percentage of actual wake words correctly detected. Higher is better._
-
-_\***Optimal Threshold** — the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target — the evaluator fell back to the highest balanced accuracy._
-
-### Why conv-attention wins
-
-- **Temporal awareness** — the conv-attention model sees the _order_ of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
-- **Better accuracy at the same model size** — attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
-- **Lower false-positive rates** — temporal structure helps reject partial or reordered matches that a flat DNN would accept.
-
-The conv-attention head is the default. You can switch to the original DNN or an RNN head via `model_type` in your config:
-
-```yaml
-model:
-  model_type: conv_attention # conv_attention (default) | dnn | rnn
-  model_size: small # tiny, small, medium, large
-```
-
-## Other Runtimes
-
-### Rust
-
-For Rust applications, use the [`livekit-wakeword`](https://crates.io/crates/livekit-wakeword) crate:
-
-```toml
-[dependencies]
-livekit-wakeword = "0.1"
-```
-
-```rust
-use livekit_wakeword::WakeWordModel;
-
-let mut model = WakeWordModel::new(&["hey_livekit.onnx"], 16000)?;
-
-// Feed ~2s PCM audio chunks (i16, at configured sample rate)
-let scores = model.predict(&audio_chunk)?;
-if scores["hey_livekit"] > 0.5 {
-    println!("Wake word detected!");
-}
-```
-
-The mel spectrogram and speech embedding models are compiled into the binary, only the wake word classifier ONNX file is loaded at runtime. Audio at supported sample rates (22050–384000 Hz) is automatically resampled to 16 kHz.
-
-## Detailed Documentation
-
-If you want to understand more about how this library works:
-
-- [Architecture Overview](docs/overview.md) — system design and data flow
-- [Data Generation](docs/data-generation.md) — TTS synthesis and adversarial negatives
-- [Augmentation](docs/augmentation.md) — audio transforms and alignment
-- [Feature Extraction](docs/feature-extraction.md) — mel spectrograms and embeddings
-- [Training](docs/training.md) — 3-phase training and checkpoint averaging
-- [Export & Inference](docs/export-and-inference.md) — ONNX export and Python API
-- [Evaluation](docs/evaluation.md) — DET curves, AUT, and model comparison
+- [Architecture Overview](docs/overview.md): system design and data flow
+- [Data Generation](docs/data-generation.md): TTS synthesis and adversarial negatives
+- [Augmentation](docs/augmentation.md): audio transforms and alignment
+- [Feature Extraction](docs/feature-extraction.md): mel spectrograms and embeddings
+- [Training](docs/training.md): 3-phase training and checkpoint averaging
+- [Export & Inference](docs/export-and-inference.md): ONNX export and Python API
+- [Evaluation](docs/evaluation.md): DET curves, AUT, and model comparison
 
 ## License
 
-This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
