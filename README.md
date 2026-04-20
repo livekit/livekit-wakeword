@@ -299,6 +299,28 @@ And install `livekit-wakeword` with the `voxcpm` optional dependency:
 pip install livekit-wakeword[train,eval,export,voxcpm]
 ```
 
+> [!WARNING]
+> **Multilingual models currently achieve lower accuracy than English models.** This is due to two factors: (1) the frozen [Google speech embedding](https://www.kaggle.com/models/google/speech-embedding) model was trained predominantly on English data, so its representations are weaker for other languages, and (2) VoxCPM produces less diverse synthetic speech compared to the large Piper TTS speaker pool available for English.
+>
+> <img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_nihao_livekit_voxcpm.png" alt="DET curve: 你好 livekit (VoxCPM)" width="350">
+>
+> _DET curve for "你好 livekit" trained with VoxCPM — note the higher error rates compared to the English "hey livekit" results [above](#results)._
+>
+> To improve multilingual performance, increase the number of `voice_design_prompts` (50–100) and `n_samples` in your config so the model sees a wider range of speaker and prosody variation:
+>
+> ```yaml
+> n_samples: 50000 # ↑ from 25000
+> n_samples_val: 10000 # ↑ from 5000
+>
+> voxcpm_tts:
+>   voice_design_prompts:
+>     # Add 50-100 diverse prompts covering age, gender, pitch, pace, accent, energy, etc.
+>     - "A young adult woman, clear mid-pitch voice, moderate pace, calm and professional"
+>     - "A young adult man, warm baritone, steady pace, friendly and articulate"
+>     - "A middle-aged woman, slightly low pitch, measured pace, confident tone"
+>     # ... add more prompts for wider speaker diversity
+> ```
+
 More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
 
 ### Python API
