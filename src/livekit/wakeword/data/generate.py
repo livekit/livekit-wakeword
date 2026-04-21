@@ -7,7 +7,7 @@ import random
 import re
 from pathlib import Path
 
-from ..config import WakeWordConfig
+from ..config import CustomPositiveSource, WakeWordConfig
 from .piper.text import expand_unknown_words, get_cmudict
 from .tts import get_tts_backend
 from .tts.piper_backend import PiperVitsBackend
@@ -48,6 +48,111 @@ def _count_original_clips(directory: Path) -> int:
     if not directory.is_dir():
         return 0
     return sum(1 for f in directory.iterdir() if _ORIGINAL_CLIP_RE.match(f.name))
+
+
+def _copy_custom_positives(
+    split_dir: Path,
+    sources: list[CustomPositiveSource],
+    start_index: int,
+    expected_sample_rate: int = 16000,
+) -> int:
+    """Append user-supplied ``.wav`` files to ``split_dir`` as ``clip_NNNNNN.wav``.
+
+    Each file in each source is copied ``source.multiplier`` times.  Output
+    indexing starts at *start_index* and increases monotonically across sources.
+    Existing output files are skipped so repeated calls are idempotent
+    (resume-safe after interruption).
+
+    Input files must match *expected_sample_rate* and be mono — mismatches raise
+    rather than silently resampling, so configuration errors surface early.
+
+    Returns:
+        Number of new files written on this call.
+
+    Raises:
+        FileNotFoundError: If a source ``path`` does not exist.
+        NotADirectoryError: If a source ``path`` exists but is not a directory.
+        ValueError: If any ``.wav`` has the wrong sample rate or is not mono.
+    """
+    import shutil
+
+    import soundfile as sf
+
+    if not sources:
+        return 0
+
+    split_dir.mkdir(parents=True, exist_ok=True)
+
+    written = 0
+    next_index = start_index
+
+    for source in sources:
+        src_path = Path(source.path)
+        if not src_path.exists():
+            raise FileNotFoundError(f"Custom positive source path does not exist: {src_path}")
+        if not src_path.is_dir():
+            raise NotADirectoryError(
+                f"Custom positive source path must be a directory, got: {src_path}"
+            )
+
+        wav_files = sorted(src_path.glob("*.wav"))
+        non_wav = [p.name for p in src_path.iterdir() if p.is_file() and p.suffix.lower() != ".wav"]
+        if non_wav:
+            sample = ", ".join(non_wav[:3]) + (" ..." if len(non_wav) > 3 else "")
+            logger.warning(
+                "Ignoring %d non-.wav file(s) in %s: %s",
+                len(non_wav),
+                src_path,
+                sample,
+            )
+
+        if not wav_files:
+            logger.warning("No .wav files found in custom positive source: %s", src_path)
+            continue
+
+        # Validate sample rate and channels up front so we don't partially
+        # copy before discovering a bad file deep in the list.
+        for wav in wav_files:
+            info = sf.info(str(wav))
+            if info.samplerate != expected_sample_rate:
+                raise ValueError(
+                    f"Custom positive {wav} has sample rate {info.samplerate}, "
+                    f"expected {expected_sample_rate}. Pre-convert the file "
+                    f"(e.g. `sox in.wav -r 16000 -c 1 out.wav`)."
+                )
+            if info.channels != 1:
+                raise ValueError(
+                    f"Custom positive {wav} has {info.channels} channels, "
+                    f"expected 1 (mono). Pre-convert the file "
+                    f"(e.g. `sox in.wav -r 16000 -c 1 out.wav`)."
+                )
+
+        logger.info(
+            "Injecting %d file(s) from %s × multiplier %d = %d copies",
+            len(wav_files),
+            src_path,
+            source.multiplier,
+            len(wav_files) * source.multiplier,
+        )
+
+        for wav in wav_files:
+            for _ in range(source.multiplier):
+                out_path = split_dir / f"clip_{next_index:06d}.wav"
+                next_index += 1
+                if out_path.exists():
+                    continue
+                shutil.copy2(wav, out_path)
+                written += 1
+
+    if written:
+        logger.info(
+            "Custom positive injection: wrote %d new clip(s) (directory now contains clips 0..%d)",
+            written,
+            next_index - 1,
+        )
+    else:
+        logger.info("Custom positive injection: all clips already present, nothing to do")
+    return written
 
 
 def _phoneme_replacements(
@@ -371,6 +476,18 @@ def run_generate(config: WakeWordConfig) -> None:
             n_samples=n_target,
             start_index=existing,
             batch_size=config.tts_batch_size,
+        )
+
+    # --- Custom positive samples (user-supplied recordings) ---
+    # Appended after TTS so the combined directory keeps the clip_NNNNNN.wav
+    # layout.  start_index is pinned to config.n_samples (not the live count)
+    # so layout is deterministic even if TTS skipped clips due to OOM — gaps
+    # are harmless to the augmentation regex.
+    if config.custom_positive_samples:
+        _copy_custom_positives(
+            split_dir=model_dir / "positive_train",
+            sources=config.custom_positive_samples,
+            start_index=config.n_samples,
         )
 
     # --- Adversarial negative splits ---
