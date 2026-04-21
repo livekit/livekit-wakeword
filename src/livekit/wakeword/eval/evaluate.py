@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+from .._ort_providers import get_providers
 from ..config import WakeWordConfig
 
 logger = logging.getLogger(__name__)
@@ -194,7 +195,7 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    session = ort.InferenceSession(str(model_path), providers=get_providers())
     logger.info(f"Loaded model from {model_path}")
 
     # Load validation data

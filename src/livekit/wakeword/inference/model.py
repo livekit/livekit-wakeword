@@ -77,6 +77,8 @@ class WakeWordModel:
         """
         import onnxruntime as ort
 
+        from .._ort_providers import get_providers
+
         model_path = Path(model_path)
         if not model_path.exists():
             raise FileNotFoundError(f"Wake word model not found: {model_path}")
@@ -86,7 +88,7 @@ class WakeWordModel:
 
         session = ort.InferenceSession(
             str(model_path),
-            providers=["CPUExecutionProvider"],
+            providers=get_providers(),
         )
         input_name = session.get_inputs()[0].name
         self._classifiers[model_name] = (session, input_name)

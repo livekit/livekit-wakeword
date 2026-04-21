@@ -64,6 +64,9 @@ export = [
     "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
 ]
+gpu = [
+    "onnxruntime-gpu>=1.17",
+]
 [project.urls]
 Homepage = "https://github.com/livekit/livekit-wakeword"
 Repository = "https://github.com/livekit/livekit-wakeword"

@@ -264,6 +264,22 @@ cd livekit-wakeword
 uv sync --all-extras
 ```
 
+**GPU acceleration (training, eval, and inference):**
+
+The default `onnxruntime` wheel is CPU-only — on a GPU pod this makes feature extraction the pipeline bottleneck. To unlock the CUDA Execution Provider, install the `gpu` extra:
+
+```bash
+# pip
+pip uninstall -y onnxruntime
+pip install livekit-wakeword[train,eval,export,gpu]
+
+# uv (from source)
+uv pip uninstall onnxruntime
+uv sync --extra train --extra eval --extra export --extra gpu
+```
+
+The `onnxruntime` and `onnxruntime-gpu` wheels provide the same Python module — pip cannot keep them side-by-side, so uninstall the CPU wheel before installing the GPU one. Provider selection is automatic (CUDA if available, CPU otherwise). Force a specific provider with `LIVEKIT_WAKEWORD_ORT_PROVIDERS=CPUExecutionProvider` (comma-separated; useful for reproducibility or opting into CoreML / DirectML / ROCm). `onnxruntime-gpu` requires a matching CUDA toolkit — see the [ONNX Runtime GPU compatibility matrix](https://onnxruntime.ai/docs/install/#cuda-and-cudnn).
+
 **Download models and data:**
 
 ```bash
