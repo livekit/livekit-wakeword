@@ -194,16 +194,18 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
-    logger.info(f"Loaded model from {model_path}")
+    providers = config.eval.execution_providers
+    session = ort.InferenceSession(str(model_path), providers=providers)
+    logger.info(f"Loaded model from {model_path} (providers={providers})")
 
     # Load validation data
     pos_features, neg_features = _load_validation_features(config)
 
     # Run predictions
     logger.info("Running predictions on validation set...")
-    pos_scores = _predict_onnx(session, pos_features)
-    neg_scores = _predict_onnx(session, neg_features)
+    batch_size = config.eval.batch_size
+    pos_scores = _predict_onnx(session, pos_features, batch_size=batch_size)
+    neg_scores = _predict_onnx(session, neg_features, batch_size=batch_size)
 
     # Compute DET curve
     thresholds, fpr, fnr = _compute_det_curve(pos_scores, neg_scores)
