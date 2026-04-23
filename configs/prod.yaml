@@ -100,6 +100,12 @@ augmentation:
   # Room impulse response directories for reverb (downloaded via `setup`)
   rir_paths: [./data/rirs]
 
+  # Parallelism for the per-clip DSP loop. Default 1 preserves the legacy
+  # single-threaded code path. On a multi-core host (e.g. 32-CPU Modal
+  # container) setting this to 0 uses all cores and gives a ~10-100x
+  # speedup for the augmentation stage.
+  # n_workers: 0   # uncomment to use all CPU cores (10–100× faster)
+
 # ============================================================================
 # Model Architecture
 # ============================================================================

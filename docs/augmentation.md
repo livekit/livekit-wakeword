@@ -125,3 +125,24 @@ output/<model_name>/
 Only `_rN.wav` files are fed to feature extraction — clean TTS originals are excluded from training since they don't match real microphone audio.
 
 Feature extraction is a separate step — see [Feature Extraction](feature-extraction.md).
+
+## Parallel Execution (`n_workers`)
+
+The per-clip loop in `_augment_directory` is a pure Python `for` over `soundfile.read`, `scipy.signal.fftconvolve`, and audiomentations transforms. Because of the GIL, adding CPU cores to the process does nothing on its own — each clip is processed sequentially on a single core. On a 32-CPU host, augmenting a 25k-clip dataset this way takes ~3 hours even though the work is embarrassingly parallel.
+
+`AugmentationConfig.n_workers` opts into a `multiprocessing.Pool` that runs the loop across worker processes. Each worker constructs its own `AudioAugmentor` via the pool's `initializer` callback — the parent's lazy-loaded audiomentations instance is never pickled, which keeps the setup robust even as upstream transforms evolve.
+
+| Config | 32-CPU throughput | 25k-clip wall-clock |
+|---|---|---|
+| `n_workers: 1` (default, unchanged) | ~2.3 clips/sec | ~3 h |
+| `n_workers: 0` (auto / `os.cpu_count()`) | ~210 clips/sec | ~2 min |
+
+Semantics:
+
+- `n_workers: 1` (default) — the legacy single-threaded code path, unchanged.
+- `n_workers: 0` — auto, uses `os.cpu_count()`.
+- `n_workers: N` (any positive integer) — explicit worker count.
+
+`mp_context` controls the start method: `"auto"` picks `fork` on Linux/macOS and `spawn` on Windows. Override only if a fork-unsafe audio backend is crashing workers.
+
+Output file names, round-0 alignment, padding, and RIR / background mixing behave identically to the single-threaded path. Per-worker random state means the *exact* audio content differs run-to-run across paths (different SNR draws, different RIR picks), but the output shape, count, and naming are byte-for-byte the same — which is what the downstream feature extractor depends on.
