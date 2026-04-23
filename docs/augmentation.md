@@ -132,10 +132,18 @@ The per-clip loop in `_augment_directory` is a pure Python `for` over `soundfile
 
 `AugmentationConfig.n_workers` opts into a `multiprocessing.Pool` that runs the loop across worker processes. Each worker constructs its own `AudioAugmentor` via the pool's `initializer` callback — the parent's lazy-loaded audiomentations instance is never pickled, which keeps the setup robust even as upstream transforms evolve.
 
-| Config | 32-CPU throughput | 25k-clip wall-clock |
+Measured on a 32-CPU Modal container augmenting a 60k-clip dataset (25k positive_train + 5k positive_test + 25k negative_train + ~5k negative_test + ~2.5k backgrounds) end-to-end in **~6 minutes**:
+
+| Split | Throughput | Wall-clock |
 |---|---|---|
-| `n_workers: 1` (default, unchanged) | ~2.3 clips/sec | ~3 h |
-| `n_workers: 0` (auto / `os.cpu_count()`) | ~210 clips/sec | ~2 min |
+| `positive_train` (25k) | 178 clips/sec | 2:20 |
+| `positive_test` (5k) | 174 clips/sec | 0:28 |
+| `negative_train` (25k) | 130 clips/sec | 3:12 |
+| `negative_test` (~5k) | 91 clips/sec | 0:53 |
+| `background_train` (2k) | 83 clips/sec | 0:24 |
+| `background_test` (500) | 62 clips/sec | 0:08 |
+
+For reference, the single-threaded path on the same host processes ~2.3 clips/sec, so the full 60k dataset would otherwise take ~7 hours.
 
 Semantics:
 

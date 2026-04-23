@@ -107,6 +107,32 @@ augmentation:
   # n_workers: 0   # uncomment to use all CPU cores (10–100× faster)
 
 # ============================================================================
+# Feature Extraction (all fields optional — defaults to single-threaded CPU)
+# ============================================================================
+#
+# Parallelism for the mel + embedding ONNX loop. Default 1 preserves the
+# legacy single-threaded behavior; 0 = os.cpu_count(); N = explicit count.
+# Workers pin ORT to 1 intra/inter-op thread to avoid thread explosion.
+#
+# ONNX Runtime providers: default is CPU-only. On a GPU host with
+# onnxruntime-gpu installed, use CUDAExecutionProvider.
+#
+# feature_extraction:
+#   n_workers: 0
+#   execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+# ============================================================================
+# Evaluation (all fields optional — defaults to single-threaded CPU)
+# ============================================================================
+#
+# Same provider story as feature_extraction. batch_size default 1 is fine on
+# CPU; bump to 64+ on GPU to saturate the device.
+#
+# eval:
+#   execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+#   batch_size: 64
+
+# ============================================================================
 # Model Architecture
 # ============================================================================
 

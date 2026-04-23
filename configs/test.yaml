@@ -41,6 +41,14 @@ augmentation:
   rir_paths: [./data/rirs]
   # n_workers: 0   # uncomment to use all CPU cores (10–100× faster)
 
+# feature_extraction:
+#   n_workers: 0
+#   execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+#
+# eval:
+#   execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+#   batch_size: 64
+
 # ============================================================================
 # Model Architecture
 # ============================================================================
