@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import random
+import sys
+from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
@@ -152,10 +155,15 @@ def run_augment(config: WakeWordConfig) -> None:
             for p in old_augs:
                 p.unlink()
 
+    background_paths = [Path(p) for p in config.augmentation.background_paths]
+    rir_paths = [Path(p) for p in config.augmentation.rir_paths]
     augmentor = AudioAugmentor(
-        background_paths=[Path(p) for p in config.augmentation.background_paths],
-        rir_paths=[Path(p) for p in config.augmentation.rir_paths],
+        background_paths=background_paths,
+        rir_paths=rir_paths,
     )
+
+    n_workers = config.augmentation.n_workers
+    mp_context = config.augmentation.mp_context
 
     for round_idx in range(config.augmentation.rounds):
         logger.info(f"Augmentation round {round_idx + 1}/{config.augmentation.rounds}")
@@ -170,7 +178,144 @@ def run_augment(config: WakeWordConfig) -> None:
                 is_positive="positive" in split,
                 round_idx=round_idx,
                 target_duration_s=target_duration,
+                n_workers=n_workers,
+                mp_context=mp_context,
+                background_paths=background_paths,
+                rir_paths=rir_paths,
             )
+
+
+def _process_one(
+    wav_path: Path,
+    augmentor: AudioAugmentor,
+    is_positive: bool,
+    round_idx: int,
+    target_length: int,
+    sample_rate: int,
+) -> None:
+    """Augment a single WAV file in place and write its ``_rN.wav`` output.
+
+    Identical to the body of the single-threaded loop — kept as a standalone
+    function so both the serial and parallel paths share exactly one
+    implementation of the per-clip pipeline.
+    """
+    import re
+
+    import soundfile as sf
+
+    audio, _sr = sf.read(str(wav_path))
+    if audio.ndim > 1:
+        audio = audio[:, 0]
+    audio = audio.astype(np.float32)
+
+    audio = augmentor.augment_clip(audio)
+    audio = augmentor.apply_rir(audio)
+    audio = augmentor.mix_with_background(audio)
+
+    if round_idx == 0:
+        if is_positive:
+            audio = align_clip_to_end(audio, target_length)
+        else:
+            if len(audio) < target_length:
+                padded = np.zeros(target_length, dtype=np.float32)
+                start = (target_length - len(audio)) // 2
+                padded[start : start + len(audio)] = audio
+                audio = padded
+            elif len(audio) > target_length:
+                start = (len(audio) - target_length) // 2
+                audio = audio[start : start + target_length]
+
+    orig_stem = re.sub(r"_r\d+$", "", wav_path.stem)
+    out_path = wav_path.with_name(f"{orig_stem}_r{round_idx}.wav")
+    sf.write(str(out_path), audio, sample_rate)
+
+
+# --- Multiprocessing support -------------------------------------------------
+#
+# Worker processes each build their own ``AudioAugmentor`` via ``_init_worker``.
+# The parent's instance is never pickled: ``AudioAugmentor._per_sample_aug`` is
+# lazily initialised to an ``audiomentations.Compose`` whose members include
+# unpicklable SciPy state, so round-tripping it through ``Pool.map`` is
+# fragile. Sending only the source paths and re-constructing is robust.
+
+_WORKER_AUGMENTOR: AudioAugmentor | None = None
+
+
+def _init_worker(
+    background_paths: list[Path],
+    rir_paths: list[Path],
+    sample_rate: int,
+    seed: int | None,
+) -> None:
+    global _WORKER_AUGMENTOR
+    _WORKER_AUGMENTOR = AudioAugmentor(
+        background_paths=background_paths,
+        rir_paths=rir_paths,
+        sample_rate=sample_rate,
+    )
+    # Give each worker a distinct random state so RIR/background picks and
+    # audiomentations probabilities aren't identical across processes.
+    worker_seed = (seed or 0) ^ (os.getpid() & 0xFFFFFFFF)
+    random.seed(worker_seed)
+    np.random.seed(worker_seed & 0xFFFFFFFF)
+
+
+def _augment_one(args: tuple[Path, bool, int, int, int]) -> None:
+    wav_path, is_positive, round_idx, target_length, sample_rate = args
+    assert _WORKER_AUGMENTOR is not None, "worker not initialised"
+    _process_one(
+        wav_path=wav_path,
+        augmentor=_WORKER_AUGMENTOR,
+        is_positive=is_positive,
+        round_idx=round_idx,
+        target_length=target_length,
+        sample_rate=sample_rate,
+    )
+
+
+def _pick_context(user_choice: str):
+    if user_choice != "auto":
+        return get_context(user_choice)
+    return get_context("spawn" if sys.platform == "win32" else "fork")
+
+
+def _parallel_augment_directory(
+    wav_files: list[Path],
+    is_positive: bool,
+    round_idx: int,
+    target_length: int,
+    sample_rate: int,
+    background_paths: list[Path],
+    rir_paths: list[Path],
+    n_workers: int,
+    mp_context: str,
+    desc: str,
+) -> None:
+    from tqdm import tqdm
+
+    if n_workers == 0:
+        n_workers = os.cpu_count() or 1
+    n_workers = max(1, min(n_workers, len(wav_files)))
+
+    ctx = _pick_context(mp_context)
+    chunksize = max(1, len(wav_files) // (n_workers * 16))
+
+    tasks = [
+        (p, is_positive, round_idx, target_length, sample_rate) for p in wav_files
+    ]
+
+    with ctx.Pool(
+        processes=n_workers,
+        initializer=_init_worker,
+        initargs=(background_paths, rir_paths, sample_rate, round_idx),
+    ) as pool:
+        for _ in tqdm(
+            pool.imap_unordered(_augment_one, tasks, chunksize=chunksize),
+            total=len(tasks),
+            desc=desc,
+            unit="clip",
+        ):
+            pass
 
 
 def _augment_directory(
@@ -180,6 +325,10 @@ def _augment_directory(
     target_duration_s: float = 2.0,
     sample_rate: int = 16000,
     round_idx: int = 0,
+    n_workers: int = 1,
+    mp_context: str = "auto",
+    background_paths: list[Path] | None = None,
+    rir_paths: list[Path] | None = None,
 ) -> None:
     """Augment all WAV files in a directory.
 
@@ -188,10 +337,14 @@ def _augment_directory(
     augmentation compounds (stacks) progressively.  Every round
     writes to its own file (``clip_000000_r0.wav``, ``_r1.wav``, …)
     so the originals are always preserved.
+
+    When ``n_workers != 1`` the per-clip loop is parallelised across a
+    ``multiprocessing.Pool``. Each worker builds its own ``AudioAugmentor``
+    from ``background_paths`` / ``rir_paths`` so the parent's lazy-loaded
+    audiomentations instance does not need to be pickled.
     """
     import re
 
-    import soundfile as sf
     from tqdm import tqdm
 
     target_length = int(target_duration_s * sample_rate)
@@ -205,38 +358,33 @@ def _augment_directory(
 
     wav_files = sorted(p for p in clip_dir.glob("*.wav") if _src_re.match(p.name))
 
-    for wav_path in tqdm(wav_files, desc=f"Augmenting {clip_dir.name} r{round_idx}", unit="clip"):
-        audio, sr = sf.read(str(wav_path))
-        if audio.ndim > 1:
-            audio = audio[:, 0]
-        audio = audio.astype(np.float32)
+    if not wav_files:
+        return
 
-        # Apply per-sample augmentations
-        audio = augmentor.augment_clip(audio)
+    desc = f"Augmenting {clip_dir.name} r{round_idx}"
 
-        # Apply RIR
-        audio = augmentor.apply_rir(audio)
+    if n_workers != 1:
+        _parallel_augment_directory(
+            wav_files=wav_files,
+            is_positive=is_positive,
+            round_idx=round_idx,
+            target_length=target_length,
+            sample_rate=sample_rate,
+            background_paths=background_paths or [],
+            rir_paths=rir_paths or [],
+            n_workers=n_workers,
+            mp_context=mp_context,
+            desc=desc,
+        )
+        return
 
-        # Mix with background
-        audio = augmentor.mix_with_background(audio)
-
-        # Align to target duration only on round 0 (raw TTS clips vary in
-        # length).  Later rounds already have the correct duration.
-        if round_idx == 0:
-            if is_positive:
-                audio = align_clip_to_end(audio, target_length)
-            else:
-                # Center-pad or crop negatives
-                if len(audio) < target_length:
-                    padded = np.zeros(target_length, dtype=np.float32)
-                    start = (target_length - len(audio)) // 2
-                    padded[start : start + len(audio)] = audio
-                    audio = padded
-                elif len(audio) > target_length:
-                    start = (len(audio) - target_length) // 2
-                    audio = audio[start : start + target_length]
-
-        # Derive output name from the original stem (strip any _rN suffix)
-        orig_stem = re.sub(r"_r\d+$", "", wav_path.stem)
-        out_path = wav_path.with_name(f"{orig_stem}_r{round_idx}.wav")
-        sf.write(str(out_path), audio, sample_rate)
+    # Single-threaded path — unchanged.
+    for wav_path in tqdm(wav_files, desc=desc, unit="clip"):
+        _process_one(
+            wav_path=wav_path,
+            augmentor=augmentor,
+            is_positive=is_positive,
+            round_idx=round_idx,
+            target_length=target_length,
+            sample_rate=sample_rate,
+        )
