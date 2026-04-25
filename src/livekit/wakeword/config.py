@@ -10,14 +10,8 @@ from typing import Annotated, Self
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from .tts_constants import DEFAULT_CHECKPOINT_RELPATH
-from .voxcpm_defaults import (
-    DEFAULT_VOXCPM_CFG_VALUES,
-    DEFAULT_VOXCPM_INFERENCE_TIMESTEPS,
-    DEFAULT_VOXCPM_MODEL_CACHE_RELPATH,
-    DEFAULT_VOXCPM_MODEL_ID,
-    default_voice_design_prompts,
-)
+from .defaults import piper as piper_defaults
+from .defaults import voxcpm as voxcpm_defaults
 
 _logger = logging.getLogger(__name__)
 
@@ -76,7 +70,7 @@ class PiperTtsConfig(BaseModel):
     """Piper VITS artifact layout under ``data_dir`` (when ``tts_backend`` is ``piper_vits``)."""
 
     checkpoint_relpath: str = Field(
-        default=DEFAULT_CHECKPOINT_RELPATH,
+        default=piper_defaults.CHECKPOINT_RELPATH,
         description="Path to the VITS state_dict .pt file, relative to data_dir",
     )
 
@@ -90,11 +84,11 @@ class VoxCpmTtsConfig(BaseModel):
     """
 
     model_id: str = Field(
-        default=DEFAULT_VOXCPM_MODEL_ID,
+        default=voxcpm_defaults.MODEL_ID,
         description="Hugging Face repo id used by setup for snapshot_download",
     )
     model_cache_relpath: str = Field(
-        default=DEFAULT_VOXCPM_MODEL_CACHE_RELPATH,
+        default=voxcpm_defaults.MODEL_CACHE_RELPATH,
         description="Directory under data_dir where setup stores the model snapshot",
     )
     local_model_path: str | None = Field(
@@ -103,10 +97,10 @@ class VoxCpmTtsConfig(BaseModel):
         "setup skips HF download if directory exists and is non-empty",
     )
     load_denoiser: bool = False
-    voice_design_prompts: list[str] = Field(default_factory=default_voice_design_prompts)
-    cfg_values: list[float] = Field(default_factory=lambda: list(DEFAULT_VOXCPM_CFG_VALUES))
+    voice_design_prompts: list[str] = Field(default_factory=voxcpm_defaults.voice_design_prompts)
+    cfg_values: list[float] = Field(default_factory=lambda: list(voxcpm_defaults.CFG_VALUES))
     inference_timesteps_list: list[int] = Field(
-        default_factory=lambda: list(DEFAULT_VOXCPM_INFERENCE_TIMESTEPS),
+        default_factory=lambda: list(voxcpm_defaults.INFERENCE_TIMESTEPS),
     )
 
 

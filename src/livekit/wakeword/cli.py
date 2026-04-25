@@ -44,7 +44,7 @@ def setup(
     ),
 ) -> None:
     """Download external dependencies: optional Piper VITS, ACAV100M features, RIRs, backgrounds."""
-    from .data.piper.defaults import default_checkpoint_path
+    from .defaults import piper as piper_defaults
 
     if config_path is not None:
         cfg = load_config(config_path)
@@ -66,7 +66,7 @@ def setup(
         data_path = Path(data_dir).resolve()
         data_path.mkdir(parents=True, exist_ok=True)
         logger.info("Setting up livekit-wakeword data dependencies...")
-        pt_dest = default_checkpoint_path(data_path)
+        pt_dest = piper_defaults.checkpoint_path(data_path)
         pt_dest.parent.mkdir(parents=True, exist_ok=True)
         _download_piper_checkpoint(pt_dest)
 
@@ -98,15 +98,11 @@ def _download_piper_checkpoint(pt_dest: Path) -> None:
 
     from rich.progress import Progress
 
-    from .data.piper.defaults import (
-        DEFAULT_RELEASE_BASE_URL,
-        RELEASE_CONFIG_JSON_ASSET,
-        RELEASE_STATE_DICT_ASSET,
-    )
+    from .defaults import piper as piper_defaults
 
-    base_url = DEFAULT_RELEASE_BASE_URL
+    base_url = piper_defaults.RELEASE_BASE_URL
 
-    pt_url = f"{base_url}/{RELEASE_STATE_DICT_ASSET}"
+    pt_url = f"{base_url}/{piper_defaults.RELEASE_STATE_DICT_ASSET}"
     pt_name = pt_dest.name
     if not pt_dest.exists():
         logger.info("Downloading %s (~166 MB)...", pt_name)
@@ -130,7 +126,7 @@ def _download_piper_checkpoint(pt_dest: Path) -> None:
     else:
         logger.info(f"VITS checkpoint already exists: {pt_dest}")
 
-    json_url = f"{base_url}/{RELEASE_CONFIG_JSON_ASSET}"
+    json_url = f"{base_url}/{piper_defaults.RELEASE_CONFIG_JSON_ASSET}"
     json_dest = pt_dest.with_suffix(".json")
     if not json_dest.exists():
         logger.info("Downloading VITS config JSON...")

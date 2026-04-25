@@ -173,7 +173,7 @@ Synthetic speech is pluggable so you can swap Piper VITS for another engine (e.g
 
 - Add a new member to **`TtsBackend`** in [`config.py`](../src/livekit/wakeword/config.py) (e.g. `qwen_tts = "qwen_tts"`).
 - Add any engine-specific fields: either nested models on `WakeWordConfig` (pattern: `PiperTtsConfig` + `piper_tts`) or top-level keys, and document them in YAML.
-- Put shared path strings that **`config.py` must import** in [`tts_constants.py`](../src/livekit/wakeword/tts_constants.py), not under `livekit.wakeword.data`, so you avoid a circular import (`config` → `data` package → modules that import `config`).
+- Put backend defaults that **`config.py` must import** in a new module under [`defaults/`](../src/livekit/wakeword/defaults/) (e.g. `defaults/qwen_tts.py`), not under `livekit.wakeword.data`, so you avoid a circular import (`config` → `data` package → modules that import `config`). Mirror the existing layout: per-backend module, no `DEFAULT_` prefix on the constants since the module path already qualifies them (e.g. `defaults.piper.CHECKPOINT_RELPATH`, `defaults.voxcpm.MODEL_ID`).
 
 ### 2. Implementation class
 

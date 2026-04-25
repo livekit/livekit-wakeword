@@ -1,18 +1,18 @@
-"""Default VoxCPM voice-design diversification (config imports this, not ``data`` package)."""
+"""Default VoxCPM2 model location and voice-design diversification."""
 
 from __future__ import annotations
 
 # Hugging Face repo for ``setup`` snapshot_download.
-DEFAULT_VOXCPM_MODEL_ID = "openbmb/VoxCPM2"
-DEFAULT_VOXCPM_MODEL_CACHE_RELPATH = "voxcpm/VoxCPM2"
+MODEL_ID = "openbmb/VoxCPM2"
+MODEL_CACHE_RELPATH = "voxcpm/VoxCPM2"
 
 # Classifier-free guidance and diffusion steps — multiple defaults for clip diversity.
-DEFAULT_VOXCPM_CFG_VALUES: list[float] = [1.5, 2.0, 2.5, 3.0]
-DEFAULT_VOXCPM_INFERENCE_TIMESTEPS: list[int] = [8, 10, 12]
+CFG_VALUES: list[float] = [1.5, 2.0, 2.5, 3.0]
+INFERENCE_TIMESTEPS: list[int] = [8, 10, 12]
 
 # Voice design personas (neutral, professional descriptors). Combined with cfg × steps
 # for broad synthetic speaker coverage without reference audio.
-DEFAULT_VOICE_DESIGN_PROMPTS: tuple[str, ...] = (
+VOICE_DESIGN_PROMPTS: tuple[str, ...] = (
     "A young adult woman, clear mid-pitch voice, moderate pace, calm and professional",
     "A young adult man, warm baritone, steady pace, friendly and articulate",
     "A middle-aged woman, slightly low pitch, measured pace, confident tone",
@@ -50,5 +50,5 @@ DEFAULT_VOICE_DESIGN_PROMPTS: tuple[str, ...] = (
 )
 
 
-def default_voice_design_prompts() -> list[str]:
-    return list(DEFAULT_VOICE_DESIGN_PROMPTS)
+def voice_design_prompts() -> list[str]:
+    return list(VOICE_DESIGN_PROMPTS)
