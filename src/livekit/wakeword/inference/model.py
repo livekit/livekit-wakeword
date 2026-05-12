@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
 
 from ..models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
 from ..resources import get_embedding_model_path, get_mel_model_path
@@ -37,6 +38,7 @@ class WakeWordModel:
     def __init__(
         self,
         models: list[str | Path] | None = None,
+        sess_options: SessionOptions | None = None,
     ):
         """Initialize the wake word detection model.
 
@@ -58,17 +60,17 @@ class WakeWordModel:
                 "This should not happen - please reinstall livekit-wakeword."
             )
 
-        self._mel_frontend = MelSpectrogramFrontend(onnx_path=mel_path)
-        self._speech_embedding = SpeechEmbedding(onnx_path=embedding_path)
+        self._mel_frontend = MelSpectrogramFrontend(onnx_path=mel_path, sess_options=sess_options)
+        self._speech_embedding = SpeechEmbedding(onnx_path=embedding_path, sess_options=sess_options)
 
         # name -> (onnx_session, input_name)
         self._classifiers: dict[str, tuple] = {}
 
         if models:
             for model_path in models:
-                self.load_model(model_path)
+                self.load_model(model_path, sess_options=sess_options)
 
-    def load_model(self, model_path: str | Path, model_name: str | None = None) -> None:
+    def load_model(self, model_path: str | Path, model_name: str | None = None, sess_options: SessionOptions = None ) -> None:
         """Load a wake word classifier model.
 
         Args:
@@ -87,6 +89,7 @@ class WakeWordModel:
         session = ort.InferenceSession(
             str(model_path),
             providers=["CPUExecutionProvider"],
+            sess_options=sess_options
         )
         input_name = session.get_inputs()[0].name
         self._classifiers[model_name] = (session, input_name)

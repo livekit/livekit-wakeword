@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +29,21 @@ class MelSpectrogramFrontend:
     Output: (batch, time_frames, 32)
     """
 
-    def __init__(self, onnx_path: str | Path):
+    def __init__(self, onnx_path: str | Path, sess_options: SessionOptions = None):
         if not Path(onnx_path).exists():
             raise FileNotFoundError(
                 f"Mel ONNX model not found: {onnx_path}\n"
                 "This should not happen - please reinstall livekit-wakeword."
             )
-        self._init_onnx(onnx_path)
+        self._init_onnx(onnx_path, sess_options)
 
-    def _init_onnx(self, onnx_path: str | Path) -> None:
+    def _init_onnx(self, onnx_path: str | Path, sess_options: SessionOptions = None) -> None:
         import onnxruntime as ort
 
         self._onnx_session = ort.InferenceSession(
             str(onnx_path),
             providers=["CPUExecutionProvider"],
+            sess_options=sess_options,
         )
         self._input_name = self._onnx_session.get_inputs()[0].name
         logger.info(f"Loaded mel ONNX model from {onnx_path}")
@@ -89,7 +91,7 @@ class SpeechEmbedding:
     ONNX output: (batch, 1, 1, 96)   — 96-dim embedding
     """
 
-    def __init__(self, onnx_path: str | Path):
+    def __init__(self, onnx_path: str | Path, sess_options: SessionOptions = None):
         import onnxruntime as ort
 
         if not Path(onnx_path).exists():
@@ -101,6 +103,7 @@ class SpeechEmbedding:
         self._session = ort.InferenceSession(
             str(onnx_path),
             providers=["CPUExecutionProvider"],
+            sess_options=sess_options,
         )
         self._input_name = self._session.get_inputs()[0].name
         logger.info(f"Loaded embedding ONNX model from {onnx_path}")

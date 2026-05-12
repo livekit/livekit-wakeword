@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
 
 from ..config import WakeWordConfig
 from ..models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
@@ -68,13 +69,15 @@ def extract_features_from_directory(
     return np.stack(all_features, axis=0)  # (N_clips, 16, 96)
 
 
-def run_extraction(config: WakeWordConfig) -> None:
+def run_extraction(config: WakeWordConfig, sess_options: SessionOptions) -> None:
     """Extract and save features for all splits of a wake word config."""
     mel_frontend = MelSpectrogramFrontend(
         onnx_path=get_mel_model_path(),
+        sess_options=sess_options,
     )
     speech_embedding = SpeechEmbedding(
         onnx_path=get_embedding_model_path(),
+        sess_options=sess_options,
     )
 
     model_dir = config.model_output_dir
