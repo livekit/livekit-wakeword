@@ -34,6 +34,7 @@ class TtsBackend(StrEnum):
 
     piper_vits = "piper_vits"
     voxcpm = "voxcpm"
+    edge_tts = "edge_tts"
 
 
 # Preset mapping: size -> (layer_dim, n_blocks)
@@ -103,6 +104,25 @@ class VoxCpmTtsConfig(BaseModel):
         default_factory=lambda: list(voxcpm_defaults.INFERENCE_TIMESTEPS),
     )
 
+class EdgeTtsTtsConfig(BaseModel):
+    voices: list[str] = Field(
+        default=[
+            "es-PE-AlexNeural",
+            "es-PE-CamilaNeural",
+            "es-MX-DaliaNeural",
+            "es-MX-JorgeNeural",
+            "es-ES-ElviraNeural",
+            "es-ES-AlvaroNeural",
+            "es-AR-ElenaNeural",
+            "es-AR-TomasNeural",
+            "es-CO-GonzaloNeural",
+            "es-CO-SalomeNeural",
+            "es-CL-CatalinaNeural",
+            "es-CL-LorenzoNeural",
+        ]
+    )
+    rate: str = "+0%"       # velocidad: "-10%", "+0%", "+10%"
+    pitch: str = "+0Hz"     # tono: "-5Hz", "+0Hz", "+5Hz"
 
 class WakeWordConfig(BaseModel):
     """Top-level config for a wake word model."""
@@ -119,6 +139,7 @@ class WakeWordConfig(BaseModel):
     tts_backend: TtsBackend = TtsBackend.piper_vits
     piper_tts: PiperTtsConfig = Field(default_factory=PiperTtsConfig)
     voxcpm_tts: VoxCpmTtsConfig = Field(default_factory=VoxCpmTtsConfig)
+    edge_tts_tts: EdgeTtsTtsConfig = Field(default_factory=EdgeTtsTtsConfig)
     custom_negative_phrases: list[str] = Field(default_factory=list)
 
     # TTS parameters (Piper VITS + SLERP speaker blending)

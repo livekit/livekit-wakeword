@@ -64,6 +64,11 @@ export = [
     "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
 ]
+edge-tts = [
+    "edge-tts>=6.1.9",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+]
 [project.urls]
 Homepage = "https://github.com/livekit/livekit-wakeword"
 Repository = "https://github.com/livekit/livekit-wakeword"
