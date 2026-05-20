@@ -85,7 +85,7 @@ def _espeak_phonemize(text: str, voice: str = "en-us") -> str:
     result = subprocess.run(
         [espeak, "--ipa", "-q", "-v", voice, text],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     )
     return result.stdout.strip()
