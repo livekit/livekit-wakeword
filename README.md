@@ -4,11 +4,7 @@
   <img style="width:100%;" alt="The LiveKit icon, the name of the repository and some sample code in the background." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/banner_light.png">
 </picture>
 
-<a href="https://livekit.io/">
-  <img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
-</a>
-
-# livekit-wakeword
+# LiveKit WakeWord
 
 [![CI](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml/badge.svg)](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
@@ -436,6 +432,7 @@ sky launch skypilot/train.yaml
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
 <br/><table>
+
 <thead><tr><th colspan="2">LiveKit Ecosystem</th></tr></thead>
 <tbody>
 <tr><td>Agents SDKs</td><td><a href="https://github.com/livekit/agents">Python</a> · <a href="https://github.com/livekit/agents-js">Node.js</a></td></tr><tr></tr>
