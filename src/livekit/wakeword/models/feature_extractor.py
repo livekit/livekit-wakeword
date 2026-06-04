@@ -16,6 +16,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class MelSpectrogramFrontend:
     """Stage 1: Raw audio → mel-spectrogram features.
 
@@ -37,11 +38,13 @@ class MelSpectrogramFrontend:
         self._init_onnx(onnx_path)
 
     def _init_onnx(self, onnx_path: str | Path) -> None:
-        import onnxruntime as ort
+        from .._ort_providers import get_providers, import_ort
+
+        ort = import_ort()
 
         self._onnx_session = ort.InferenceSession(
             str(onnx_path),
-            providers=["CPUExecutionProvider"],
+            providers=get_providers(),
         )
         self._input_name = self._onnx_session.get_inputs()[0].name
         logger.info(f"Loaded mel ONNX model from {onnx_path}")
@@ -78,6 +81,7 @@ class MelSpectrogramFrontend:
         mel = mel / 10.0 + 2.0
         return mel
 
+
 class SpeechEmbedding:
     """Stage 2: Google's speech_embedding CNN via ONNX runtime.
 
@@ -90,7 +94,9 @@ class SpeechEmbedding:
     """
 
     def __init__(self, onnx_path: str | Path):
-        import onnxruntime as ort
+        from .._ort_providers import get_providers, import_ort
+
+        ort = import_ort()
 
         if not Path(onnx_path).exists():
             raise FileNotFoundError(
@@ -100,7 +106,7 @@ class SpeechEmbedding:
 
         self._session = ort.InferenceSession(
             str(onnx_path),
-            providers=["CPUExecutionProvider"],
+            providers=get_providers(),
         )
         self._input_name = self._session.get_inputs()[0].name
         logger.info(f"Loaded embedding ONNX model from {onnx_path}")

@@ -25,10 +25,18 @@ classifiers = [
 
 dependencies = [
     "numpy>=1.24",
-    "onnxruntime>=1.17",
 ]
 
 [project.optional-dependencies]
+# ONNX Runtime backend — pick exactly one. Kept out of base deps because
+# `onnxruntime` and `onnxruntime-gpu` share the `onnxruntime` import path and
+# clobber each other on disk if both are installed (see [tool.uv] conflicts).
+cpu = [
+    "onnxruntime>=1.20",
+]
+gpu = [
+    "onnxruntime-gpu>=1.20",
+]
 listener = [
     "pyaudio>=0.2.14",
 ]
@@ -61,7 +69,6 @@ eval = [
 ]
 export = [
     "onnx>=1.15",
-    "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
 ]
 [project.urls]
@@ -94,6 +101,12 @@ include = [
     "src/livekit/wakeword/**/*.py",
     "src/livekit/wakeword/resources/*.onnx",
 ]
+
+[tool.uv]
+# cpu/gpu both provide the onnxruntime import path — never resolve them together.
+# NOTE: this is honored when developing in this repo (`uv sync --extra gpu`), but
+# does NOT propagate to downstream consumers of the published wheel.
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [dependency-groups]
 dev = ["pytest>=8.0", "pytest-cov>=4.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.8"]

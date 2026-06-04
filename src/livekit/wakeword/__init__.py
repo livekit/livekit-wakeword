@@ -5,8 +5,9 @@ from .inference.model import WakeWordModel
 
 __version__ = "0.1.0"
 
-# Training / CLI imports are lazy-loaded so that the core inference API
-# works with only numpy + onnxruntime (no torch, pydantic, etc.).
+# Training / CLI imports are lazy-loaded so that the core inference API works
+# with only numpy + an ONNX Runtime backend (the cpu/gpu extra; no torch,
+# pydantic, etc.).
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "WakeWordConfig": (".config", "WakeWordConfig"),
     "load_config": (".config", "load_config"),
