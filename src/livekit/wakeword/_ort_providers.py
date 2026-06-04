@@ -5,8 +5,9 @@ provider list stays consistent across training (feature extraction), eval, and
 inference (``WakeWordModel``).
 
 Default behavior: prefer CUDA, fall back to CPU — driven by whatever ONNX
-Runtime distribution is installed (plain ``onnxruntime`` is CPU-only; install
-``onnxruntime-gpu`` to unlock CUDA, see README for the switch).
+Runtime distribution is installed.  A backend is no longer a base dependency;
+install the ``cpu`` extra (``onnxruntime``) or the ``gpu`` extra
+(``onnxruntime-gpu``) to get one — see README for the switch.
 
 Override via the ``LIVEKIT_WAKEWORD_ORT_PROVIDERS`` env var (comma-separated
 provider names) — handy for forcing CPU for reproducibility, or opting into
@@ -17,11 +18,33 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_PREFERENCE: tuple[str, ...] = ("CUDAExecutionProvider", "CPUExecutionProvider")
 _ENV_VAR = "LIVEKIT_WAKEWORD_ORT_PROVIDERS"
+
+
+def import_ort() -> ModuleType:
+    """Import ``onnxruntime`` with an actionable error if no backend is installed.
+
+    livekit-wakeword does not bundle an ONNX Runtime backend — exactly one of the
+    ``cpu`` / ``gpu`` extras must be installed.
+    """
+    try:
+        import onnxruntime as ort
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "No ONNX Runtime backend is installed. livekit-wakeword does not bundle "
+            "one — install exactly one of:\n"
+            "  pip install 'livekit-wakeword[cpu]'   # CPU-only\n"
+            "  pip install 'livekit-wakeword[gpu]'   # CUDA (see README)"
+        ) from exc
+    return ort
 
 
 def get_providers() -> list[str]:
@@ -38,7 +61,7 @@ def get_providers() -> list[str]:
        build without CUDA), return whatever ORT reports as available so
        session creation still succeeds.
     """
-    import onnxruntime as ort
+    ort = import_ort()
 
     override = os.environ.get(_ENV_VAR, "").strip()
     if override:

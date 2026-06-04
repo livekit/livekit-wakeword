@@ -38,9 +38,9 @@ class MelSpectrogramFrontend:
         self._init_onnx(onnx_path)
 
     def _init_onnx(self, onnx_path: str | Path) -> None:
-        import onnxruntime as ort
+        from .._ort_providers import get_providers, import_ort
 
-        from .._ort_providers import get_providers
+        ort = import_ort()
 
         self._onnx_session = ort.InferenceSession(
             str(onnx_path),
@@ -94,9 +94,9 @@ class SpeechEmbedding:
     """
 
     def __init__(self, onnx_path: str | Path):
-        import onnxruntime as ort
+        from .._ort_providers import get_providers, import_ort
 
-        from .._ort_providers import get_providers
+        ort = import_ort()
 
         if not Path(onnx_path).exists():
             raise FileNotFoundError(

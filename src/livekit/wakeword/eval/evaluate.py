@@ -7,10 +7,11 @@ import logging
 from pathlib import Path
 
 import numpy as np
-import onnxruntime as ort
 
-from .._ort_providers import get_providers
+from .._ort_providers import get_providers, import_ort
 from ..config import WakeWordConfig
+
+ort = import_ort()
 
 logger = logging.getLogger(__name__)
 

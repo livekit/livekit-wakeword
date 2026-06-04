@@ -118,16 +118,20 @@ sudo apt install portaudio19-dev
 
 **Installation:**
 
+livekit-wakeword needs an ONNX Runtime backend, installed via the `cpu` extra
+(CPU-only) or the `gpu` extra (CUDA — see [GPU acceleration](#gpu-acceleration)).
+Pick exactly one; they share the `onnxruntime` import path and cannot coexist.
+
 ```bash
-pip install livekit-wakeword
+pip install livekit-wakeword[cpu]
 # or
-uv add livekit-wakeword
+uv add "livekit-wakeword[cpu]"
 ```
 
-For microphone listening, install with the `listener` extra:
+For microphone listening, add the `listener` extra:
 
 ```bash
-pip install livekit-wakeword[listener]
+pip install livekit-wakeword[cpu,listener]
 ```
 
 **Basic inference:**
@@ -240,16 +244,18 @@ brew install espeak-ng ffmpeg portaudio
 sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
 ```
 
+Add the `cpu` backend extra (or `gpu` — see [GPU acceleration](#gpu-acceleration)) alongside the training extras.
+
 **Installation (with pip):**
 
 ```bash
-pip install livekit-wakeword[train,eval,export]
+pip install livekit-wakeword[cpu,train,eval,export]
 ```
 
 **Installation (with uv):**
 
 ```bash
-uv tool install livekit-wakeword[train,eval,export]
+uv tool install "livekit-wakeword[cpu,train,eval,export]"
 ```
 
 **Installation (from source):**
@@ -258,27 +264,28 @@ uv tool install livekit-wakeword[train,eval,export]
 # Install uv (if you don't have it)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone and install
+# Clone and install (pick the cpu OR gpu backend — they're mutually exclusive)
 git clone https://github.com/livekit/livekit-wakeword
 cd livekit-wakeword
-uv sync --all-extras
+uv sync --extra cpu --extra train --extra eval --extra export
 ```
 
+<a id="gpu-acceleration"></a>
 **GPU acceleration (training, eval, and inference):**
 
-The default `onnxruntime` wheel is CPU-only — on a GPU pod this makes feature extraction the pipeline bottleneck. To unlock the CUDA Execution Provider, install the `gpu` extra:
+The `cpu` extra is CPU-only — on a GPU pod this makes feature extraction the pipeline bottleneck (a production augmentation run takes ~14 h on CPU vs ~13 min on an RTX 3090). Swap in the `gpu` extra to unlock the CUDA Execution Provider:
 
 ```bash
 # pip
-pip uninstall -y onnxruntime
-pip install livekit-wakeword[train,eval,export,gpu]
+pip install livekit-wakeword[gpu,train,eval,export]
 
 # uv (from source)
-uv pip uninstall onnxruntime
-uv sync --extra train --extra eval --extra export --extra gpu
+uv sync --extra gpu --extra train --extra eval --extra export
 ```
 
-The `onnxruntime` and `onnxruntime-gpu` wheels provide the same Python module — pip cannot keep them side-by-side, so uninstall the CPU wheel before installing the GPU one. Provider selection is automatic (CUDA if available, CPU otherwise). Force a specific provider with `LIVEKIT_WAKEWORD_ORT_PROVIDERS=CPUExecutionProvider` (comma-separated; useful for reproducibility or opting into CoreML / DirectML / ROCm). `onnxruntime-gpu` requires a matching CUDA toolkit — see the [ONNX Runtime GPU compatibility matrix](https://onnxruntime.ai/docs/install/#cuda-and-cudnn).
+Provider selection is then automatic (CUDA if available, CPU otherwise). Force a specific provider with `LIVEKIT_WAKEWORD_ORT_PROVIDERS=CPUExecutionProvider` (comma-separated; useful for reproducibility or opting into CoreML / DirectML / ROCm). `onnxruntime-gpu` requires a matching CUDA toolkit — see the [ONNX Runtime GPU compatibility matrix](https://onnxruntime.ai/docs/install/#cuda-and-cudnn).
+
+> **Switching an existing install** between `cpu` and `gpu`: the `onnxruntime` and `onnxruntime-gpu` wheels share the same `onnxruntime` import path and cannot coexist, so remove the old one first (`pip uninstall -y onnxruntime onnxruntime-gpu`, then reinstall with the desired extra). With `uv`, `[tool.uv].conflicts` enforces this automatically when you `uv sync` a different backend extra from this repo.
 
 **Download models and data:**
 
@@ -355,7 +362,7 @@ tts_backend: voxcpm
 And install `livekit-wakeword` with the `voxcpm` optional dependency:
 
 ```bash
-pip install livekit-wakeword[train,eval,export,voxcpm]
+pip install livekit-wakeword[cpu,train,eval,export,voxcpm]
 ```
 
 > [!WARNING]

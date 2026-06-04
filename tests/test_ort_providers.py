@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import builtins
 import logging
 
 import pytest
 
 from livekit.wakeword import _ort_providers
-from livekit.wakeword._ort_providers import get_providers
+from livekit.wakeword._ort_providers import get_providers, import_ort
 
 
 class TestEnvVarOverride:
@@ -113,6 +114,26 @@ class TestLogging:
         with caplog.at_level(logging.INFO, logger="livekit.wakeword._ort_providers"):
             get_providers()
         assert any("LIVEKIT_WAKEWORD_ORT_PROVIDERS" in r.message for r in caplog.records)
+
+
+class TestImportBackend:
+    def test_returns_module_when_installed(self) -> None:
+        import onnxruntime as ort
+
+        assert import_ort() is ort
+
+    def test_actionable_error_when_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """No backend installed → a ModuleNotFoundError pointing at the cpu/gpu extras."""
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "onnxruntime":
+                raise ModuleNotFoundError("No module named 'onnxruntime'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        with pytest.raises(ModuleNotFoundError, match=r"\[cpu\]"):
+            import_ort()
 
 
 class TestCallSitesUseHelper:

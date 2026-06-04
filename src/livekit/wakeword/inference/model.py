@@ -75,9 +75,9 @@ class WakeWordModel:
             model_path: Path to the ONNX wake word classifier.
             model_name: Optional name for the model. If None, derived from filename.
         """
-        import onnxruntime as ort
+        from .._ort_providers import get_providers, import_ort
 
-        from .._ort_providers import get_providers
+        ort = import_ort()
 
         model_path = Path(model_path)
         if not model_path.exists():
