@@ -9,6 +9,7 @@ __version__ = "0.1.0"
 # works with only numpy + onnxruntime (no torch, pydantic, etc.).
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "WakeWordConfig": (".config", "WakeWordConfig"),
+    "ExportFormat": (".config", "ExportFormat"),
     "load_config": (".config", "load_config"),
     "run_augment": (".data.augment", "run_augment"),
     "run_extraction": (".data.features", "run_extraction"),
@@ -31,6 +32,7 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "WakeWordConfig",
+    "ExportFormat",
     "WakeWordListener",
     "WakeWordModel",
     "Detection",

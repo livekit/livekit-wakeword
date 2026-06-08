@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{ name = "Binh Pham", email = "binh.pham@livekit.io" }]
-keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx"]
+keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx", "tflite"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -63,6 +63,15 @@ export = [
     "onnx>=1.15",
     "onnxruntime>=1.17",
     "onnxscript>=0.6.2",
+]
+tflite = [
+    "onnx2tf>=1.22",
+    "tensorflow>=2.15",
+    "tf-keras>=2.15",
+    "onnx-graphsurgeon>=0.3.27",
+    "sng4onnx>=1.0.4",
+    "psutil>=5.9",
+    "ai-edge-litert>=1.0",
 ]
 [project.urls]
 Homepage = "https://github.com/livekit/livekit-wakeword"

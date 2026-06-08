@@ -8,6 +8,7 @@ import yaml
 
 from livekit.wakeword.config import (
     MODEL_SIZE_PRESETS,
+    ExportFormat,
     ModelConfig,
     ModelSize,
     ModelType,
@@ -63,6 +64,21 @@ def test_load_config_from_yaml(tmp_path: Path):
     assert config.steps == 1000
     assert config.model.model_type == ModelType.rnn
     assert config.model.model_size == ModelSize.large
+
+
+def test_output_format_default():
+    config = WakeWordConfig(model_name="test", target_phrases=["test"])
+    assert config.output_format is ExportFormat.onnx
+
+
+def test_output_format_from_yaml(tmp_path: Path):
+    yaml_path = tmp_path / "cfg.yaml"
+    yaml_path.write_text(
+        "model_name: t\ntarget_phrases: [a]\noutput_format: tflite\n",
+        encoding="utf-8",
+    )
+    config = load_config(yaml_path)
+    assert config.output_format is ExportFormat.tflite
 
 
 def test_batch_n_per_class_default():

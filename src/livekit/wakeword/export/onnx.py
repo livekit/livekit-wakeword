@@ -8,13 +8,13 @@ from pathlib import Path
 import onnx
 import torch
 
-from ..config import WakeWordConfig
+from ..config import ExportFormat, WakeWordConfig
 from ..models.pipeline import WakeWordClassifier
 
 logger = logging.getLogger(__name__)
 
 
-def export_classifier(
+def export_onnx(
     config: WakeWordConfig,
     model_path: Path,
     output_path: Path,
@@ -60,10 +60,25 @@ def export_classifier(
 
 def quantize_onnx(input_path: Path, output_path: Path | None = None) -> Path:
     """Apply INT8 dynamic quantization to an ONNX model."""
-    from onnxruntime.quantization import quantize_dynamic, QuantType
+    from onnxruntime.quantization import QuantType, quantize_dynamic
 
     if output_path is None:
         output_path = input_path.with_suffix(".int8.onnx")
+
+    # The torch dynamo ONNX exporter emits value_info entries describing the
+    # weight initializers (e.g. a Gemm B of shape [out, in]). When the dynamic
+    # quantizer rewrites Gemm->MatMul it transposes those weights in place but
+    # leaves the value_info stale, so its strict shape-inference pass then fails
+    # with "Inferred shape and existing shape differ". Dropping initializer
+    # value_info (which is redundant — shapes are inferred from the tensors)
+    # avoids the conflict without affecting the model.
+    model = onnx.load(str(input_path))
+    init_names = {init.name for init in model.graph.initializer}
+    kept = [vi for vi in model.graph.value_info if vi.name not in init_names]
+    if len(kept) != len(model.graph.value_info):
+        del model.graph.value_info[:]
+        model.graph.value_info.extend(kept)
+        onnx.save(model, str(input_path))
 
     quantize_dynamic(
         model_input=str(input_path),
@@ -74,20 +89,51 @@ def quantize_onnx(input_path: Path, output_path: Path | None = None) -> Path:
     return output_path
 
 
-def run_export(config: WakeWordConfig, quantize: bool = False) -> Path:
-    """Export trained model to ONNX."""
+def run_export(
+    config: WakeWordConfig,
+    quantize: bool = False,
+    format: ExportFormat | str | None = None,
+) -> Path:
+    """Export the trained classifier head.
+
+    Args:
+        config: Wake word config.
+        quantize: Apply INT8 quantization to the exported artifact.
+        format: Output format (``onnx`` or ``tflite``). Defaults to
+            ``config.output_format`` when ``None``.
+
+    Returns:
+        Path to the primary exported artifact for the chosen format. ONNX is
+        always produced as well, since TFLite is converted from it.
+    """
+    fmt = ExportFormat(format) if format is not None else config.output_format
+
+    # Fail fast on unsupported (head, format) combinations before doing any work.
+    if fmt == ExportFormat.tflite:
+        from .tflite import ensure_tflite_supported
+
+        ensure_tflite_supported(config.model.model_type)
+
     model_dir = config.model_output_dir
     model_path = model_dir / f"{config.model_name}.pt"
 
     if not model_path.exists():
         raise FileNotFoundError(f"Trained model not found: {model_path}")
 
-    # Export classifier head
+    # Export classifier head to ONNX (also the conversion source for TFLite).
     onnx_path = model_dir / f"{config.model_name}.onnx"
-    export_classifier(config, model_path, onnx_path)
+    export_onnx(config, model_path, onnx_path)
 
-    # Optionally quantize
-    if quantize:
-        quantize_onnx(onnx_path)
+    if fmt == ExportFormat.onnx:
+        if quantize:
+            quantize_onnx(onnx_path)
+        return onnx_path
 
-    return onnx_path
+    if fmt == ExportFormat.tflite:
+        # TFLite quantization is applied by the TF converter, not the ONNX path.
+        from .tflite import export_tflite
+
+        tflite_path = model_dir / f"{config.model_name}.tflite"
+        return export_tflite(onnx_path, tflite_path, quantize=quantize)
+
+    raise ValueError(f"Unsupported export format: {fmt}")

@@ -36,6 +36,13 @@ class TtsBackend(StrEnum):
     voxcpm = "voxcpm"
 
 
+class ExportFormat(StrEnum):
+    """Artifact format produced by the export stage."""
+
+    onnx = "onnx"
+    tflite = "tflite"
+
+
 # Preset mapping: size -> (layer_dim, n_blocks)
 MODEL_SIZE_PRESETS: dict[ModelSize, tuple[int, int]] = {
     ModelSize.tiny: (16, 1),
@@ -131,6 +138,9 @@ class WakeWordConfig(BaseModel):
     # Paths
     data_dir: Annotated[str, Field(description="Root data directory")] = "./data"
     output_dir: str = "./output"
+
+    # Export
+    output_format: ExportFormat = ExportFormat.onnx
 
     # Augmentation
     augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig)

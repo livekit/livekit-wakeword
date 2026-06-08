@@ -1,15 +1,17 @@
 # Export & Inference
 
-The export stage converts the trained PyTorch classifier to ONNX for deployment. The inference API provides `WakeWordModel` for prediction and `WakeWordListener` for async microphone detection.
+The export stage converts the trained PyTorch classifier to ONNX or TFLite for deployment. The inference API provides `WakeWordModel` for prediction and `WakeWordListener` for async microphone detection.
 
-**Source:** `src/livekit/wakeword/export/onnx.py`, `src/livekit/wakeword/inference/model.py`, `src/livekit/wakeword/inference/listener.py`
-**CLI:** `livekit-wakeword export <config>`
+**Source:** `src/livekit/wakeword/export/onnx.py`, `src/livekit/wakeword/export/tflite.py`, `src/livekit/wakeword/inference/model.py`, `src/livekit/wakeword/inference/listener.py`
+**CLI:** `livekit-wakeword export <config> [--format onnx|tflite]`
+
+The output format is chosen by (in priority order) the `--format` flag, then the `output_format` field in the config (defaults to `onnx`).
 
 ## ONNX Export
 
 ### Classifier Export
 
-`export_classifier()` exports the trained PyTorch classifier head to ONNX format.
+`export_onnx()` exports the trained PyTorch classifier head to ONNX format.
 
 | Property | Value |
 |----------|-------|
@@ -34,7 +36,43 @@ livekit-wakeword export configs/hey_jarvis.yaml --quantize
 
 ### Export Entry Point
 
-`run_export()` loads the trained model from `output/<model_name>/<model_name>.pt`, exports it to ONNX, and optionally quantizes it. Raises `FileNotFoundError` if the trained model doesn't exist.
+`run_export(config, quantize=False, format=None)` loads the trained model from `output/<model_name>/<model_name>.pt`, exports it to ONNX, and optionally quantizes it. `format` defaults to `config.output_format`. ONNX is always produced (it is the conversion source for TFLite); when `format="tflite"`, the TFLite artifact is produced as well and its path is returned. Raises `FileNotFoundError` if the trained model doesn't exist.
+
+## TFLite Export (openWakeWord-compatible)
+
+`export_tflite()` converts an exported ONNX classifier to TFLite via `onnx2tf` (ONNX → TF SavedModel → TFLite), producing an artifact that [openWakeWord](https://github.com/dscripka/openWakeWord) can load directly.
+
+Requires the optional extra:
+
+```bash
+uv sync --extra tflite     # or: pip install 'livekit-wakeword[tflite]'
+```
+
+```bash
+livekit-wakeword export configs/hey_jarvis.yaml --format tflite
+```
+
+### openWakeWord contract
+
+openWakeWord loads classifier models with `ai_edge_litert.interpreter` and runs them without resizing tensors, so the artifact must satisfy:
+
+| Requirement | Detail |
+|-------------|--------|
+| Input shape | **Static** `(1, 16, 96)` float32 (no dynamic batch — openWakeWord never calls `resize_tensor_input`) |
+| Output shape | `(1, 1)` float32 sigmoid score |
+| Ops | **Builtin TFLite ops only** — the LiteRT interpreter has no Flex/SELECT_TF delegate |
+
+We pin the input shape with onnx2tf's `overwrite_input_shape` + `keep_shape_absolutely_input_names` (without the latter, onnx2tf's NCHW→NHWC pass transposes the input to `(1, 96, 16)`) and restrict the converter to `TFLITE_BUILTINS`.
+
+### Head support
+
+| Head | TFLite export | Notes |
+|------|---------------|-------|
+| `dnn` | Supported | Bit-exact vs ONNX/PyTorch (verified, maxdiff `0.0`) |
+| `conv_attention` | Not supported | onnx2tf emits an unsupported constant for the attention block |
+| `rnn` | Not supported | LSTM lowers to `TensorList` ops requiring the Flex delegate (which openWakeWord can't load) |
+
+Use `dnn` for openWakeWord-compatible TFLite; deploy `conv_attention`/`rnn` via ONNX. Requesting TFLite for an unsupported head raises `NotImplementedError` before any export work begins.
 
 ## Inference API
 

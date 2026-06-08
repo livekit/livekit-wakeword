@@ -284,8 +284,15 @@ Or run stages individually:
 livekit-wakeword generate configs/prod.yaml  # TTS synthesis + adversarial negatives
 livekit-wakeword augment configs/prod.yaml   # Augment + extract features
 livekit-wakeword train configs/prod.yaml     # 3-phase adaptive training
-livekit-wakeword export configs/prod.yaml    # Export to ONNX
+livekit-wakeword export configs/prod.yaml    # Export to ONNX (default)
 livekit-wakeword eval configs/prod.yaml      # Evaluate model (DET curve, AUT, FPPH)
+```
+
+The export format defaults to ONNX. Pass `--format tflite` (or set `output_format: tflite` in the config) to also emit an [openWakeWord](https://github.com/dscripka/openWakeWord)-compatible TFLite model — this requires the `tflite` extra and currently supports the `dnn` head only. See [Export & Inference](docs/export-and-inference.md#tflite-export-openwakeword-compatible) for details.
+
+```bash
+pip install livekit-wakeword[tflite]
+livekit-wakeword export configs/prod.yaml --format tflite
 ```
 
 You can also evaluate any compatible ONNX model (e.g., one trained with openWakeWord):

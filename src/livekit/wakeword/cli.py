@@ -313,17 +313,24 @@ def train(
 @app.command()
 def export(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
+    format: str = typer.Option(
+        None,
+        "--format",
+        "-f",
+        help="Export format: onnx or tflite (default: config.output_format)",
+    ),
     quantize: bool = typer.Option(False, "--quantize", help="Apply INT8 quantization"),
 ) -> None:
-    """Export trained model to ONNX (optionally quantize for embedded)."""
+    """Export trained model (optionally quantize for embedded)."""
     config = load_config(config_path)
 
-    logger.info(f"Exporting '{config.model_name}' to ONNX...")
+    fmt = format or config.output_format
+    logger.info(f"Exporting '{config.model_name}' to {fmt}...")
 
     from .export.onnx import run_export
 
-    onnx_path = run_export(config, quantize=quantize)
-    logger.info(f"Export complete! ONNX model at {onnx_path}")
+    out_path = run_export(config, quantize=quantize, format=fmt)
+    logger.info(f"Export complete! Model at {out_path}")
 
 
 @app.command()
@@ -384,8 +391,11 @@ def run(
     logger.info("Step 4/6: Train classifier")
     run_train(config)
 
-    logger.info("Step 5/6: Export to ONNX")
-    onnx_path = run_export(config)
+    logger.info(f"Step 5/6: Export to {config.output_format}")
+    run_export(config)
+
+    # Eval runs on the ONNX artifact (run_export always produces it).
+    onnx_path = config.model_output_dir / f"{config.model_name}.onnx"
 
     logger.info("Step 6/6: Evaluate model")
     results = run_eval(config, onnx_path)
