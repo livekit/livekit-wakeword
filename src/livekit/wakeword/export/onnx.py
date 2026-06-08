@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from pathlib import Path
 
 import onnx
@@ -71,20 +72,31 @@ def quantize_onnx(input_path: Path, output_path: Path | None = None) -> Path:
     # leaves the value_info stale, so its strict shape-inference pass then fails
     # with "Inferred shape and existing shape differ". Dropping initializer
     # value_info (which is redundant — shapes are inferred from the tensors)
-    # avoids the conflict without affecting the model.
+    # avoids the conflict. We do this on a temp copy so the input model on disk
+    # is left untouched.
     model = onnx.load(str(input_path))
     init_names = {init.name for init in model.graph.initializer}
     kept = [vi for vi in model.graph.value_info if vi.name not in init_names]
-    if len(kept) != len(model.graph.value_info):
+
+    if len(kept) == len(model.graph.value_info):
+        # Nothing to strip — quantize the input directly.
+        quantize_dynamic(
+            model_input=str(input_path),
+            model_output=str(output_path),
+            weight_type=QuantType.QInt8,
+        )
+    else:
         del model.graph.value_info[:]
         model.graph.value_info.extend(kept)
-        onnx.save(model, str(input_path))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            cleaned = Path(tmp_dir) / "cleaned.onnx"
+            onnx.save(model, str(cleaned))
+            quantize_dynamic(
+                model_input=str(cleaned),
+                model_output=str(output_path),
+                weight_type=QuantType.QInt8,
+            )
 
-    quantize_dynamic(
-        model_input=str(input_path),
-        model_output=str(output_path),
-        weight_type=QuantType.QInt8,
-    )
     logger.info(f"Quantized ONNX model to {output_path}")
     return output_path
 

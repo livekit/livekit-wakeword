@@ -57,13 +57,17 @@ def test_quantize_onnx_dnn(tmp_path: Path):
     which previously crashed quantization with a ShapeInferenceError.
     """
     config = _make_checkpoint(tmp_path, ModelType.dnn)
-    run_export(config, quantize=True, format="onnx")
+    out = run_export(config, quantize=True, format="onnx")
     int8 = config.model_output_dir / "ww.int8.onnx"
     assert int8.exists()
 
     session = ort.InferenceSession(str(int8), providers=["CPUExecutionProvider"])
     y = session.run(None, {"embeddings": np.random.randn(1, 16, 96).astype(np.float32)})[0]
     assert y.shape == (1, 1)
+
+    # The source ONNX must not be mutated by quantization, and must still run.
+    src = ort.InferenceSession(str(out), providers=["CPUExecutionProvider"])
+    assert src.get_inputs()[0].name == "embeddings"
 
 
 def test_tflite_supported_heads():
@@ -110,6 +114,21 @@ def test_tflite_export_dnn(tmp_path: Path):
     )
     y_onnx = float(session.run(None, {"embeddings": x})[0][0, 0])
     assert abs(y_tflite - y_onnx) < 1e-4
+
+
+def test_tflite_export_dnn_quantized(tmp_path: Path):
+    """--quantize --format tflite must still satisfy the openWakeWord contract."""
+    pytest.importorskip("onnx2tf")
+    tf = pytest.importorskip("tensorflow")
+
+    config = _make_checkpoint(tmp_path, ModelType.dnn)
+    out = run_export(config, quantize=True, format="tflite")
+    assert out.suffix == ".tflite" and out.exists()
+
+    interp = tf.lite.Interpreter(model_path=str(out))
+    interp.allocate_tensors()
+    assert tuple(interp.get_input_details()[0]["shape"]) == (1, 16, 96)
+    assert tuple(interp.get_output_details()[0]["shape"]) == (1, 1)
 
 
 def test_export_tflite_missing_extra_message(tmp_path: Path):

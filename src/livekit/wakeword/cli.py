@@ -368,7 +368,16 @@ def run(
     config_path: str = typer.Argument(..., help="Path to wake word config YAML"),
 ) -> None:
     """Run entire pipeline end-to-end: generate → augment → train → export."""
+    from .config import ExportFormat
+
     config = load_config(config_path)
+
+    # Validate the export target up front so we don't train for hours and then
+    # fail at the export step (e.g. tflite + an unsupported head).
+    if config.output_format == ExportFormat.tflite:
+        from .export.tflite import ensure_tflite_supported
+
+        ensure_tflite_supported(config.model.model_type)
 
     logger.info(f"Running full pipeline for '{config.model_name}'...")
 
