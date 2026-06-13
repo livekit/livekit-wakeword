@@ -43,6 +43,7 @@ public struct Detection: Sendable {
 public actor WakeWordListener {
     public let threshold: Float
     public let debounce: TimeInterval
+    public let echoCancellation: Bool
 
     private let model: WakeWordModel
     private var engine: AVAudioEngine?
@@ -71,16 +72,22 @@ public actor WakeWordListener {
     ///     same utterance.
     ///   - windowSeconds: Length of the rolling audio window fed to the
     ///     model. 2 s matches the Rust crate's recommendation.
+    ///   - echoCancellation: When `true`, the microphone is routed through the
+    ///     platform's voice-processing I/O unit so audio the device is playing
+    ///     out (e.g. an assistant's own TTS) is removed from the captured
+    ///     signal. Defaults to `false` (raw capture).
     public init(
         model: WakeWordModel,
         threshold: Float = 0.5,
         debounce: TimeInterval = 2.0,
-        windowSeconds: Double = 2.0
+        windowSeconds: Double = 2.0,
+        echoCancellation: Bool = false
     ) {
         self.model = model
         self.threshold = threshold
         self.debounce = debounce
         self.windowSeconds = windowSeconds
+        self.echoCancellation = echoCancellation
     }
 
     /// Start capturing audio and running inference. Must be called after
@@ -90,12 +97,22 @@ public actor WakeWordListener {
 
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+        let mode: AVAudioSession.Mode = echoCancellation ? .voiceChat : .measurement
+        try session.setCategory(.playAndRecord, mode: mode, options: [.defaultToSpeaker])
         try session.setActive(true, options: [])
         #endif
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
+
+        if echoCancellation {
+            do {
+                try input.setVoiceProcessingEnabled(true)
+            } catch {
+                throw WakeWordError.echoCancellationUnavailable(underlying: error)
+            }
+        }
+
         let hwFormat = input.inputFormat(forBus: 0)
         guard hwFormat.sampleRate > 0 else {
             throw WakeWordError.unsupportedSampleRate(rate: 0)

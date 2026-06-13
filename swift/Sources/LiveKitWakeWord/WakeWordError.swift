@@ -32,6 +32,10 @@ public enum WakeWordError: Error, LocalizedError, Sendable {
     /// The ONNX Runtime raised an error during session creation or
     /// inference.
     case runtimeFailure(underlying: Error)
+    /// Acoustic echo cancellation was requested (``WakeWordListener`` created
+    /// with `echoCancellation: true`) but the platform's voice-processing I/O
+    /// unit could not be enabled.
+    case echoCancellationUnavailable(underlying: Error)
 
     public var errorDescription: String? {
         switch self {
@@ -54,6 +58,8 @@ public enum WakeWordError: Error, LocalizedError, Sendable {
             return "LiveKitWakeWord: resampling failed."
         case .runtimeFailure(let underlying):
             return "LiveKitWakeWord: ONNX Runtime error (\(underlying))."
+        case .echoCancellationUnavailable(let underlying):
+            return "LiveKitWakeWord: could not enable echo cancellation (\(underlying))."
         }
     }
 }

@@ -224,6 +224,12 @@ for await detection in listener.detections() {
 }
 ```
 
+Pass `echoCancellation: true` to route the microphone through the platform's voice-processing I/O unit, which subtracts what the device is playing out (e.g. your app's own TTS) from the captured signal so the listener only reacts to the user's voice. It defaults to `false` (raw capture).
+
+```swift
+let listener = WakeWordListener(model: model, threshold: 0.5, debounce: 2.0, echoCancellation: true)
+```
+
 The mel spectrogram and speech embedding `.onnx` models ship inside the Swift package; only the classifier ships with your app. Audio at any sample rate is resampled to 16 kHz internally via `AVAudioConverter` (matches the Rust crate's 22050–384000 Hz input range); the listener handles mic-hardware resampling automatically. ONNX Runtime with the CoreML Execution Provider dispatches to ANE / GPU / CPU by default (override via `executionProvider:`).
 
 Add `NSMicrophoneUsageDescription` to Info.plist (and `com.apple.security.device.audio-input` on sandboxed macOS apps) for listener use. A runnable SwiftUI demo (iOS + macOS) lives in [examples/ios_wakeword/](examples/ios_wakeword/).
