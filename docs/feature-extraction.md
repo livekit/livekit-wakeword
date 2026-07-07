@@ -206,6 +206,24 @@ Only augmented clips (`clip_NNNNNN_rN.wav`) are processed — clean TTS original
 
 Audio files are read via `soundfile`, converted to float32, reduced to mono if stereo, and processed one clip at a time.
 
+### Parallel Execution (`feature_extraction.n_workers`)
+
+The per-clip mel + embedding loop in `extract_features_from_directory` is a pure Python `for` over two ONNX sessions. Under the GIL it pins to a single core; on a 32-CPU L40S container we measured ~3.5 clips/sec, which is ~4 h wall-clock for a 55k-clip dataset before training even starts.
+
+`FeatureExtractionConfig.n_workers` opts into a `multiprocessing.Pool` that spreads the loop across worker processes. Each worker builds its own mel + embedding ONNX sessions via the pool's `initializer` (ORT sessions are not pickle-safe) and pins each session to a single intra-/inter-op thread — otherwise `n_workers` × N ORT threads thread-explode on multi-core hosts.
+
+The pool uses `pool.imap` (ordered, not `imap_unordered`) so the per-clip order within a split is preserved — the downstream classifier training relies on consistent sample ordering.
+
+```yaml
+feature_extraction:
+  n_workers: 0   # 0 = os.cpu_count(); 1 = single-threaded (default)
+  execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+```
+
+### ONNX Execution Providers
+
+`FeatureExtractionConfig.execution_providers` is plumbed through `MelSpectrogramFrontend.__init__` and `SpeechEmbedding.__init__`. The default `["CPUExecutionProvider"]` keeps existing behavior; on a GPU host with `onnxruntime-gpu` installed, setting `["CUDAExecutionProvider", "CPUExecutionProvider"]` offloads mel + embedding inference to the GPU with CPU as a fallback.
+
 ## Memory-Mapped Dataset
 
 **Source:** `src/livekit/wakeword/data/dataset.py`

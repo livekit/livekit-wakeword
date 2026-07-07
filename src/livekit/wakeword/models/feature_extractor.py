@@ -28,23 +28,35 @@ class MelSpectrogramFrontend:
     Output: (batch, time_frames, 32)
     """
 
-    def __init__(self, onnx_path: str | Path):
+    def __init__(
+        self,
+        onnx_path: str | Path,
+        execution_providers: list[str] | None = None,
+        session_options: object | None = None,
+    ):
         if not Path(onnx_path).exists():
             raise FileNotFoundError(
                 f"Mel ONNX model not found: {onnx_path}\n"
                 "This should not happen - please reinstall livekit-wakeword."
             )
-        self._init_onnx(onnx_path)
+        self._init_onnx(onnx_path, execution_providers, session_options)
 
-    def _init_onnx(self, onnx_path: str | Path) -> None:
+    def _init_onnx(
+        self,
+        onnx_path: str | Path,
+        execution_providers: list[str] | None,
+        session_options: object | None,
+    ) -> None:
         import onnxruntime as ort
 
+        providers = execution_providers or ["CPUExecutionProvider"]
         self._onnx_session = ort.InferenceSession(
             str(onnx_path),
-            providers=["CPUExecutionProvider"],
+            sess_options=session_options,
+            providers=providers,
         )
         self._input_name = self._onnx_session.get_inputs()[0].name
-        logger.info(f"Loaded mel ONNX model from {onnx_path}")
+        logger.info(f"Loaded mel ONNX model from {onnx_path} (providers={providers})")
 
     def __call__(self, audio: np.ndarray) -> np.ndarray:
         """Compute mel spectrogram features.
@@ -89,7 +101,12 @@ class SpeechEmbedding:
     ONNX output: (batch, 1, 1, 96)   — 96-dim embedding
     """
 
-    def __init__(self, onnx_path: str | Path):
+    def __init__(
+        self,
+        onnx_path: str | Path,
+        execution_providers: list[str] | None = None,
+        session_options: object | None = None,
+    ):
         import onnxruntime as ort
 
         if not Path(onnx_path).exists():
@@ -98,12 +115,14 @@ class SpeechEmbedding:
                 "This should not happen - please reinstall livekit-wakeword."
             )
 
+        providers = execution_providers or ["CPUExecutionProvider"]
         self._session = ort.InferenceSession(
             str(onnx_path),
-            providers=["CPUExecutionProvider"],
+            sess_options=session_options,
+            providers=providers,
         )
         self._input_name = self._session.get_inputs()[0].name
-        logger.info(f"Loaded embedding ONNX model from {onnx_path}")
+        logger.info(f"Loaded embedding ONNX model from {onnx_path} (providers={providers})")
 
     def __call__(self, mel_windows: np.ndarray) -> np.ndarray:
         """Compute embeddings for mel spectrogram windows.

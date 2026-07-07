@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -58,6 +58,52 @@ class AugmentationConfig(BaseModel):
     rounds: int = 1
     background_paths: list[str] = Field(default_factory=lambda: ["./data/backgrounds"])
     rir_paths: list[str] = Field(default_factory=lambda: ["./data/rirs"])
+
+    n_workers: int = 1
+    """Number of parallel worker processes for the audio DSP loop.
+    0 = auto (os.cpu_count()), 1 = single-threaded (legacy, default for
+    backwards compatibility), N = explicit worker count."""
+
+    mp_context: Literal["auto", "fork", "spawn", "forkserver"] = "auto"
+    """Multiprocessing start method. "auto" picks 'fork' on Linux/macOS
+    and 'spawn' on Windows. Override only if a fork-unsafe audio backend
+    is crashing workers."""
+
+
+class FeatureExtractionConfig(BaseModel):
+    """Configuration for the feature-extraction stage (mel + embedding ONNX models)."""
+
+    n_workers: int = 1
+    """Number of parallel worker processes for the feature-extraction loop.
+    0 = auto (os.cpu_count()), 1 = single-threaded (legacy, default for
+    backwards compatibility), N = explicit worker count."""
+
+    mp_context: Literal["auto", "fork", "spawn", "forkserver"] = "auto"
+    """Multiprocessing start method. "auto" picks 'fork' on Linux/macOS
+    and 'spawn' on Windows."""
+
+    execution_providers: list[str] = Field(
+        default_factory=lambda: ["CPUExecutionProvider"],
+    )
+    """ONNX Runtime execution providers, in priority order. Default preserves
+    CPU-only behavior. Set to ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    on a GPU host to offload mel + embedding inference to the GPU (requires
+    onnxruntime-gpu)."""
+
+
+class EvalConfig(BaseModel):
+    """Configuration for the eval stage (classifier ONNX inference)."""
+
+    execution_providers: list[str] = Field(
+        default_factory=lambda: ["CPUExecutionProvider"],
+    )
+    """ONNX Runtime execution providers, in priority order. Default preserves
+    CPU-only behavior. Set to ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    on a GPU host (requires onnxruntime-gpu)."""
+
+    batch_size: int = 1
+    """Batch size for classifier inference. 1 is fine on CPU; bump to 64+
+    when running on GPU to saturate the device."""
 
 
 class ModelConfig(BaseModel):
@@ -144,6 +190,12 @@ class WakeWordConfig(BaseModel):
 
     # Augmentation
     augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig)
+
+    # Feature extraction
+    feature_extraction: FeatureExtractionConfig = Field(default_factory=FeatureExtractionConfig)
+
+    # Evaluation
+    eval: EvalConfig = Field(default_factory=EvalConfig)
 
     # Model
     model: ModelConfig = Field(default_factory=ModelConfig)

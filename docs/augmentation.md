@@ -125,3 +125,32 @@ output/<model_name>/
 Only `_rN.wav` files are fed to feature extraction — clean TTS originals are excluded from training since they don't match real microphone audio.
 
 Feature extraction is a separate step — see [Feature Extraction](feature-extraction.md).
+
+## Parallel Execution (`n_workers`)
+
+The per-clip loop in `_augment_directory` is a pure Python `for` over `soundfile.read`, `scipy.signal.fftconvolve`, and audiomentations transforms. Because of the GIL, adding CPU cores to the process does nothing on its own — each clip is processed sequentially on a single core. On a 32-CPU host, augmenting a 25k-clip dataset this way takes ~3 hours even though the work is embarrassingly parallel.
+
+`AugmentationConfig.n_workers` opts into a `multiprocessing.Pool` that runs the loop across worker processes. Each worker constructs its own `AudioAugmentor` via the pool's `initializer` callback — the parent's lazy-loaded audiomentations instance is never pickled, which keeps the setup robust even as upstream transforms evolve.
+
+Measured on a 32-CPU Modal container augmenting a 60k-clip dataset (25k positive_train + 5k positive_test + 25k negative_train + ~5k negative_test + ~2.5k backgrounds) end-to-end in **~6 minutes**:
+
+| Split | Throughput | Wall-clock |
+|---|---|---|
+| `positive_train` (25k) | 178 clips/sec | 2:20 |
+| `positive_test` (5k) | 174 clips/sec | 0:28 |
+| `negative_train` (25k) | 130 clips/sec | 3:12 |
+| `negative_test` (~5k) | 91 clips/sec | 0:53 |
+| `background_train` (2k) | 83 clips/sec | 0:24 |
+| `background_test` (500) | 62 clips/sec | 0:08 |
+
+For reference, the single-threaded path on the same host processes ~2.3 clips/sec, so the full 60k dataset would otherwise take ~7 hours.
+
+Semantics:
+
+- `n_workers: 1` (default) — the legacy single-threaded code path, unchanged.
+- `n_workers: 0` — auto, uses `os.cpu_count()`.
+- `n_workers: N` (any positive integer) — explicit worker count.
+
+`mp_context` controls the start method: `"auto"` picks `fork` on Linux/macOS and `spawn` on Windows. Override only if a fork-unsafe audio backend is crashing workers.
+
+Output file names, round-0 alignment, padding, and RIR / background mixing behave identically to the single-threaded path. Per-worker random state means the *exact* audio content differs run-to-run across paths (different SNR draws, different RIR picks), but the output shape, count, and naming are byte-for-byte the same — which is what the downstream feature extractor depends on.

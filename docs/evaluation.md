@@ -154,3 +154,15 @@ uv run livekit-wakeword eval configs/hey_livekit.yaml -m models/hey_livekit_oww.
 ```
 
 This works because both livekit-wakeword and openWakeWord share the same frozen embedding front-end, producing identical `(16, 96)` feature matrices.
+
+## ONNX Execution Providers
+
+`EvalConfig.execution_providers` controls the ONNX Runtime providers used for the classifier inference session. Default `["CPUExecutionProvider"]` preserves existing behavior. On a GPU host with `onnxruntime-gpu` installed:
+
+```yaml
+eval:
+  execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+  batch_size: 64   # default 1 is fine on CPU; bump on GPU
+```
+
+CPU-side the classifier is small enough that `batch_size: 1` is rarely the bottleneck; on GPU the per-launch overhead dominates, so batching is required to see any speedup.
