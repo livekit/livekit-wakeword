@@ -60,6 +60,23 @@ class AugmentationConfig(BaseModel):
     rir_paths: list[str] = Field(default_factory=lambda: ["./data/rirs"])
 
 
+class CustomPositiveSource(BaseModel):
+    """User-supplied directory of positive WAV files to inject into ``positive_train``.
+
+    Each ``.wav`` file in ``path`` is copied ``multiplier`` times into the
+    ``positive_train`` split, appended after the TTS-generated clips.  Copies
+    enter the standard augmentation pipeline — each one gets different RIR /
+    background / EQ per round — so duplication is not wasted.
+    """
+
+    path: str = Field(description="Directory of 16 kHz mono .wav files (absolute or relative)")
+    multiplier: int = Field(
+        default=1,
+        ge=1,
+        description="Number of copies per source file (oversampling factor)",
+    )
+
+
 class ModelConfig(BaseModel):
     model_type: ModelType = ModelType.conv_attention
     model_size: ModelSize = ModelSize.small
@@ -127,6 +144,10 @@ class WakeWordConfig(BaseModel):
     piper_tts: PiperTtsConfig = Field(default_factory=PiperTtsConfig)
     voxcpm_tts: VoxCpmTtsConfig = Field(default_factory=VoxCpmTtsConfig)
     custom_negative_phrases: list[str] = Field(default_factory=list)
+    custom_positive_samples: list[CustomPositiveSource] = Field(
+        default_factory=list,
+        description="User-supplied positive audio sources injected into positive_train after TTS",
+    )
 
     # TTS parameters (Piper VITS + SLERP speaker blending)
     noise_scales: list[float] = Field(default_factory=lambda: [0.98])
