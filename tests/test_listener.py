@@ -11,11 +11,9 @@ import pytest
 
 from livekit.wakeword.inference.listener import (
     CHUNK_FRAMES,
-    Detection,
-    WakeWordListener,
     FRAME_SAMPLES,
+    WakeWordListener,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -43,6 +41,31 @@ class FakeModel:
         return scores
 
 
+class FakeStreamingPredictor(FakeModel):
+    def __init__(self, scores_sequence: list[dict[str, float]]):
+        super().__init__(scores_sequence)
+        self.chunks: list[np.ndarray] = []
+        self.reset_count = 0
+
+    def predict(self, audio_chunk: np.ndarray) -> dict[str, float]:
+        self.chunks.append(audio_chunk.copy())
+        return super().predict(audio_chunk)
+
+    def reset(self) -> None:
+        self.reset_count += 1
+
+
+class FakeStreamingModel:
+    def __init__(self, scores_sequence: list[dict[str, float]]):
+        self._scores_sequence = scores_sequence
+        self.streams: list[FakeStreamingPredictor] = []
+
+    def create_stream(self) -> FakeStreamingPredictor:
+        stream = FakeStreamingPredictor(self._scores_sequence)
+        self.streams.append(stream)
+        return stream
+
+
 class FakeStream:
     """Mock PyAudio stream that returns silence."""
 
@@ -53,7 +76,7 @@ class FakeStream:
     def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes:
         self._read_count += 1
         if self._error_after is not None and self._read_count > self._error_after:
-            raise IOError("Simulated stream read error")
+            raise OSError("Simulated stream read error")
         return np.zeros(num_frames, dtype=np.int16).tobytes()
 
     def stop_stream(self) -> None:
@@ -61,6 +84,14 @@ class FakeStream:
 
     def close(self) -> None:
         pass
+
+
+class CountingFakeStream(FakeStream):
+    """Mock stream whose frame values expose the sliding-window overlap."""
+
+    def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes:
+        self._read_count += 1
+        return np.full(num_frames, self._read_count, dtype=np.int16).tobytes()
 
 
 class FakePyAudio:
@@ -91,6 +122,51 @@ def _patch_pyaudio(stream: FakeStream):
 
 
 @pytest.mark.asyncio
+async def test_listener_uses_stream_predictor_for_overlapping_windows():
+    model = FakeStreamingModel([{"test": 0.0}, {"test": 0.9}])
+    audio = CountingFakeStream()
+
+    with _patch_pyaudio(audio):
+        async with WakeWordListener(model, threshold=0.5, debounce=0.0) as listener:
+            await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
+
+    predictor = model.streams[0]
+    assert len(predictor.chunks) == 2
+    assert np.array_equal(
+        predictor.chunks[0][FRAME_SAMPLES:],
+        predictor.chunks[1][:-FRAME_SAMPLES],
+    )
+
+
+@pytest.mark.asyncio
+async def test_detection_resets_stream_cache():
+    model = FakeStreamingModel([{"test": 0.9}])
+    audio = FakeStream()
+
+    with _patch_pyaudio(audio):
+        async with WakeWordListener(model, threshold=0.5, debounce=0.0) as listener:
+            await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
+
+    assert model.streams[0].reset_count == 1
+
+
+@pytest.mark.asyncio
+async def test_context_reentry_creates_fresh_stream_state():
+    model = FakeStreamingModel([{"test": 0.9}])
+    audio = FakeStream()
+    listener = WakeWordListener(model, threshold=0.5, debounce=0.0)
+
+    with _patch_pyaudio(audio):
+        async with listener:
+            await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
+        async with listener:
+            await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
+
+    assert len(model.streams) == 2
+    assert all(stream._call_count == 1 for stream in model.streams)
+
+
+@pytest.mark.asyncio
 async def test_predict_runs_in_executor():
     """predict() should execute on a non-main thread (in the executor)."""
     predict_threads: list[threading.Thread] = []
@@ -104,7 +180,7 @@ async def test_predict_runs_in_executor():
     stream = FakeStream()
 
     with _patch_pyaudio(stream):
-        async with WakeWordListener(model, threshold=0.5) as listener:
+        async with WakeWordListener(model, threshold=0.5):
             await asyncio.sleep(0.5)
 
     assert len(predict_threads) > 0
@@ -153,9 +229,7 @@ async def test_buffer_cleared_after_detection():
 
     with _patch_pyaudio(stream):
         async with WakeWordListener(model, threshold=0.5, debounce=0.0) as listener:
-            detection = await asyncio.wait_for(
-                listener.wait_for_detection(), timeout=5.0
-            )
+            detection = await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
             assert detection.name == "test"
             assert detection.confidence == pytest.approx(0.9)
             # Buffer should be empty after detection
@@ -188,9 +262,7 @@ async def test_loop_pauses_after_detection():
 
     with _patch_pyaudio(stream):
         async with WakeWordListener(model, threshold=0.5, debounce=0.0) as listener:
-            det1 = await asyncio.wait_for(
-                listener.wait_for_detection(), timeout=5.0
-            )
+            det1 = await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
 
             # Give time for the loop to potentially queue more (it shouldn't)
             await asyncio.sleep(0.3)
@@ -199,9 +271,7 @@ async def test_loop_pauses_after_detection():
             )
 
             # Second call resumes listening and gets next detection
-            det2 = await asyncio.wait_for(
-                listener.wait_for_detection(), timeout=5.0
-            )
+            det2 = await asyncio.wait_for(listener.wait_for_detection(), timeout=5.0)
             assert det2.timestamp > det1.timestamp
 
 
@@ -227,6 +297,6 @@ async def test_shutdown_during_active_listening():
     stream = FakeStream()
 
     with _patch_pyaudio(stream):
-        async with WakeWordListener(model, threshold=0.5) as listener:
+        async with WakeWordListener(model, threshold=0.5):
             await asyncio.sleep(0.2)  # let loop run a few iterations
     # If we reach here without hanging, shutdown is clean.

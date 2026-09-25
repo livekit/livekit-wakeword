@@ -1,7 +1,7 @@
 """livekit-wakeword — Wake word detection for voice-enabled applications."""
 
 from .inference.listener import Detection, WakeWordListener
-from .inference.model import WakeWordModel
+from .inference.model import WakeWordModel, WakeWordStream
 
 __version__ = "0.1.0"
 
@@ -35,6 +35,7 @@ __all__ = [
     "ExportFormat",
     "WakeWordListener",
     "WakeWordModel",
+    "WakeWordStream",
     "Detection",
     "load_config",
     "run_augment",

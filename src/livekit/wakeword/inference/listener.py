@@ -8,6 +8,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 
@@ -18,8 +19,12 @@ logger = logging.getLogger(__name__)
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80ms per frame
 CHUNK_SECONDS = 2.0
-# Number of frames that fill a ~2-second chunk (25 × 80ms = 2000ms)
+# Number of frames that fill a ~2-second chunk (25 * 80ms = 2000ms)
 CHUNK_FRAMES = int(CHUNK_SECONDS * SAMPLE_RATE / FRAME_SAMPLES)
+
+
+class _Predictor(Protocol):
+    def predict(self, audio_chunk: np.ndarray) -> dict[str, float]: ...
 
 
 @dataclass
@@ -35,9 +40,10 @@ class WakeWordListener:
     """Async wake word listener that handles audio capture.
 
     The listener owns the audio buffer and passes fixed ~2-second chunks
-    to the stateless ``WakeWordModel.predict()``.  After a detection the
-    loop pauses automatically and resumes when the consumer calls
-    ``wait_for_detection()`` again.
+    through an isolated stream predictor. The predictor reuses unchanged
+    speech embeddings while ``WakeWordModel`` remains stateless. After a
+    detection the loop pauses automatically and resumes when the consumer
+    calls ``wait_for_detection()`` again.
 
     Example:
         from livekit.wakeword import WakeWordModel, WakeWordListener
@@ -64,6 +70,7 @@ class WakeWordListener:
             debounce: Minimum seconds between detections.
         """
         self._model = model
+        self._predictor: _Predictor = model
         self._threshold = threshold
         self._debounce = debounce
 
@@ -95,6 +102,8 @@ class WakeWordListener:
         """Start audio capture."""
         import pyaudio
 
+        create_stream = getattr(self._model, "create_stream", None)
+        self._predictor = create_stream() if callable(create_stream) else self._model
         self._pa = pyaudio.PyAudio()
         self._stream = self._pa.open(
             format=pyaudio.paInt16,
@@ -124,7 +133,7 @@ class WakeWordListener:
         if self._task:
             try:
                 await asyncio.wait_for(self._task, timeout=2.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
+            except (TimeoutError, asyncio.CancelledError):
                 self._task.cancel()
                 try:
                     await self._task
@@ -175,7 +184,7 @@ class WakeWordListener:
                 chunk = np.concatenate(list(self._frame_buffer))
                 scores = await loop.run_in_executor(
                     self._executor,
-                    self._model.predict,
+                    self._predictor.predict,
                     chunk,
                 )
                 if not self._running:
@@ -193,11 +202,12 @@ class WakeWordListener:
                             # the detection.
                             self._listening.clear()
                             self._frame_buffer.clear()
+                            reset = getattr(self._predictor, "reset", None)
+                            if callable(reset):
+                                await loop.run_in_executor(self._executor, reset)
 
                             await self._detection_queue.put(
-                                Detection(
-                                    name=name, confidence=score, timestamp=now
-                                )
+                                Detection(name=name, confidence=score, timestamp=now)
                             )
                             break  # one detection per iteration
         except asyncio.CancelledError:
@@ -243,8 +253,6 @@ class WakeWordListener:
             return self._detection_queue.get_nowait()
 
         if self._error is not None:
-            raise RuntimeError(
-                f"Audio loop crashed: {self._error}"
-            ) from self._error
+            raise RuntimeError(f"Audio loop crashed: {self._error}") from self._error
 
         raise RuntimeError("Audio loop ended unexpectedly")

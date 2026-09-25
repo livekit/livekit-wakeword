@@ -145,6 +145,10 @@ if scores["hey_livekit"] > 0.5:
     print("Wake word detected!")
 ```
 
+`WakeWordModel.predict()` is stateless. For a sequence of overlapping full
+windows, `model.create_stream()` reuses only speech embeddings whose mel inputs
+match exactly. `WakeWordListener` enables this optimization automatically.
+
 **Async listener with microphone:**
 
 ```python

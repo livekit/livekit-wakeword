@@ -1,4 +1,4 @@
-"""Stateless wake word detection model."""
+"""Wake word detection model with optional per-stream caching."""
 
 from __future__ import annotations
 
@@ -61,7 +61,10 @@ class WakeWordModel:
             )
 
         self._mel_frontend = MelSpectrogramFrontend(onnx_path=mel_path, sess_options=sess_options)
-        self._speech_embedding = SpeechEmbedding(onnx_path=embedding_path, sess_options=sess_options)
+        self._speech_embedding = SpeechEmbedding(
+            onnx_path=embedding_path,
+            sess_options=sess_options,
+        )
 
         # name -> (onnx_session, input_name)
         self._classifiers: dict[str, tuple] = {}
@@ -70,7 +73,12 @@ class WakeWordModel:
             for model_path in models:
                 self.load_model(model_path, sess_options=sess_options)
 
-    def load_model(self, model_path: str | Path, model_name: str | None = None, sess_options: SessionOptions = None ) -> None:
+    def load_model(
+        self,
+        model_path: str | Path,
+        model_name: str | None = None,
+        sess_options: SessionOptions | None = None,
+    ) -> None:
         """Load a wake word classifier model.
 
         Args:
@@ -89,11 +97,19 @@ class WakeWordModel:
         session = ort.InferenceSession(
             str(model_path),
             providers=["CPUExecutionProvider"],
-            sess_options=sess_options
+            sess_options=sess_options,
         )
         input_name = session.get_inputs()[0].name
         self._classifiers[model_name] = (session, input_name)
         logger.info(f"Loaded wake word model '{model_name}' from {model_path}")
+
+    def create_stream(self) -> WakeWordStream:
+        """Create an isolated predictor for overlapping audio windows.
+
+        The returned stream caches speech embeddings. The model itself remains
+        stateless, and each stream owns independent cache state.
+        """
+        return WakeWordStream(self)
 
     def predict(self, audio_chunk: np.ndarray) -> dict[str, float]:
         """Get wake word predictions for an audio chunk.
@@ -112,38 +128,104 @@ class WakeWordModel:
         if not self._classifiers:
             return {}
 
-        # Convert int16 to float32 if needed
+        windows = self._mel_windows(audio_chunk)
+        if windows is None:
+            return self._zero_scores()
+
+        embeddings = np.stack(
+            [self._speech_embedding(window[np.newaxis, :, :])[0] for window in windows],
+            axis=0,
+        )
+        return self._classify(embeddings)
+
+    def _mel_windows(self, audio_chunk: np.ndarray) -> np.ndarray | None:
         if audio_chunk.dtype == np.int16:
             audio_chunk = audio_chunk.astype(np.float32) / 32768.0
 
-        audio_chunk = audio_chunk.flatten()
-
-        # Mel spectrogram over the full chunk
-        all_mel = self._mel_frontend(audio_chunk)
+        all_mel = self._mel_frontend(audio_chunk.flatten())
         if all_mel.ndim == 3:
             all_mel = all_mel[0]
 
-        if all_mel.shape[0] < EMBEDDING_WINDOW:
-            return {name: 0.0 for name in self._classifiers}
+        starts = range(
+            0,
+            all_mel.shape[0] - EMBEDDING_WINDOW + 1,
+            EMBEDDING_STRIDE,
+        )
+        windows = [all_mel[start : start + EMBEDDING_WINDOW] for start in starts]
+        if len(windows) < MIN_EMBEDDINGS:
+            return None
+        return np.stack(windows[-MIN_EMBEDDINGS:], axis=0)
 
-        # Extract embeddings: 76-frame windows, stride 8
-        embeddings = []
-        for start in range(0, all_mel.shape[0] - EMBEDDING_WINDOW + 1, EMBEDDING_STRIDE):
-            window = all_mel[start : start + EMBEDDING_WINDOW]
-            emb = self._speech_embedding(window[np.newaxis, :, :])
-            embeddings.append(emb[0])
-
-        if len(embeddings) < MIN_EMBEDDINGS:
-            return {name: 0.0 for name in self._classifiers}
-
-        # Use last 16 embeddings
-        emb_sequence = np.stack(embeddings[-MIN_EMBEDDINGS:], axis=0)
-        emb_input = emb_sequence[np.newaxis, :, :].astype(np.float32)
-
-        predictions = {}
+    def _classify(self, embeddings: np.ndarray) -> dict[str, float]:
+        emb_input = embeddings[np.newaxis, :, :].astype(np.float32)
+        predictions: dict[str, float] = {}
         for name, (session, input_name) in self._classifiers.items():
             outputs = session.run(None, {input_name: emb_input})
-            score = float(outputs[0][0, 0])
-            predictions[name] = score
-
+            predictions[name] = float(outputs[0][0, 0])
         return predictions
+
+    def _zero_scores(self) -> dict[str, float]:
+        return {name: 0.0 for name in self._classifiers}
+
+
+class WakeWordStream:
+    """Prediction state for a sequence of overlapping full audio windows.
+
+    Each call still computes the full mel spectrogram because that model's
+    output can depend on the complete audio window. Speech embeddings are reused
+    only when their 76-frame mel inputs exactly match the shifted prior inputs.
+    """
+
+    def __init__(self, model: WakeWordModel):
+        self._model = model
+        self._mel_windows: np.ndarray | None = None
+        self._embeddings: np.ndarray | None = None
+
+    def reset(self) -> None:
+        """Clear cached windows and embeddings."""
+        self._mel_windows = None
+        self._embeddings = None
+
+    def predict(self, audio_chunk: np.ndarray) -> dict[str, float]:
+        """Predict from the next complete audio window in the stream."""
+        if not self._model._classifiers:
+            return {}
+
+        windows = self._model._mel_windows(audio_chunk)
+        if windows is None:
+            self.reset()
+            return self._model._zero_scores()
+
+        embeddings = self._embedding_sequence(windows)
+        self._mel_windows = windows
+        self._embeddings = embeddings
+        return self._model._classify(embeddings)
+
+    def _embedding_sequence(self, windows: np.ndarray) -> np.ndarray:
+        changed_indexes: list[int] = []
+        changed_windows: list[np.ndarray] = []
+        reused: dict[int, np.ndarray] = {}
+
+        for index, window in enumerate(windows):
+            previous_index = index + 1
+            if (
+                self._mel_windows is not None
+                and self._embeddings is not None
+                and previous_index < len(self._mel_windows)
+                and np.array_equal(window, self._mel_windows[previous_index])
+            ):
+                reused[index] = self._embeddings[previous_index]
+            else:
+                changed_indexes.append(index)
+                changed_windows.append(window)
+
+        fresh = self._model._speech_embedding(np.stack(changed_windows, axis=0))
+        embeddings = np.empty(
+            (len(windows), fresh.shape[1]),
+            dtype=fresh.dtype,
+        )
+        for index, embedding in reused.items():
+            embeddings[index] = embedding
+        for index, embedding in zip(changed_indexes, fresh, strict=True):
+            embeddings[index] = embedding
+        return embeddings

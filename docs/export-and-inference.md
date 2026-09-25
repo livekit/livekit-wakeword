@@ -107,7 +107,28 @@ Feature extraction models (`melspectrogram.onnx`, `embedding_model.onnx`) are bu
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `predict(audio_chunk)` | `dict[str, float]` | Scores for each loaded model (0-1) |
+| `create_stream()` | `WakeWordStream` | Isolated cache for overlapping full audio windows |
 | `load_model(path, name)` | `None` | Load additional wake word model |
+
+#### Streaming Prediction
+
+`WakeWordModel` remains stateless. For one continuous audio source, create a
+separate stream and pass it the same complete ~2-second windows, advanced by
+80 ms (1,280 samples), that you would otherwise pass to `model.predict()`:
+
+```python
+stream = model.create_stream()
+
+scores = stream.predict(first_audio_window)
+scores = stream.predict(next_overlapping_window)
+stream.reset()  # Clear cached mel windows and speech embeddings.
+```
+
+The stream still computes the full mel spectrogram because mel output can depend
+on the complete audio window. It reuses a speech embedding only when its 76-frame
+mel input exactly matches the shifted input from the previous window, then batches
+all changed windows into one embedding call. Use one stream per audio source and
+call it serially. `WakeWordListener` creates and resets its own stream automatically.
 
 #### Audio Input
 
@@ -118,6 +139,8 @@ Feature extraction models (`melspectrogram.onnx`, `embedding_model.onnx`) are bu
 ### WakeWordListener
 
 The `WakeWordListener` class provides async microphone detection with debouncing.
+It also uses `WakeWordModel.create_stream()` to avoid recomputing unchanged speech
+embeddings between overlapping microphone windows.
 
 ```python
 import asyncio
