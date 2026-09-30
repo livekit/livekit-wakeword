@@ -31,3 +31,21 @@ jobs:
 
       - name: Run tests
         run: uv run pytest --tb=short -q
+
+  # onnxruntime's arm64 kernels differ from x86 (KleidiAI); run the pretrained-model check on Apple silicon too.
+  inference-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run inference tests
+        run: uv run pytest tests/test_pretrained.py --noconftest --tb=short -q

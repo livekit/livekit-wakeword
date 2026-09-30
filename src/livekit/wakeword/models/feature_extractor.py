@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
 
+from ..session import session_options
+
 logger = logging.getLogger(__name__)
 
 class MelSpectrogramFrontend:
@@ -43,7 +45,7 @@ class MelSpectrogramFrontend:
         self._onnx_session = ort.InferenceSession(
             str(onnx_path),
             providers=["CPUExecutionProvider"],
-            sess_options=sess_options,
+            sess_options=session_options(sess_options),
         )
         self._input_name = self._onnx_session.get_inputs()[0].name
         logger.info(f"Loaded mel ONNX model from {onnx_path}")
@@ -103,7 +105,7 @@ class SpeechEmbedding:
         self._session = ort.InferenceSession(
             str(onnx_path),
             providers=["CPUExecutionProvider"],
-            sess_options=sess_options,
+            sess_options=session_options(sess_options),
         )
         self._input_name = self._session.get_inputs()[0].name
         logger.info(f"Loaded embedding ONNX model from {onnx_path}")
