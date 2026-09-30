@@ -10,6 +10,7 @@ from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
 
 from ..models.feature_extractor import MelSpectrogramFrontend, SpeechEmbedding
 from ..resources import get_embedding_model_path, get_mel_model_path
+from ..session import session_options
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class WakeWordModel:
         session = ort.InferenceSession(
             str(model_path),
             providers=["CPUExecutionProvider"],
-            sess_options=sess_options
+            sess_options=session_options(sess_options),
         )
         input_name = session.get_inputs()[0].name
         self._classifiers[model_name] = (session, input_name)

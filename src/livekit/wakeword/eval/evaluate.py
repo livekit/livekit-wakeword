@@ -10,6 +10,7 @@ import numpy as np
 import onnxruntime as ort
 
 from ..config import WakeWordConfig
+from ..session import session_options
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,9 @@ def run_eval(config: WakeWordConfig, model_path: str | Path) -> dict[str, float]
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    session = ort.InferenceSession(
+        str(model_path), session_options(), providers=["CPUExecutionProvider"]
+    )
     logger.info(f"Loaded model from {model_path}")
 
     # Load validation data
