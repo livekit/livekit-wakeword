@@ -49,3 +49,14 @@ class TestMelSpectrogramFrontend:
         """Non-existent ONNX path should raise FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             MelSpectrogramFrontend(onnx_path=tmp_path / "nonexistent.onnx")
+
+
+class TestRunExtraction:
+    """Test the run_extraction entry point used by the CLI."""
+
+    def test_callable_without_sess_options(self, sample_config):
+        # The `augment` and `run` CLI commands call run_extraction(config) with no
+        # sess_options; this must not raise TypeError.
+        from livekit.wakeword.data.features import run_extraction
+
+        run_extraction(sample_config)
