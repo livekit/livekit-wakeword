@@ -44,6 +44,14 @@ custom_negative_phrases:
   - "hey look at"
   - "hey look it"
 
+# Real recordings of the wake word to inject into positive_train alongside
+# the TTS clips — use when biasing toward a specific voice or demographic.
+# Each directory must contain 16 kHz mono .wav files; each file is copied
+# `multiplier` times before augmentation. See docs/data-generation.md.
+# custom_positive_samples:
+#   - path: ./data/my_recordings
+#     multiplier: 50
+
 # ============================================================================
 # TTS Parameters (VITS + SLERP speaker blending)
 # ============================================================================

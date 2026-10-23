@@ -104,6 +104,39 @@ Generated audio is silence-trimmed via WebRTC VAD. If the VAD strips too aggress
 
 **Diversification:** Defaults cover many `voice_design_prompts` × `cfg_values` × `inference_timesteps_list` (see `VoxCpmTtsConfig` in `config.py`). Clip *i* cycles through that Cartesian product so resumes stay aligned with `start_index`. Output is **16 kHz** `clip_%06d.wav` (model native rate is resampled with librosa).
 
+## Custom Positive Samples
+
+Real human recordings of the target phrase can be injected into `positive_train` alongside the synthetic TTS clips. This is the usual way to bias the model toward a specific voice (yours, a customer's, a target demographic) without giving up the diversity of the TTS speaker pool.
+
+### Configuration
+
+```yaml
+custom_positive_samples:
+  - path: ./data/my_recordings
+    multiplier: 50
+  - path: ./data/other_voices
+    multiplier: 10
+```
+
+Each entry is a directory of **16 kHz mono `.wav`** files. Every file is copied `multiplier` times into `positive_train/`, appended after the TTS clips using the same `clip_NNNNNN.wav` numbering. Augmentation (RIR, background noise, EQ, distortion) then runs over every copy independently, so duplicates are not wasted — each one sees different acoustic conditions per round.
+
+- **Why a multiplier instead of a sampling weight?** The training sampler cycles through positives deterministically (see `batch_n_per_class`), so oversampling by duplication is how you increase per-voice exposure in this architecture. A multiplier of 50 over 143 recordings yields 7,150 positive copies that augment into ~14,300 unique features with `augmentation.rounds: 2`.
+- **No resampling.** Sample-rate or channel mismatches raise `ValueError` so a misconfigured source surfaces early rather than silently producing bad training data. Pre-convert with `sox in.wav -r 16000 -c 1 out.wav` or an equivalent ffmpeg one-liner.
+- **Resume-safe.** Each copy checks for its output path before writing, so interrupted runs pick up where they left off. The injection `start_index` is pinned to `n_samples`, so layout is deterministic even if TTS skipped some clips due to OOM.
+- **Train split only.** Custom recordings do not enter `positive_test`; eval runs against held-out TTS. Keep a separate held-out dir outside `custom_positive_samples` if you want to measure recall on real voices.
+
+### Minimal layout
+
+```
+data/
+└── my_recordings/
+    ├── take_001.wav   # 16 kHz mono
+    ├── take_002.wav
+    └── ...
+```
+
+Non-`.wav` files in the source directory are ignored with a warning. A missing path raises `FileNotFoundError` — typos are not silent.
+
 ## Adversarial Phrase Generation
 
 `generate_adversarial_phrases()` creates phonetically similar but incorrect phrases to train the model to reject near-misses. The resulting phrases are fed back through the active TTS backend to produce negative clips.
