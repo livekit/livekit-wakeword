@@ -63,7 +63,7 @@ sources = ["client/python/src", "train/src"]
 dev-mode-dirs = ["client/python/src", "train/src"]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["client/python/src", "train/src", "README.md", "LICENSE"]
+only-include = ["client/python/src", "train/src", "README.md", "LICENSE", "NOTICE"]
 
 [dependency-groups]
 dev = [
