@@ -3,7 +3,7 @@
 from .inference.listener import Detection, WakeWordListener
 from .inference.model import WakeWordModel
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 # Training / CLI imports are lazy-loaded so that the core inference API
 # works with only numpy + onnxruntime (no torch, pydantic, etc.).

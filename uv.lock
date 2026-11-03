@@ -1930,6 +1930,7 @@ wheels = [
 
 [[package]]
 name = "livekit-wakeword"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
@@ -2028,7 +2029,7 @@ requires-dist = [
     { name = "voxcpm", marker = "extra == 'voxcpm'", specifier = ">=2.0.0" },
     { name = "webrtcvad-wheels", marker = "extra == 'train'", specifier = ">=2.0.14" },
 ]
-provides-extras = ["eval", "export", "listener", "tflite", "train", "voxcpm"]
+provides-extras = ["listener", "train", "voxcpm", "eval", "export", "tflite"]
 
 [package.metadata.requires-dev]
 dev = [
