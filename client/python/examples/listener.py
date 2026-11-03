@@ -1,0 +1,20 @@
+"""Real-time wake word detection from microphone."""
+
+import asyncio
+from pathlib import Path
+
+from livekit.wakeword import WakeWordListener, WakeWordModel
+
+model = WakeWordModel(models=[Path(__file__).parents[3] / "models" / "hey_livekit.onnx"])
+
+
+async def main():
+    async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
+        print("Listening... Press Ctrl+C to stop.\n")
+        while True:
+            detection = await listener.wait_for_detection()
+            print(f"Detected {detection.name}! (confidence={detection.confidence:.2f})")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

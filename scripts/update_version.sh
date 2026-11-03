@@ -1,7 +1,9 @@
 #!/bin/sh
-# Set the package version in pyproject.toml and livekit.wakeword.__version__, then sync
-# uv.lock. Commit all three together in a "Release vX.Y.Z" PR; the publish workflow checks
-# that the pushed tag matches this version.
+# Set the release version everywhere it is written down, then sync uv.lock:
+#   pyproject.toml                                    the livekit-wakeword Python package
+#   client/esp32/livekit_wakeword/idf_component.yml   the ESP32 component
+# (Swift Package Manager versions come from the git tag.) Commit the result in a
+# "Release vX.Y.Z" PR; the publish workflow checks that the pushed tag matches.
 # Usage: scripts/update_version.sh <version>
 set -eu
 
@@ -18,15 +20,15 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-file="$REPO_ROOT/pyproject.toml"
-sed "s/^version = \".*\"/version = \"$VERSION\"/" "$file" > "$file.tmp"
-mv "$file.tmp" "$file"
-echo "updated $file"
+edit() {  # edit <file> <sed expression>
+    sed "$2" "$1" > "$1.tmp"
+    mv "$1.tmp" "$1"
+    echo "updated $1"
+}
 
-file="$REPO_ROOT/src/livekit/wakeword/__init__.py"
-sed "s/^__version__ = \".*\"/__version__ = \"$VERSION\"/" "$file" > "$file.tmp"
-mv "$file.tmp" "$file"
-echo "updated $file"
+edit "$REPO_ROOT/pyproject.toml" "s/^version = \".*\"/version = \"$VERSION\"/"
+edit "$REPO_ROOT/client/esp32/livekit_wakeword/idf_component.yml" \
+    "s/^version: \".*\"/version: \"$VERSION\"/"
 
 (cd "$REPO_ROOT" && uv lock)
 echo "updated $REPO_ROOT/uv.lock"

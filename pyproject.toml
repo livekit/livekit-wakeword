@@ -4,35 +4,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "livekit-wakeword"
-version = "0.3.0"
-description = "Wake word detection for voice-enabled applications"
+version = "2.0.0"
+description = "Type a wake word, get a streaming model: training and streaming detection for LiveKit wake word models"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-authors = [{ name = "Binh Pham", email = "binh.pham@livekit.io" }]
+authors = [{ name = "LiveKit", email = "hello@livekit.io" }]
 keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx", "tflite"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Multimedia :: Sound/Audio :: Speech",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-
+# detection (livekit.wakeword) needs only these; training is the `train` extra
 dependencies = [
     "numpy>=1.24",
     "onnxruntime>=1.17",
 ]
 
 [project.optional-dependencies]
-listener = [
-    "pyaudio>=0.2.14",
-]
-train = [
+listener = ["pyaudio>=0.2.14"]
+train = [  # livekit.wakeword_train and the CLI (Python 3.12+: dataset generation)
+    "livekit-wakeword-bench>=0.1.0; python_version >= '3.12'",  # LiveKit Inference TTS
     "torch>=2.5",
     "torchaudio>=2.5",
     "pydantic>=2.0",
@@ -40,31 +28,17 @@ train = [
     "pyyaml>=6.0",
     "rich>=13.0",
     "huggingface-hub>=0.20",
+    "safetensors>=0.4",  # pretrained encoders
     "soundfile>=0.12",
-    "torch-audiomentations>=0.11",
-    "audiomentations>=0.36",
-    "webrtcvad-wheels>=2.0.14",
-    "nltk>=3.8",
+    "soxr>=0.3",
+    "librosa>=0.10",  # mel filterbank
     "pronouncing>=0.2",
-    "scipy>=1.11",
-    "setuptools>=69.0,<81",
-    "librosa>=0.10",
-    "scikit-learn>=1.3",
-    "cmudict>=1.0",
-    "tqdm>=4.60",
-]
-voxcpm = [
-    "voxcpm>=2.0.0",
-]
-eval = [
-    "matplotlib>=3.8",
-]
-export = [
+    "setuptools>=69.0,<81",  # pronouncing imports pkg_resources
+    "pyarrow>=14",
     "onnx>=1.15",
-    "onnxruntime>=1.17",
-    "onnxscript>=0.6.2",
 ]
-tflite = [
+tflite = [  # micro models as int8 TFLite (without it, micro exports ONNX only)
+    "livekit-wakeword[train]",
     "onnx2tf>=1.22",
     "tensorflow>=2.15",
     "tf-keras>=2.15",
@@ -72,37 +46,37 @@ tflite = [
     "sng4onnx>=1.0.4",
     "psutil>=5.9",
     "ai-edge-litert>=1.0",
+    "onnxsim>=0.4",
 ]
-[project.urls]
-Homepage = "https://github.com/livekit/livekit-wakeword"
-Repository = "https://github.com/livekit/livekit-wakeword"
-Issues = "https://github.com/livekit/livekit-wakeword/issues"
 
 [project.scripts]
-livekit-wakeword = "livekit.wakeword.cli:app"
+livekit-wakeword = "livekit.wakeword._cli:main"
 
+[project.urls]
+Homepage = "https://github.com/livekit/livekit-wakeword"
+Issues = "https://github.com/livekit/livekit-wakeword/issues"
+
+# one distribution from two source trees: the client (client/python) and the trainer (train)
 [tool.hatch.build.targets.wheel]
-packages = ["src/livekit"]
-
-[tool.hatch.build.targets.wheel.sources]
-"src" = ""
-
-# Include bundled ONNX models for feature extraction
-[tool.hatch.build.targets.wheel.force-include]
-"src/livekit/wakeword/resources/melspectrogram.onnx" = "livekit/wakeword/resources/melspectrogram.onnx"
-"src/livekit/wakeword/resources/embedding_model.onnx" = "livekit/wakeword/resources/embedding_model.onnx"
+only-include = ["client/python/src/livekit", "train/src/livekit"]
+sources = ["client/python/src", "train/src"]
+dev-mode-dirs = ["client/python/src", "train/src"]
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "src/livekit/wakeword/**/*.py",
-    "src/livekit/wakeword/resources/*.onnx",
-]
+only-include = ["client/python/src", "train/src", "README.md", "LICENSE"]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pytest-cov>=4.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.8"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.8",
+    "tract>=0.22,<0.23",  # the Rust SDK (ort-tract 0.2)'s runtime: exports must load in it
+]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["client/python/tests", "train/tests"]
+addopts = "--import-mode=importlib"
 asyncio_mode = "auto"
 
 [tool.ruff]
@@ -112,10 +86,35 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
-# Vendored VITS graph (rhasspy/piper); keep upstream naming.
-[tool.ruff.lint.per-file-ignores]
-"src/livekit/wakeword/data/piper/vits/**" = ["E741"]
+[tool.ruff.lint.isort]
+known-first-party = ["livekit"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
+plugins = ["pydantic.mypy"]
+
+# Third-party packages without type stubs / py.typed markers.
+[[tool.mypy.overrides]]
+module = [
+    "ai_edge_litert",
+    "ai_edge_litert.*",
+    "livekit_wakeword_bench",
+    "livekit_wakeword_bench.*",
+    "onnx2tf",
+    "onnxsim",
+    "onnxruntime",
+    "onnxruntime.*",
+    "pronouncing",
+    "pyarrow",
+    "pyarrow.*",
+    "pyaudio",
+    "soundfile",
+    "soxr",
+    "tensorflow",
+    "librosa",
+    "torchaudio",
+    "torchaudio.*",
+    "yaml",
+]
+ignore_missing_imports = true

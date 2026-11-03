@@ -19,7 +19,7 @@ ENV/
 *.swp
 *.swo
 
-# Data & output (large files, top-level only)
+# Training output
 /data/
 /output/
 *.npy
@@ -58,3 +58,4 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
+/Package.resolved

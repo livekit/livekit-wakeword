@@ -1,0 +1,36 @@
+menu "livekit-wakeword"
+
+    config LKWW_MODEL_PATH
+        string "Wake word model (.tflite) to embed"
+        default ""
+        help
+            <name>_micro.tflite from `livekit-wakeword train --type micro`, relative to the
+            project. Embedded in the firmware and used by LKWW_DEFAULT_CONFIG(); leave empty to
+            pass your own model to lkww_create().
+
+    config LKWW_ARENA_KB
+        int "TensorFlow Lite Micro arena (KB, 0: size it to the model)"
+        default 0
+        range 0 1024
+        help
+            Working memory for the model. 0 measures what the model needs when the detector is
+            created (it briefly takes the largest free block, up to 256 KB) and allocates exactly
+            that; set a size to skip the measurement.
+
+    config LKWW_ARENA_IN_PSRAM
+        bool "Allocate the arena in PSRAM"
+        default n
+        depends on SPIRAM
+        help
+            Saves internal SRAM at the cost of slower inference.
+
+    config LKWW_TASK_CORE
+        int "Core for the inference task (-1: any)"
+        default 1
+        range -1 1
+
+    config LKWW_TASK_PRIORITY
+        int "Inference task priority"
+        default 5
+
+endmenu

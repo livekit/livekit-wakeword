@@ -1,0 +1,29 @@
+version: "2.0.0"
+description: On-device wake word detection for ESP32 (livekit-wakeword micro models, TensorFlow Lite Micro)
+url: https://github.com/livekit/livekit-wakeword
+repository: https://github.com/livekit/livekit-wakeword.git
+license: Apache-2.0
+tags:
+  - wake-word
+  - keyword-spotting
+  - voice
+  - livekit
+targets:
+  - esp32s3
+  - esp32p4
+  - esp32
+dependencies:
+  idf:
+    version: ">=5.4"
+  espressif/esp-tflite-micro: "^1.3.0"
+  # Record devices (codec boards, BSPs), the way the LiveKit ESP32 SDK takes its microphone
+  espressif/esp_codec_dev:
+    version: ">=1.3,<2"
+    public: true
+files:
+  exclude:
+    - "examples/**/build/**"
+    - "examples/**/managed_components/**"
+    - "examples/**/sdkconfig"
+    - "examples/**/sdkconfig.old"
+    - "examples/**/dependencies.lock"

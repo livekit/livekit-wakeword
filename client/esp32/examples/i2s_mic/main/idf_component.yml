@@ -1,0 +1,4 @@
+dependencies:
+  livekit/livekit_wakeword:
+    version: "*"
+    override_path: ../../../livekit_wakeword
