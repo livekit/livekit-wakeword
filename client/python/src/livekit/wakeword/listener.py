@@ -34,7 +34,7 @@ class WakeWordListener:
     """Streams the microphone through ``WakeWordModel.predict()`` in 80 ms frames.
 
     After a detection the loop pauses (and the model is reset) until ``wait_for_detection()`` is
-    called again::
+    called again. ``debounce`` is the minimum time between two detections of the same wake word::
 
         async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
             while True:
@@ -49,7 +49,7 @@ class WakeWordListener:
         self._pa: Any = None
         self._task: asyncio.Task[None] | None = None
         self._running = False
-        self._last_detection_time = 0.0
+        self._last_detection: dict[str, float] = {}  # per wake word, for `debounce`
         self._detection_queue: asyncio.Queue[Detection] = asyncio.Queue()
         self._error: BaseException | None = None
         # one worker thread for mic reads and predict(), off the event loop
@@ -64,13 +64,19 @@ class WakeWordListener:
             raise ImportError(f"WakeWordListener needs PyAudio: {PYAUDIO_HINT}") from e
 
         self._pa = pyaudio.PyAudio()
-        self._stream = self._pa.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=SAMPLE_RATE,
-            input=True,
-            frames_per_buffer=FRAME_SAMPLES,
-        )
+        try:
+            self._stream = self._pa.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=SAMPLE_RATE,
+                input=True,
+                frames_per_buffer=FRAME_SAMPLES,
+            )
+        except BaseException:
+            self._pa.terminate()
+            self._pa = None
+            raise
+        self._last_detection = {}
         self._running = True
         self._listening.set()
         self._done_event.clear()
@@ -99,8 +105,10 @@ class WakeWordListener:
         if self._stream:
             self._stream.stop_stream()
             self._stream.close()
+            self._stream = None
         if self._pa:
             self._pa.terminate()
+            self._pa = None
 
     async def _audio_loop(self) -> None:
         loop = asyncio.get_running_loop()
@@ -121,11 +129,9 @@ class WakeWordListener:
                     break
                 now = time.monotonic()
                 for name, score in scores.items():
-                    if (
-                        score >= self._threshold
-                        and now - self._last_detection_time >= self._debounce
-                    ):
-                        self._last_detection_time = now
+                    last = self._last_detection.get(name)
+                    if score >= self._threshold and (last is None or now - last >= self._debounce):
+                        self._last_detection[name] = now
                         self._listening.clear()
                         self._model.reset()
                         await self._detection_queue.put(

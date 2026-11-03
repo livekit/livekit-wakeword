@@ -215,7 +215,7 @@ def download_encoders(root: Path) -> Path:
         tarball = Path(tmp) / name
         try:
             _fetch_asset(repo, tag, name, tarball)
-        except (urllib.error.URLError, KeyError) as e:
+        except (OSError, KeyError, ValueError) as e:  # URLError, timeouts, bad JSON
             raise RuntimeError(
                 f"cannot download {name} from {repo} release {tag} ({e}). Check your network "
                 "(GH_TOKEN helps with GitHub rate limits), or set LIVEKIT_WAKEWORD_ENCODERS to an "

@@ -22,6 +22,7 @@ namespace {
 enum Mode { kNone, kFeed, kCodecDev, kI2s };
 constexpr size_t kFeedBufferBytes = LKWW_SAMPLE_RATE * sizeof(int16_t);  // 1 s
 constexpr uint32_t kTaskStack = 6 * 1024;
+constexpr size_t kCodecFrameSamples = 320;  // 20 ms per esp_codec_dev_read()
 }  // namespace
 
 struct lkww_detector {
@@ -36,6 +37,7 @@ struct lkww_detector {
     volatile float last_score = 0;
     volatile uint32_t last_step_us = 0;
     volatile uint32_t dropped = 0;
+    volatile bool reset_requested = false;  // lkww_reset() while the inference task runs
 
     Mode mode = kNone;
     volatile bool running = false;
@@ -44,6 +46,7 @@ struct lkww_detector {
     StreamBufferHandle_t feed = nullptr;
     lkww_codec_dev_config_t dev = {};
     bool dev_opened = false;
+    int16_t *dev_raw = nullptr;  // interleaved read buffer of the codec_dev task
     lkww_i2s_config_t mic = {};
     i2s_chan_handle_t rx = nullptr;
 };
@@ -69,10 +72,21 @@ static void run_step(lkww_detector *ww)
     }
 }
 
+/* Runs on the thread that steps the model, so the reset never lands mid-step. */
+static void apply_reset(lkww_detector *ww)
+{
+    if (ww->reset_requested) {
+        ww->reset_requested = false;
+        ww->det->Reset();
+        ww->n_pending = 0;
+    }
+}
+
 static float push(lkww_detector *ww, const int16_t *pcm, size_t n)
 {
     float best = 0;
     while (n > 0) {
+        apply_reset(ww);
         size_t k = LKWW_STEP_SAMPLES - ww->n_pending;
         if (k > n) {
             k = n;
@@ -211,8 +225,10 @@ void lkww_reset(lkww_handle_t ww)
     if (ww == nullptr) {
         return;
     }
-    ww->det->Reset();
-    ww->n_pending = 0;
+    ww->reset_requested = true;
+    if (!ww->running) {
+        apply_reset(ww);  // no inference task: reset now
+    }  // else the inference task resets before its next samples (also from on_detect)
 }
 
 float lkww_last_score(lkww_handle_t ww) { return ww ? ww->last_score : 0.0f; }
@@ -248,14 +264,10 @@ static void codec_dev_task(void *arg)
 {
     lkww_detector *ww = (lkww_detector *)arg;
     const lkww_codec_dev_config_t &dev = ww->dev;
-    const size_t frame_samples = 320;
+    const size_t frame_samples = kCodecFrameSamples;
     const size_t stride = read_channels(dev);  // the driver drops channels outside the mask
-    int16_t *raw = (int16_t *)malloc(frame_samples * stride * sizeof(int16_t));
+    int16_t *raw = ww->dev_raw;  // allocated by lkww_start_codec_dev: this task never exits early
     int16_t mono[frame_samples];
-    if (raw == nullptr) {
-        ESP_LOGE(TAG, "out of memory");
-        ww->running = false;
-    }
     while (ww->running) {
         int ret = esp_codec_dev_read(dev.handle, raw, frame_samples * stride * sizeof(int16_t));
         if (ret != ESP_CODEC_DEV_OK) {
@@ -268,7 +280,6 @@ static void codec_dev_task(void *arg)
         }
         push(ww, mono, frame_samples);
     }
-    free(raw);
     finish_task(ww);
 }
 
@@ -357,6 +368,13 @@ esp_err_t lkww_start_codec_dev(lkww_handle_t ww, const lkww_codec_dev_config_t *
         (dev->channel_mask >> dev->channels) != 0 || dev->channel >= read_channels(*dev)) {
         return ESP_ERR_INVALID_ARG;
     }
+    if (ww->running) {  // before touching ww->dev, which the running task reads
+        return ESP_ERR_INVALID_STATE;
+    }
+    int16_t *raw = (int16_t *)malloc(kCodecFrameSamples * read_channels(*dev) * sizeof(int16_t));
+    if (raw == nullptr) {
+        return ESP_ERR_NO_MEM;
+    }
     if (!dev->skip_open) {
         esp_codec_dev_sample_info_t fs = {};
         fs.sample_rate = LKWW_SAMPLE_RATE;
@@ -365,18 +383,32 @@ esp_err_t lkww_start_codec_dev(lkww_handle_t ww, const lkww_codec_dev_config_t *
         fs.channel_mask = dev->channel_mask;
         if (esp_codec_dev_open(dev->handle, &fs) != ESP_CODEC_DEV_OK) {
             ESP_LOGE(TAG, "esp_codec_dev_open failed");
+            free(raw);
             return ESP_FAIL;
         }
     }
     ww->dev = *dev;
     ww->dev_opened = !dev->skip_open;
-    return start_task(ww, kCodecDev, codec_dev_task, "lkww_codec");
+    ww->dev_raw = raw;
+    esp_err_t err = start_task(ww, kCodecDev, codec_dev_task, "lkww_codec");
+    if (err != ESP_OK) {
+        if (ww->dev_opened) {
+            esp_codec_dev_close(dev->handle);
+            ww->dev_opened = false;
+        }
+        free(ww->dev_raw);
+        ww->dev_raw = nullptr;
+    }
+    return err;
 }
 
 esp_err_t lkww_start_i2s(lkww_handle_t ww, const lkww_i2s_config_t *mic)
 {
     if (ww == nullptr || mic == nullptr || mic->gain_shift < 0 || mic->gain_shift > 8) {
         return ESP_ERR_INVALID_ARG;
+    }
+    if (ww->running) {  // before creating a channel over the running one's ww->rx
+        return ESP_ERR_INVALID_STATE;
     }
     i2s_chan_config_t chan = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     ESP_RETURN_ON_ERROR(i2s_new_channel(&chan, nullptr, &ww->rx), TAG, "i2s_new_channel");
@@ -399,7 +431,13 @@ esp_err_t lkww_start_i2s(lkww_handle_t ww, const lkww_i2s_config_t *mic)
         return err;
     }
     ww->mic = *mic;
-    return start_task(ww, kI2s, i2s_task, "lkww_i2s");
+    err = start_task(ww, kI2s, i2s_task, "lkww_i2s");
+    if (err != ESP_OK) {
+        i2s_channel_disable(ww->rx);
+        i2s_del_channel(ww->rx);
+        ww->rx = nullptr;
+    }
+    return err;
 }
 
 esp_err_t lkww_stop(lkww_handle_t ww)
@@ -412,9 +450,16 @@ esp_err_t lkww_stop(lkww_handle_t ww)
     }
     ww->running = false;
     xSemaphoreTake(ww->done, portMAX_DELAY);
-    if (ww->mode == kCodecDev && ww->dev_opened) {
-        esp_codec_dev_close(ww->dev.handle);
-        ww->dev_opened = false;
+    if (ww->mode == kCodecDev) {
+        if (ww->dev_opened) {
+            esp_codec_dev_close(ww->dev.handle);
+            ww->dev_opened = false;
+        }
+        free(ww->dev_raw);
+        ww->dev_raw = nullptr;
+    }
+    if (ww->mode == kFeed && ww->feed) {
+        xStreamBufferReset(ww->feed);  // no stale audio when lkww_feed() starts it again
     }
     if (ww->mode == kI2s && ww->rx) {
         i2s_channel_disable(ww->rx);

@@ -22,6 +22,7 @@ try await listener.start()
 for await detection in listener.detections() {
     print("Detected \(detection.name) (\(detection.confidence))")
 }
+// the stream ends on stop(), or if the model fails: then `await listener.error` says why
 ```
 
 `executionProvider:` picks the ONNX Runtime provider. The listener needs `NSMicrophoneUsageDescription`

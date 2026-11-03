@@ -32,6 +32,11 @@ final class AudioResampler {
         converter = conv
     }
 
+    /// Drops the converter's filter history (the tail of the audio fed before).
+    func reset() {
+        converter.reset()
+    }
+
     func resample(samples: UnsafeBufferPointer<Int16>) throws -> [Float] {
         let count = samples.count
         guard count > 0, let base = samples.baseAddress else { return [] }

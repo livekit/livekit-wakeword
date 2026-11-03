@@ -74,21 +74,36 @@ CONFIG = typer.Option(
 
 
 def _config(wakeword: str | None, config_path: Path | None, **overrides: object) -> WakeWordConfig:
-    """--config, else <name>.yaml if present, else the defaults; plus CLI overrides."""
+    """--config, else <name>.yaml if present, else the defaults; plus CLI overrides (validated
+    like the YAML, so e.g. `--steps 0` is refused here rather than failing mid-training)."""
+    from pydantic import ValidationError
+
     from .config import WakeWordConfig, default_config_path, load_config
 
     if config_path is None and wakeword and default_config_path(wakeword).exists():
         config_path = default_config_path(wakeword)
-    if config_path is not None:
-        cfg = load_config(config_path)
-        if wakeword and wakeword != cfg.wakeword:
-            raise typer.BadParameter(f"{config_path} is for {cfg.wakeword!r}, not {wakeword!r}")
-    elif wakeword:
-        cfg = WakeWordConfig(wakeword=wakeword)
-    else:
-        raise typer.BadParameter("give --wakeword (or --config)")
-    changes = {k: v for k, v in overrides.items() if v is not None}
-    return cfg.model_copy(update=changes) if changes else cfg
+    try:
+        if config_path is not None:
+            cfg = load_config(config_path)
+            if wakeword and wakeword != cfg.wakeword:
+                raise typer.BadParameter(f"{config_path} is for {cfg.wakeword!r}, not {wakeword!r}")
+        elif wakeword:
+            cfg = WakeWordConfig(wakeword=wakeword)
+        else:
+            raise typer.BadParameter("give --wakeword (or --config)")
+        changes = {k: v for k, v in overrides.items() if v is not None}
+        return with_changes(cfg, **changes) if changes else cfg
+    except ValidationError as e:
+        where = f" in {config_path}" if config_path is not None else ""
+        problems = "; ".join(
+            f"{'.'.join(map(str, err['loc'])) or 'config'}: {err['msg']}" for err in e.errors()
+        )
+        raise _fail(f"invalid settings{where}: {problems}") from None
+
+
+def with_changes(cfg: WakeWordConfig, **changes: object) -> WakeWordConfig:
+    """`cfg` with `changes`, validated (`model_copy(update=...)` would skip validation)."""
+    return type(cfg).model_validate({**cfg.model_dump(), **changes})
 
 
 @app.command()
@@ -143,7 +158,7 @@ def setup(
         **counts,
     )
     if words:
-        cfg = cfg.model_copy(update={"pronunciations": {**cfg.pronunciations, **words}})
+        cfg = with_changes(cfg, pronunciations={**cfg.pronunciations, **words})
     problems = check_environment(cfg)  # before writing anything
     if problems:
         raise _fail("cannot set up:\n  - " + "\n  - ".join(problems))
@@ -208,6 +223,8 @@ def eval_cmd(
 
     cfg = _config(wakeword, config_path)
     path = model or cfg.model_path(type.value)
+    if model is None and not path.exists() and path.with_suffix(".onnx").exists():
+        path = path.with_suffix(".onnx")  # micro without the tflite extra: <name>_micro.onnx
     try:
         s = run_eval(cfg, path, media=media)
     except SetupError as e:

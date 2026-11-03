@@ -18,6 +18,13 @@ def audio() -> np.ndarray:
     return (rng.standard_normal(16000 * 3) * 0.05).astype(np.float32)
 
 
+def test_unload_model() -> None:
+    model = WakeWordModel(models=[FIXTURE])
+    assert model.unload_model("streaming_tiny") and model.model_names == []
+    assert not model.unload_model("streaming_tiny")
+    assert model.predict(np.zeros(1280, np.float32)) == {}
+
+
 def test_model_names() -> None:
     model = WakeWordModel(models=[FIXTURE])
     assert model.model_names == ["streaming_tiny"]

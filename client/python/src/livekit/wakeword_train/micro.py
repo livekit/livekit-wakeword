@@ -352,6 +352,8 @@ def export_micro(
         tfl = out_dir / f"{name}_micro.tflite"
         out["tflite"] = convert_micro_tflite(m, onnx_path, tfl, dataset)
     except Exception as e:  # keep the ONNX model; TFLite is an extra artifact
+        # a .tflite from an earlier run would otherwise sit next to the new model unnoticed
+        tfl.unlink(missing_ok=True)
         logger.warning("TFLite conversion failed (%s); %s is still usable", e, onnx_path)
     return out
 
@@ -495,6 +497,14 @@ class MicroRuntime:
         if side.exists():
             p = json.loads(side.read_text())["mel_params"]
             self.mel_params = (float(p[0]), float(p[1]), float(p[2]))
+        else:
+            logger.warning(
+                "%s not found: using the default log-mel parameters %s, which may not be the "
+                "ones %s was trained with (keep the .json next to the model)",
+                side.name,
+                self.mel_params,
+                path.name,
+            )
         if path.suffix == ".tflite":
             from ai_edge_litert.interpreter import Interpreter
 

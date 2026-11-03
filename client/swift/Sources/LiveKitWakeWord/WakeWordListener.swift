@@ -26,6 +26,9 @@ public struct Detection: Sendable {
 
 /// Streams the microphone through a ``WakeWordModel`` and emits ``Detection``s.
 ///
+/// If the model fails, the listener stops, every detection stream finishes and ``error`` says
+/// why.
+///
 /// ```swift
 /// let model = try WakeWordModel(models: [heyLiveKitURL], sampleRate: 16_000)
 /// let listener = WakeWordListener(model: model)
@@ -37,10 +40,14 @@ public actor WakeWordListener {
     /// Minimum time between two detections of the same wake word.
     public let debounce: TimeInterval
 
+    /// Why the listener stopped on its own (the model failed), if it did; cleared by ``start()``.
+    public private(set) var error: Error?
+
     private let model: WakeWordModel
     private var engine: AVAudioEngine?
-    private var pending: [Int16] = []
-    private var inflight = false
+    // microphone buffers, in capture order, to the task that runs the model
+    private var audio: AsyncStream<[Int16]>.Continuation?
+    private var consumer: Task<Void, Never>?
     private var lastDetectionAt: [String: Date] = [:]
     private var continuations: [UUID: AsyncStream<Detection>.Continuation] = [:]
 
@@ -71,17 +78,31 @@ public actor WakeWordListener {
         else {
             throw WakeWordError.unsupportedSampleRate(rate: UInt32(hwFormat.sampleRate))
         }
-        pending = []
-        inflight = false
         lastDetectionAt = [:]
+        error = nil
         self.engine = engine
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buffer, _ in
-            guard let self, let samples = Self.convert(buffer, converter, target) else { return }
-            Task { await self.ingest(samples) }
+        // One stream rather than a Task per buffer: separate Tasks may reach the actor out of
+        // order, and the model must see the audio in order.
+        let (stream, continuation) = AsyncStream<[Int16]>.makeStream()
+        audio = continuation
+        consumer = Task { [weak self] in
+            for await samples in stream {
+                guard let self else { return }
+                await self.ingest(samples)
+            }
+        }
+        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { buffer, _ in
+            guard let samples = Self.convert(buffer, converter, target) else { return }
+            continuation.yield(samples)
         }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            stop()
+            throw error
+        }
     }
 
     /// Stops capturing and finishes every detection stream.
@@ -89,11 +110,13 @@ public actor WakeWordListener {
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
+        audio?.finish()
+        audio = nil
+        consumer?.cancel()
+        consumer = nil
         #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
         #endif
-        pending = []
-        inflight = false
         for c in continuations.values { c.finish() }
         continuations.removeAll()
     }
@@ -114,13 +137,16 @@ public actor WakeWordListener {
     private func remove(_ id: UUID) { continuations.removeValue(forKey: id) }
 
     private func ingest(_ samples: [Int16]) {
-        pending.append(contentsOf: samples)
-        guard !inflight, !pending.isEmpty else { return }
-        inflight = true
-        defer { inflight = false }
-        let batch = pending
-        pending.removeAll(keepingCapacity: true)
-        guard let scores = try? model.predict(batch) else { return }
+        guard engine != nil else { return }  // stopped; buffers still in the stream are dropped
+        let scores: [String: Float]
+        do {
+            scores = try model.predict(samples)
+        } catch {
+            // like the Python listener's crashed audio loop: stop, and say why in `error`
+            self.error = error
+            stop()
+            return
+        }
         let now = Date()
         var fired = false
         for (name, confidence) in scores where confidence >= threshold {

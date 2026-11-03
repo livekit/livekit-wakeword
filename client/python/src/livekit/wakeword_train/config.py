@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 ModelType = Literal["standard", "micro"]
 PLANS = ("build", "ship", "scale")  # LiveKit Cloud plans: 5 / 20 / 50 concurrent TTS requests
@@ -19,7 +19,15 @@ def slug(phrase: str) -> str:
     return re.sub(r"[^\w]+", "_", phrase.lower(), flags=re.UNICODE).strip("_") or "wakeword"
 
 
+def is_english(language: str) -> bool:
+    """Whether a language code is English ("en", "en-US", "en_GB", ...)."""
+    return re.split(r"[-_]", language.strip().lower())[0] == "en"
+
+
 class WakeWordConfig(BaseModel):
+    # a misspelt key would otherwise fall back to its default without a word
+    model_config = ConfigDict(extra="forbid")
+
     wakeword: str = Field(min_length=1, description='The wake phrase, e.g. "hey livekit"')
     model_name: str | None = Field(None, description="Output file stem (default: from the phrase)")
     language: str = Field("en", description="Language of the phrase (TTS voices)")

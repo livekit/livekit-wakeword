@@ -111,6 +111,10 @@ class WakeWordModel:
         self._models[name] = _Stream(session)
         logger.info("Loaded wake word model '%s' from %s", name, model_path)
 
+    def unload_model(self, model_name: str) -> bool:
+        """Remove a model; returns whether it was loaded."""
+        return self._models.pop(model_name, None) is not None
+
     @property
     def model_names(self) -> list[str]:
         return list(self._models)

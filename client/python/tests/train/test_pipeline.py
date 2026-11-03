@@ -111,7 +111,13 @@ def test_setup_regenerates_when_clip_counts_change(
             "n_adversarial": knobs["splits__train__n_adversarial"],
             "n_speech": knobs["splits__train__n_speech"],
         }
-        (out / "bench_config.yaml").write_text(yaml.safe_dump({"splits": {"train": split}}))
+        bench = {
+            "wake_word": config.wakeword,
+            "language": config.language,
+            "pronunciations": dict(config.pronunciations),
+            "splits": {"train": split},
+        }
+        (out / "bench_config.yaml").write_text(yaml.safe_dump(bench))
 
     monkeypatch.setattr("livekit.wakeword_train.config.CACHE", tmp_path / "cache")
     monkeypatch.setattr(pipeline, "check_environment", lambda config: [])
@@ -130,6 +136,59 @@ def test_setup_regenerates_when_clip_counts_change(
     pipeline.run_setup(cfg.model_copy(update={"n_positive": 2000}))
     assert made[2:] == [("steered", True, 2000), ("natural", True, 2000)]
     assert not (cfg.runs_dir / "standard.pt").exists()  # the old teacher learned from other speech
+    # a changed pronunciation: the old clips say the phrase differently
+    bigger = cfg.model_copy(update={"n_positive": 2000})
+    pipeline.run_setup(bigger)
+    assert len(made) == 4
+    pipeline.run_setup(bigger.model_copy(update={"pronunciations": {"test": "T EH1 S T"}}))
+    assert [m[:2] for m in made[4:]] == [("steered", True), ("natural", True)]
+
+
+def test_cli_overrides_are_validated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from livekit.wakeword_train import cli
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.check_environment", lambda cfg: [])
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.run_setup", lambda cfg, eval=False: [])
+    runner = CliRunner()
+    r = runner.invoke(cli.app, ["setup", "-w", "hey robot", "--concurrency", "0"])
+    assert r.exit_code == 1 and "concurrency" in r.output
+    assert not Path("hey_robot.yaml").exists()
+    r = runner.invoke(cli.app, ["train", "-w", "hey robot", "--steps", "0"])
+    assert r.exit_code == 1 and "steps" in r.output
+    Path("hey_robot.yaml").write_text("wakeword: hey robot\nmicro_step: 10\n")  # typo
+    r = runner.invoke(cli.app, ["train", "-w", "hey robot"])
+    assert r.exit_code == 1 and "micro_step" in r.output and "hey_robot.yaml" in r.output
+
+
+def test_language_codes() -> None:
+    from livekit.wakeword_train.config import is_english
+    from livekit.wakeword_train.pipeline import natural_positives_help, phrase_problems
+
+    assert is_english("en") and is_english("en-US") and is_english("EN_gb")
+    assert not is_english("es") and not is_english("eng-x")
+    assert "zork" in phrase_problems(WakeWordConfig(wakeword="hey zork", language="en-US"))[0]
+    assert not natural_positives_help("hey livekit", language="en-US")
+
+
+def test_clip_cache_follows_the_dataset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+
+    from livekit.wakeword_train import data
+
+    ds = tmp_path / "ds"
+    (ds / "data").mkdir(parents=True)
+    parquet = ds / "data" / "train-00000.parquet"
+    parquet.touch()
+    cdir = tmp_path / "cache"
+    assert not data._cache_fresh(cdir, ds)
+    for c in data._CATS:
+        (cdir / c).mkdir(parents=True)
+        (cdir / c / "ends.npy").touch()
+    assert data._cache_fresh(cdir, ds)
+    later = (cdir / "speech" / "ends.npy").stat().st_mtime + 10
+    os.utime(parquet, (later, later))  # regenerated after the cache was built
+    assert not data._cache_fresh(cdir, ds)
 
 
 def test_cli_setup_checks_before_writing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -193,3 +252,20 @@ def test_generate_knobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     assert calls[-1]["pronunciations__zork"] == '"Z AO1 R K"' and "tts__phonemes" not in calls[-1]
     pipeline._generate(WakeWordConfig(wakeword="xin chào", language="vi"), tmp_path, ["train"])
     assert calls[-1]["tts__phonemes"] is False and "pronunciations__xin" in calls[-1]
+
+
+def test_default_aug_follows_the_log_mel_floor() -> None:
+    import torch
+
+    from livekit.wakeword_train.augment import AugConfig, robust_aug
+    from livekit.wakeword_train.loop import default_aug
+    from livekit.wakeword_train.nn import MEL_DEFAULT, MEL_LOW_FLOOR, LogMel
+
+    def det(params: tuple[float, float, float]) -> torch.nn.Module:
+        m = torch.nn.Module()
+        m.encoder = torch.nn.Module()
+        m.encoder.frontend = LogMel(params=params)
+        return m
+
+    assert default_aug(det(MEL_DEFAULT)) == AugConfig(p_codec=0.25)  # float32 params
+    assert default_aug(det(MEL_LOW_FLOOR)) == robust_aug()
