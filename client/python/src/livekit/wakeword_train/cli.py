@@ -256,28 +256,6 @@ def listen(
     threshold: float = typer.Option(0.5, "--threshold", help="Detection threshold"),
 ) -> None:
     """Listen on the microphone and print detections."""
-    import asyncio
+    from livekit.wakeword._listen import run
 
-    from livekit.wakeword.listener import PYAUDIO_HINT, WakeWordListener
-    from livekit.wakeword.model import WakeWordModel
-
-    try:
-        import pyaudio  # noqa: F401
-    except ImportError:
-        raise _fail(f"listen needs PyAudio: {PYAUDIO_HINT}") from None
-    try:
-        model = WakeWordModel(models=list(models))
-    except (FileNotFoundError, ValueError) as e:
-        raise _fail(str(e)) from None
-
-    async def _run() -> None:
-        async with WakeWordListener(model, threshold=threshold) as listener:
-            logger.info(f"Listening for {', '.join(model.model_names)} (Ctrl+C to stop)")
-            while True:
-                d = await listener.wait_for_detection()
-                logger.info(f"Detected {d.name} ({d.confidence:.2f})")
-
-    try:
-        asyncio.run(_run())
-    except KeyboardInterrupt:
-        pass
+    run(models, threshold)

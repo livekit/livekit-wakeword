@@ -157,16 +157,16 @@ downloads the pretrained encoders from the v2.0.0 release once.
 livekit-wakeword setup --wakeword "hey robot" --eval  # training speech + held-out test set
 livekit-wakeword train --wakeword "hey robot" --type standard
 livekit-wakeword eval --wakeword "hey robot"          # bench score on a held-out test set
-livekit-wakeword listen hey_robot.onnx                # try it on your microphone (see below)
+uvx --from "livekit-wakeword[listener]" livekit-wakeword listen hey_robot.onnx  # try it live
 ```
 
 A new phrase takes about 11 minutes on one data-center GPU (6 minutes of speech generation, 5 of
 training). On an M4 Pro Mac, speech generation took 22 minutes and training 37. The first run
 downloads about 4 GB of noise, room and speech sources once.
 
-`listen` needs PyAudio. Add it to the CLI with
-`uv tool install --python 3.13 "livekit-wakeword[tflite,listener]"`; PyAudio builds against
-PortAudio (`brew install portaudio` on macOS, `apt install portaudio19-dev` on Debian/Ubuntu).
+`listen` runs on the detection client alone (no trainer), so `uvx` fetches just that and PyAudio,
+on any machine. PyAudio builds against PortAudio: `brew install portaudio` on macOS,
+`apt install portaudio19-dev` on Debian/Ubuntu.
 
 **For ESP32**, also train a micro model (about 7 more minutes):
 
