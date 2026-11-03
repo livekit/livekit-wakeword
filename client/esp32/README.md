@@ -41,7 +41,7 @@ dependencies:
   livekit/livekit_wakeword:
     git: https://github.com/livekit/livekit-wakeword.git
     path: client/esp32/livekit_wakeword
-    version: v2.0.0  # a release tag (or a branch / commit)
+    version: v2.1.0  # a release tag (or a branch / commit)
 ```
 
 Then set the model in `idf.py menuconfig` → **livekit-wakeword** → *Wake word model (.tflite) to
