@@ -1,0 +1,12 @@
+livekit-wakeword
+Copyright 2025-2026 LiveKit, Inc.
+
+This product includes software and machine learning models developed at LiveKit, Inc.
+(https://livekit.io/), including the pretrained encoders livekit-wakeword-encoder-standard
+and livekit-wakeword-encoder-micro and the models built from them.
+
+The source code and the model weights (*.onnx, *.tflite, encoders.tar.gz) are licensed
+under the Apache License, Version 2.0. See LICENSE.
+
+The models were trained in part on synthetic speech. LiveKit makes no representation
+about how suitable they are for any particular use; see LICENSE for the warranty disclaimer.
