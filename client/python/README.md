@@ -1,7 +1,7 @@
 # Python
 
 Streaming wake word detection with ONNX Runtime (Python 3.11+). Models come from
-[`train/`](../../train) or the [release](../../README.md#models).
+[training](TRAINING.md) or the [release](../../README.md#models).
 
 ```bash
 uv add livekit-wakeword                          # detection only: numpy + onnxruntime

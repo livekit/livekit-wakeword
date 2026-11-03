@@ -23,6 +23,10 @@ class WakeWordConfig(BaseModel):
     wakeword: str = Field(min_length=1, description='The wake phrase, e.g. "hey livekit"')
     model_name: str | None = Field(None, description="Output file stem (default: from the phrase)")
     language: str = Field("en", description="Language of the phrase (TTS voices)")
+    pronunciations: dict[str, str] = Field(
+        default_factory=dict,
+        description='ARPAbet for words outside the CMU dictionary, e.g. {"zork": "Z AO1 R K"}',
+    )
     output_dir: Path = Field(Path("."), description="Where models are written")
     data_dir: Path | None = Field(
         None, description="Where generated speech lives (default: the cache, per wake word)"
@@ -63,6 +67,8 @@ class WakeWordConfig(BaseModel):
     def save(self, path: str | Path) -> Path:
         path = Path(path)
         data = self.model_dump(mode="json", exclude_none=True)
+        if not data["pronunciations"]:
+            del data["pronunciations"]
         path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
         return path
 

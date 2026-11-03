@@ -53,6 +53,7 @@ def test_cli_commands(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "livekit.wakeword_train.pipeline.run_train",
         lambda cfg, type="standard": calls.append((type, cfg)) or Path("x.onnx"),
     )
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.check_environment", lambda cfg: [])
     runner = CliRunner()
     r = runner.invoke(cli.app, ["setup", "--wakeword", "hey robot", "--plan", "ship"])
     assert r.exit_code == 0, r.output
@@ -79,6 +80,7 @@ def test_cli_clips_and_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         "livekit.wakeword_train.pipeline.run_train",
         lambda cfg, type="standard": calls.append(cfg) or Path("x.onnx"),
     )
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.check_environment", lambda cfg: [])
     runner = CliRunner()
     r = runner.invoke(cli.app, ["setup", "-w", "hey robot", "--clips", "4"])
     assert r.exit_code == 0, r.output
@@ -128,3 +130,64 @@ def test_setup_regenerates_when_clip_counts_change(
     pipeline.run_setup(cfg.model_copy(update={"n_positive": 2000}))
     assert made[2:] == [("steered", True, 2000), ("natural", True, 2000)]
     assert not (cfg.runs_dir / "standard.pt").exists()  # the old teacher learned from other speech
+
+
+def test_cli_setup_checks_before_writing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from livekit.wakeword_train import cli
+
+    monkeypatch.chdir(tmp_path)
+    for k in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"):
+        monkeypatch.delenv(k, raising=False)
+    runner = CliRunner()
+    r = runner.invoke(cli.app, ["setup", "-w", "hey zork"])
+    assert r.exit_code == 1
+    assert "LIVEKIT_URL" in r.output and "--pronounce" in r.output and "zork" in r.output
+    assert not Path("hey_zork.yaml").exists()  # nothing written when setup cannot run
+    assert runner.invoke(cli.app, ["--version"]).output.startswith("livekit-wakeword ")
+    r = runner.invoke(cli.app, ["eval", "-w", "hey zork", "-m", "missing.onnx"])
+    assert r.exit_code == 1 and "no model at missing.onnx" in r.output
+
+
+def test_cli_pronounce_is_saved(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from livekit.wakeword_train import cli, pipeline
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline, "run_setup", lambda cfg, eval=False: [])
+    seen: list[list[str]] = []
+    monkeypatch.setattr(
+        pipeline, "check_environment", lambda cfg: seen.append(pipeline.phrase_problems(cfg)) or []
+    )
+    r = CliRunner().invoke(cli.app, ["setup", "-w", "hey zork", "--pronounce", "Zork=Z AO1 R K"])
+    assert r.exit_code == 0, r.output
+    assert seen == [[]]  # the pronunciation covers the unknown word
+    assert load_config("hey_zork.yaml").pronunciations == {"zork": "Z AO1 R K"}
+
+
+def test_phrase_pronunciations() -> None:
+    from livekit.wakeword_train.pipeline import _wanted, phoneme_steered, phrase_problems
+
+    assert phrase_problems(WakeWordConfig(wakeword="hey livekit")) == []  # live + kit
+    zork = WakeWordConfig(wakeword="hey zork")
+    assert "zork" in phrase_problems(zork)[0] and not phoneme_steered(zork)
+    fixed = zork.model_copy(update={"pronunciations": {"zork": "Z AO1 R K"}})
+    assert phrase_problems(fixed) == [] and phoneme_steered(fixed)
+    bad = zork.model_copy(update={"pronunciations": {"zork": "zork"}})
+    assert "not ARPAbet" in phrase_problems(bad)[0]
+    # other languages: no error, plain-text TTS only, one set with every clip
+    vi = WakeWordConfig(wakeword="xin chào", language="vi")
+    assert phrase_problems(vi) == [] and not phoneme_steered(vi)
+    assert _wanted(vi) == {"natural": (1000, 500, 150)}
+
+
+def test_generate_knobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import livekit_wakeword_bench
+
+    from livekit.wakeword_train import pipeline
+
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
+    cfg = WakeWordConfig(wakeword="hey zork", pronunciations={"zork": "Z AO1 R K"})
+    pipeline._generate(cfg, tmp_path, ["train"])
+    assert calls[-1]["pronunciations__zork"] == '"Z AO1 R K"' and "tts__phonemes" not in calls[-1]
+    pipeline._generate(WakeWordConfig(wakeword="xin chào", language="vi"), tmp_path, ["train"])
+    assert calls[-1]["tts__phonemes"] is False and "pronunciations__xin" in calls[-1]

@@ -1,15 +1,15 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/.github/banner_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="/.github/banner_light.png">
-  <img style="width:100%;" alt="The LiveKit icon, the name of the repository and some sample code in the background." src="/.github/banner_light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/banner_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/banner_light.png">
+  <img style="width:100%;" alt="The LiveKit icon, the name of the repository and some sample code in the background." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/banner_light.png">
 </picture>
 
 # LiveKit WakeWord
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](client/python)
-[![Swift](https://img.shields.io/badge/swift-iOS%20%7C%20macOS-orange)](client/swift)
-[![ESP32](https://img.shields.io/badge/ESP32-TFLite%20Micro-red)](client/esp32)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://github.com/livekit/livekit-wakeword/tree/main/client/python)
+[![Swift](https://img.shields.io/badge/swift-iOS%20%7C%20macOS-orange)](https://github.com/livekit/livekit-wakeword/tree/main/client/swift)
+[![ESP32](https://img.shields.io/badge/ESP32-TFLite%20Micro-red)](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/livekit/livekit-wakeword/blob/main/LICENSE)
 
 **[Why LiveKit WakeWord](#why-livekit-wakeword) · [Comparison](#comparison) ·
 [Guides and examples](#guides-and-examples) · [Train your own](#train-a-wake-word) ·
@@ -48,13 +48,13 @@ words, nanowakeword 49%, and openWakeWord 46%. Their training times were 11, 34 
 respectively. Streaming inference used 16.5, 30.5 and 29.5 ms of CPU time per second of audio.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/accuracy_dark.png">
-  <img width="100%" alt="More accurate at every false-alarm budget. Wake words caught at 0.1, 0.5 and 1 false alarms per hour: LiveKit 87%, 89%, 90%; LiveKit micro 24%, 78%, 79%; nanowakeword 0%, 49%, 55%; openWakeWord 32%, 46%, 52%; microWakeWord 0%, 0%, 24%." src="/.github/assets/accuracy_light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/accuracy_dark.png">
+  <img width="100%" alt="More accurate at every false-alarm budget. Wake words caught at 0.1, 0.5 and 1 false alarms per hour: LiveKit 87%, 89%, 90%; LiveKit micro 24%, 78%, 79%; nanowakeword 0%, 49%, 55%; openWakeWord 32%, 46%, 52%; microWakeWord 0%, 0%, 24%." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/accuracy_light.png">
 </picture>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/speed_dark.png">
-  <img width="100%" alt="Faster to train, lighter to run. Train time: LiveKit 11 min, LiveKit micro 18 min, nanowakeword 34, openWakeWord 94, microWakeWord 39. Wake-word clips: 1k and 1k against 2.5k, 100k and 25k. CPU per second of audio: 16.5 and 18 ms against 30.5, 29.5 and 2.2 ms." src="/.github/assets/speed_light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/speed_dark.png">
+  <img width="100%" alt="Faster to train, lighter to run. Train time: LiveKit 11 min, LiveKit micro 18 min, nanowakeword 34, openWakeWord 94, microWakeWord 39. Wake-word clips: 1k and 1k against 2.5k, 100k and 25k. CPU per second of audio: 16.5 and 18 ms against 30.5, 29.5 and 2.2 ms." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/speed_light.png">
 </picture>
 
 The micro model detected 78% of wake words at the same false-alarm rate. microWakeWord scored
@@ -93,9 +93,9 @@ run. Use a [ready-made model](#models) or one you trained yourself.
 
 | Platform | Installation and usage | Examples |
 |---|---|---|
-| Python | [Python README](client/python/README.md) | [Audio clip inference](client/python/examples/inference.py) · [Microphone listener](client/python/examples/listener.py) |
-| Swift | [Swift README](client/swift/README.md) | [SwiftUI demo for iOS and macOS, with setup instructions](client/swift/Example/README.md) |
-| ESP32 | [ESP32 README](client/esp32/README.md) | [I2S microphone detection](client/esp32/examples/i2s_mic) · [Wake word to LiveKit agent](client/esp32/examples/livekit_agent) · [Build and flash instructions](client/esp32/README.md#examples) |
+| Python | [Python README](https://github.com/livekit/livekit-wakeword/blob/main/client/python/README.md) | [Audio clip inference](https://github.com/livekit/livekit-wakeword/blob/main/client/python/examples/inference.py) · [Microphone listener](https://github.com/livekit/livekit-wakeword/blob/main/client/python/examples/listener.py) |
+| Swift | [Swift README](https://github.com/livekit/livekit-wakeword/blob/main/client/swift/README.md) | [SwiftUI demo for iOS and macOS, with setup instructions](https://github.com/livekit/livekit-wakeword/blob/main/client/swift/Example/README.md) |
+| ESP32 | [ESP32 README](https://github.com/livekit/livekit-wakeword/blob/main/client/esp32/README.md) | [I2S microphone detection](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32/examples/i2s_mic) · [Wake word to LiveKit agent](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32/examples/livekit_agent) · [Build and flash instructions](https://github.com/livekit/livekit-wakeword/blob/main/client/esp32/README.md#examples) |
 
 ## Models
 
@@ -175,18 +175,40 @@ uv run livekit-wakeword setup --wakeword "hey robot" --clips 4      # 4x the def
 uv run livekit-wakeword train --wakeword "hey robot" --out models   # writes models/hey_robot.onnx
 ```
 
-The [training guide](train/README.md#flags) lists every flag, with a full example from setup to
+**Multilingual wake words.** A phrase can be in any language and script. Pass its language with
+`--language` (`-l`, an ISO 639-1 code such as `es`, `de`, `vi` or `ja`) so the speech is generated
+by voices that speak it; `train` and `eval` read it from the saved config:
+
+```bash
+uv run livekit-wakeword setup --wakeword "hola asistente" --language es --eval
+uv run livekit-wakeword setup --wakeword "xin chào robot" --language vi
+uv run livekit-wakeword setup --wakeword "ねえ ロボット" --language ja
+uv run livekit-wakeword train --wakeword "ねえ ロボット"             # -> ねえ_ロボット.onnx
+```
+
+The model file is named after the phrase; set `model_name` in the config (for example
+`ne_robot`) for an ASCII file name, such as for ESP32 builds.
+
+In English, words outside the dictionary (names, brands, made-up words) need a pronunciation in
+[ARPAbet](http://www.speech.cs.cmu.edu/cgi-bin/cmudict), so every voice says them the same way;
+`setup` names any word it is missing. Words made of dictionary words, such as "livekit", work
+without one. Phrases in other languages need none: their speech is generated from the text.
+
+```bash
+uv run livekit-wakeword setup --wakeword "hey zork" --pronounce "zork=Z AO1 R K"
+```
+
+The [training guide](https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md#flags) lists every flag, with a full example from setup to
 evaluation.
 
 ## Repository layout
 
 | | |
 |---|---|
-| [`train/`](train) | The `livekit-wakeword` CLI: generates speech with LiveKit Inference TTS, trains, calibrates and evaluates (GPU) |
-| [`client/python/`](client/python) | Python client: `WakeWordModel`, `WakeWordListener` |
-| [`client/swift/`](client/swift) | Swift package for iOS and macOS, plus a SwiftUI demo |
-| [`client/esp32/`](client/esp32) | ESP-IDF component and examples for micro models |
-| [`models/`](models) | The hey livekit models the tests and examples use |
+| [`client/python/`](https://github.com/livekit/livekit-wakeword/tree/main/client/python) | Python client (`livekit.wakeword`: `WakeWordModel`, `WakeWordListener`) and the trainer behind the `livekit-wakeword` CLI (`livekit.wakeword_train`, the `train` extra: generates speech with LiveKit Inference TTS, trains, calibrates and evaluates; [training guide](https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md)) |
+| [`client/swift/`](https://github.com/livekit/livekit-wakeword/tree/main/client/swift) | Swift package for iOS and macOS, plus a SwiftUI demo |
+| [`client/esp32/`](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32) | ESP-IDF component and examples for micro models |
+| [`models/`](https://github.com/livekit/livekit-wakeword/tree/main/models) | The hey livekit models the tests and examples use |
 
 ## Development
 
@@ -199,4 +221,4 @@ swift test                                       # Swift client
 
 ## License
 
-Apache 2.0, see [LICENSE](LICENSE).
+Apache 2.0, see [LICENSE](https://github.com/livekit/livekit-wakeword/blob/main/LICENSE).

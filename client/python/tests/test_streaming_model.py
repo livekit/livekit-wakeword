@@ -70,6 +70,23 @@ def test_int16_input(audio: np.ndarray) -> None:
     assert 0.0 <= s <= 1.0
 
 
+def test_input_shapes_and_types(audio: np.ndarray, tmp_path: Path) -> None:
+    model = WakeWordModel(models=[FIXTURE])
+    mono = model.predict_clip(audio)["streaming_tiny"]
+    assert model.predict_clip(audio[:, None])["streaming_tiny"] == pytest.approx(mono)  # (n, 1)
+    assert model.predict_clip(audio.astype(np.float64))["streaming_tiny"] == pytest.approx(mono)
+    with pytest.raises(ValueError, match="mono"):
+        model.predict(np.stack([audio, audio], axis=1))  # stereo
+    with pytest.raises(TypeError, match="int16 or float"):
+        model.predict((audio * 2**31).astype(np.int32))
+    (tmp_path / "m.tflite").write_bytes(b"TFL3")
+    with pytest.raises(ValueError, match="micro model"):
+        WakeWordModel(models=[tmp_path / "m.tflite"])
+    (tmp_path / "bad.onnx").write_bytes(b"not a model")
+    with pytest.raises(ValueError, match="not a valid ONNX model"):
+        WakeWordModel(models=[tmp_path / "bad.onnx"])
+
+
 def test_predict_matches_fresh_stream(audio: np.ndarray) -> None:
     model = WakeWordModel(models=[FIXTURE])
     live = WakeWordModel(models=[FIXTURE])

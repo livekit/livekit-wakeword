@@ -40,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      # one wheel (and sdist) from client/python/src and train/src
+      # one wheel (and sdist) from client/python/src: livekit.wakeword and livekit.wakeword_train
       - name: Build package
         run: uv build
 

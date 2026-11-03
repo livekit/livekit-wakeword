@@ -2,7 +2,7 @@
 `streaming_tiny_expected.json` (the Python runtime's per-80 ms scores of the 3 s chirp the Swift
 test generates).
 
-    uv run python train/tests/make_streaming_tiny.py
+    uv run python client/python/tests/train/make_streaming_tiny.py
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from livekit.wakeword import WakeWordModel
 from livekit.wakeword_train.export import export_streaming
 from livekit.wakeword_train.nn import Detector, Encoder, Head
 
-OUT = Path(__file__).resolve().parents[2] / "client/python/tests/fixtures/streaming_tiny.onnx"
+OUT = Path(__file__).resolve().parents[1] / "fixtures" / "streaming_tiny.onnx"
 
 
 def chirp() -> np.ndarray:

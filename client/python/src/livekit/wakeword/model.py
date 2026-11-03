@@ -89,11 +89,19 @@ class WakeWordModel:
         model_path = Path(model_path)
         if not model_path.exists():
             raise FileNotFoundError(f"Wake word model not found: {model_path}")
-        session = InferenceSession(
-            str(model_path),
-            providers=["CPUExecutionProvider"],
-            sess_options=session_options(sess_options or self._sess_options),
-        )
+        if model_path.suffix == ".tflite":
+            raise ValueError(
+                f"{model_path} is a micro model (int8 TFLite for ESP32 / TensorFlow Lite Micro); "
+                "load the standard .onnx model here"
+            )
+        try:
+            session = InferenceSession(
+                str(model_path),
+                providers=["CPUExecutionProvider"],
+                sess_options=session_options(sess_options or self._sess_options),
+            )
+        except Exception as e:  # onnxruntime's InvalidProtobuf, Fail, ... (not RuntimeError)
+            raise ValueError(f"{model_path} is not a valid ONNX model: {e}") from e
         if "chunk" not in {i.name for i in session.get_inputs()}:
             raise ValueError(
                 f"{model_path} is not a streaming wake word model; v1 classifier models are no "
@@ -113,8 +121,8 @@ class WakeWordModel:
             m.reset()
 
     def predict(self, audio: np.ndarray) -> dict[str, float]:
-        """Feed the next audio (16 kHz, int16 or float32, any length). Returns each model's
-        highest score among the 80 ms steps this call completed (0.0 if none)."""
+        """Feed the next audio (16 kHz mono, int16 or float in [-1, 1], any length). Returns each
+        model's highest score among the 80 ms steps this call completed (0.0 if none)."""
         x = _as_float(audio)
         return {name: m.feed(x) for name, m in self._models.items()}
 
@@ -125,5 +133,14 @@ class WakeWordModel:
 
 
 def _as_float(audio: np.ndarray) -> np.ndarray:
-    x = audio.astype(np.float32).reshape(-1)
-    return x / 32768.0 if audio.dtype == np.int16 else x
+    """Mono int16 or float PCM -> float32 in [-1, 1]."""
+    audio = np.asarray(audio)
+    if audio.ndim > 1 and sum(n > 1 for n in audio.shape) <= 1:
+        audio = audio.reshape(-1)  # (n, 1) or (1, n)
+    if audio.ndim != 1:
+        raise ValueError(f"expected mono audio (one channel), got shape {audio.shape}")
+    if audio.dtype == np.int16:
+        return audio.astype(np.float32) / 32768.0
+    if np.issubdtype(audio.dtype, np.floating):
+        return audio.astype(np.float32)
+    raise TypeError(f"expected int16 or float PCM, got {audio.dtype}")

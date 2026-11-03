@@ -56,14 +56,14 @@ livekit-wakeword = "livekit.wakeword._cli:main"
 Homepage = "https://github.com/livekit/livekit-wakeword"
 Issues = "https://github.com/livekit/livekit-wakeword/issues"
 
-# one distribution from two source trees: the client (client/python) and the trainer (train)
+# one distribution: the client (livekit.wakeword) and the trainer (livekit.wakeword_train)
 [tool.hatch.build.targets.wheel]
-only-include = ["client/python/src/livekit", "train/src/livekit"]
-sources = ["client/python/src", "train/src"]
-dev-mode-dirs = ["client/python/src", "train/src"]
+only-include = ["client/python/src/livekit"]
+sources = ["client/python/src"]
+dev-mode-dirs = ["client/python/src"]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["client/python/src", "train/src", "README.md", "LICENSE", "NOTICE"]
+only-include = ["client/python/src", "README.md", "LICENSE", "NOTICE"]
 
 [dependency-groups]
 dev = [
@@ -75,7 +75,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["client/python/tests", "train/tests"]
+testpaths = ["client/python/tests"]
 addopts = "--import-mode=importlib"
 asyncio_mode = "auto"
 

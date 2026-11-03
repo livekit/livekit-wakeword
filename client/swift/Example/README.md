@@ -30,6 +30,6 @@ The project is generated from [`project.yml`](./project.yml) with
 ## Other wake words
 
 Train one with `livekit-wakeword train --wakeword "<phrase>"` (see
-[`train/`](../../../train)), add the `.onnx` to the app's resources and to `classifierURLs` in
+[training](../../python/TRAINING.md)), add the `.onnx` to the app's resources and to `classifierURLs` in
 `WakewordEngine.init()`. `predict()` returns a score per model, keyed by
 filename stem.

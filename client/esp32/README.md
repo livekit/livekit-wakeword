@@ -1,7 +1,7 @@
 # ESP32
 
 On-device wake word detection for ESP32 chips: the `livekit_wakeword` ESP-IDF component runs the
-micro models that [`train/`](../../train) makes from a phrase (or the ones in the
+micro models that [the trainer](../python/TRAINING.md) makes from a phrase (or the ones in the
 [release](../../README.md#models)):
 
 ```bash
@@ -41,6 +41,7 @@ dependencies:
   livekit/livekit_wakeword:
     git: https://github.com/livekit/livekit-wakeword.git
     path: client/esp32/livekit_wakeword
+    version: v2.0.0  # a release tag (or a branch / commit)
 ```
 
 Then set the model in `idf.py menuconfig` → **livekit-wakeword** → *Wake word model (.tflite) to

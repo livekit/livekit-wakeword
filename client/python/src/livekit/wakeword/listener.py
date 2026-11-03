@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 FRAME_SAMPLES = 1280  # 80 ms
+PYAUDIO_HINT = (
+    "pip install 'livekit-wakeword[listener]' (or `uv run --with pyaudio ...`); PyAudio needs "
+    "PortAudio: brew install portaudio / apt install portaudio19-dev"
+)
 
 
 @dataclass
@@ -54,7 +58,10 @@ class WakeWordListener:
         self._done_event = asyncio.Event()  # set when the audio loop exits
 
     async def __aenter__(self) -> WakeWordListener:
-        import pyaudio
+        try:
+            import pyaudio
+        except ImportError as e:
+            raise ImportError(f"WakeWordListener needs PyAudio: {PYAUDIO_HINT}") from e
 
         self._pa = pyaudio.PyAudio()
         self._stream = self._pa.open(
@@ -96,7 +103,7 @@ class WakeWordListener:
             self._pa.terminate()
 
     async def _audio_loop(self) -> None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             while self._running:
                 await self._listening.wait()

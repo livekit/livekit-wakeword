@@ -1,11 +1,11 @@
 # Swift
 
 Streaming wake word detection for iOS 16+ and macOS 14+, on ONNX Runtime (CoreML execution
-provider by default). Models come from [`train/`](../../train) or the
+provider by default). Models come from [training](../python/TRAINING.md) or the
 [release](../../README.md#models).
 
 ```swift
-.package(url: "https://github.com/livekit/livekit-wakeword", branch: "main"),
+.package(url: "https://github.com/livekit/livekit-wakeword", from: "2.0.0"),
 ```
 
 ```swift

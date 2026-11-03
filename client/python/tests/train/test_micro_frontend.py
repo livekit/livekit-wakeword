@@ -10,7 +10,7 @@ import torch
 
 from livekit.wakeword_train.nn import FRAME, MEL_DEFAULT, MEL_LOW_FLOOR, LogMel
 
-ESP32 = Path(__file__).resolve().parents[2] / "client" / "esp32"
+ESP32 = Path(__file__).resolve().parents[3] / "esp32"
 
 
 @pytest.fixture(scope="module")

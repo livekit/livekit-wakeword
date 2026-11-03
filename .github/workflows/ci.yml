@@ -29,5 +29,5 @@ jobs:
       - run: uv python install 3.12
       # detection alone (numpy + onnxruntime, no extras)
       - run: uv sync --frozen
-      - run: uv run --no-sync pytest client/python/tests --tb=short -q
+      - run: uv run --no-sync pytest client/python/tests --ignore=client/python/tests/train --tb=short -q
       - run: swift test
