@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "livekit-wakeword-train"
+version = "2.0.0"
+description = "Type a wake word, get a streaming model: training for LiveKit wake word models"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "LiveKit", email = "hello@livekit.io" }]
+keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx", "tflite"]
+dependencies = [
+    "livekit-wakeword==2.0.0",  # released together (scripts/update_version.sh)
+    "livekit-wakeword-bench>=0.1.0",  # dataset generation and evaluation (LiveKit Inference TTS)
+    "torch>=2.5",
+    "torchaudio>=2.5",
+    "pydantic>=2.0",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "huggingface-hub>=0.20",
+    "safetensors>=0.4",  # pretrained encoders
+    "soundfile>=0.12",
+    "soxr>=0.3",
+    "librosa>=0.10",  # mel filterbank
+    "pronouncing>=0.2",
+    "setuptools>=69.0,<81",  # pronouncing imports pkg_resources
+    "pyarrow>=14",
+    "onnx>=1.15",
+]
+
+[project.optional-dependencies]
+tflite = [  # micro: int8 TFLite (without it, micro exports ONNX only)
+    "onnx2tf>=1.22",
+    "tensorflow>=2.15",
+    "tf-keras>=2.15",
+    "onnx-graphsurgeon>=0.3.27",
+    "sng4onnx>=1.0.4",
+    "psutil>=5.9",
+    "ai-edge-litert>=1.0",
+    "onnxsim>=0.4",
+]
+
+[project.scripts]
+livekit-wakeword = "livekit.wakeword_train.cli:app"
+
+[tool.uv.sources]
+livekit-wakeword = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/livekit"]

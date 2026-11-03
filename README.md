@@ -1,454 +1,202 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="/.github/banner_dark.png">
   <source media="(prefers-color-scheme: light)" srcset="/.github/banner_light.png">
-  <img style="width:100%;" alt="The LiveKit icon, the name of the repository and some sample code in the background." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/banner_light.png">
+  <img style="width:100%;" alt="The LiveKit icon, the name of the repository and some sample code in the background." src="/.github/banner_light.png">
 </picture>
 
 # LiveKit WakeWord
 
-[![CI](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml/badge.svg)](https://github.com/livekit/livekit-wakeword/actions/workflows/ci.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](client/python)
+[![Swift](https://img.shields.io/badge/swift-iOS%20%7C%20macOS-orange)](client/swift)
+[![ESP32](https://img.shields.io/badge/ESP32-TFLite%20Micro-red)](client/esp32)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-v0.2-green)](https://github.com/livekit/livekit-wakeword)
 
-An open-source wake word library for creating voice-enabled applications. Based on [openWakeWord](https://github.com/dscripka/openWakeWord) with streamlined training: generate synthetic data, augment, train, and export from a single YAML config.
+**[Why LiveKit WakeWord](#why-livekit-wakeword) · [Comparison](#comparison) ·
+[Guides and examples](#guides-and-examples) · [Train your own](#train-a-wake-word) ·
+[Models](#models) · [Development](#development)**
 
-**Features:**
+LiveKit WakeWord is an open-source toolkit for training and running wake word models. You provide
+a phrase, and the training CLI generates speech with LiveKit Inference TTS and adapts a pretrained
+encoder to recognize it. The resulting model runs locally in Python, Swift or on an ESP32, without
+sending audio to a server. You do not need to record your own training data.
 
-- **Conv-Attention classifier**: 1D temporal convolutions + multi-head self-attention replace openWakeWord's flat DNN head, preserving temporal structure across the 16-frame embedding window for better accuracy and fewer false positives (see [comparison](#why-livekit-wakeword) below)
-- **Backward compatible** with openWakeWord models and library
-- **Multilingual support**: over 30 languages via VoxCPM synthetic data generation
-- **Train anywhere**: local machine, cloud, or spawn [SkyPilot](https://github.com/skypilot-org/skypilot) jobs
-- **Zero dependency headaches**: uv handles everything
+> [!IMPORTANT]
+> The original LiveKit WakeWord implementation, based on openWakeWord, is deprecated.
+> LiveKit WakeWord now uses LiveKit's own pretrained encoders. In our “hey livekit” benchmark,
+> the standard model detected 89% of wake words at 0.5 false alarms per hour, compared with 46%
+> for openWakeWord 0.6. It used 16.5 ms of CPU time per second of audio, compared with 29.5 ms.
+> Models from the deprecated implementation are not compatible with the new clients;
+> [retrain your phrase](#train-a-wake-word) to upgrade.
 
-**Quick Links:**
+## Why LiveKit WakeWord
 
-- [Why livekit-wakeword](#why-livekit-wakeword)
-- [Using a Pre-trained Model](#using-a-pre-trained-model)
-- [Training a Custom Wake Word](#training-a-custom-wake-word)
-- [Multilingual Support](#multilingual)
-- [Python API](#python-api)
-- [Example: Wake Word–Triggered Agent](https://github.com/livekit-examples/hello-wakeword)
+Training a standard model for “hey livekit” took 11 minutes on one RTX PRO 6000 GPU: about
+6 minutes to generate speech and 5 minutes to train, calibrate and export the model. Training
+used 1,000 generated wake-word clips. The same workflow produces a micro model in about 18 minutes,
+including the standard model it learns from.
 
-## Why livekit-wakeword
+The standard model is about 7 MB and runs in Python or Swift through ONNX Runtime. The micro
+model is 451 KB and runs on ESP32 through TensorFlow Lite Micro. You can start with a
+[ready-made model](#models), or [train a model](#train-a-wake-word) for your own phrase. Running
+detection requires neither a GPU nor LiveKit Cloud credentials.
 
-Both livekit-wakeword and openWakeWord share the same audio front-end: mel spectrograms are fed through frozen [Google speech embedding](https://github.com/google-research/google-research/tree/master/embedding_fns) and [openWakeWord embedding](https://github.com/dscripka/openWakeWord) models to produce a `(16, 96)` feature matrix (16 timesteps × 96-dim embeddings). The difference is the classification head that sits on top.
+## Comparison
 
-### Architecture
+We trained “hey livekit” separately in each engine using its own recipe, then evaluated the
+models on the same benchmark. At 0.5 false alarms per hour, LiveKit WakeWord detected 89% of wake
+words, nanowakeword 49%, and openWakeWord 46%. Their training times were 11, 34 and 94 minutes,
+respectively. Streaming inference used 16.5, 30.5 and 29.5 ms of CPU time per second of audio.
 
-**openWakeWord** flattens the `(16, 96)` matrix into a 1536-d vector and feeds it through a small fully-connected DNN:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/accuracy_dark.png">
+  <img width="100%" alt="More accurate at every false-alarm budget. Wake words caught at 0.1, 0.5 and 1 false alarms per hour: LiveKit 87%, 89%, 90%; LiveKit micro 24%, 78%, 79%; nanowakeword 0%, 49%, 55%; openWakeWord 32%, 46%, 52%; microWakeWord 0%, 0%, 24%." src="/.github/assets/accuracy_light.png">
+</picture>
 
-```
-Flatten(16×96=1536) → Dense → Dense → Sigmoid
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/speed_dark.png">
+  <img width="100%" alt="Faster to train, lighter to run. Train time: LiveKit 11 min, LiveKit micro 18 min, nanowakeword 34, openWakeWord 94, microWakeWord 39. Wake-word clips: 1k and 1k against 2.5k, 100k and 25k. CPU per second of audio: 16.5 and 18 ms against 30.5, 29.5 and 2.2 ms." src="/.github/assets/speed_light.png">
+</picture>
 
-While the positional information is technically still present in the flattened vector, the dense layer has no inductive bias for temporal structure and must learn any sequential patterns from scratch.
+The micro model detected 78% of wake words at the same false-alarm rate. microWakeWord scored
+0% at that operating point, although it used less CPU: 2.2 ms per second of audio versus 18 ms
+for LiveKit micro. These results compare the complete training workflows for one phrase,
+including their different speech generators; they do not isolate encoder performance.
 
-**livekit-wakeword** introduces a **Conv-Attention** (`conv_attention`) classifier:
+<details>
+<summary>How we compared</summary>
 
-```
-Conv1D blocks → MultiheadAttention → Mean pool → Linear(1) → Sigmoid
-```
+We used [LiveKit WakeWord Bench](https://github.com/livekit/wakeword-bench) with party scenes:
+7,873 clips covering unseen voices, noise, rooms, codecs, similar-sounding phrases and
+conversational speech, plus 24 hours of TV, music and podcasts. Accuracy in the chart is recall
+at 0.1, 0.5 and 1 false alarms per hour. Each model's threshold is selected for that rate; this is different
+from setting every model's score threshold to 0.5.
 
-1. **1D Convolutions** (kernel size 3) slide across the 16 timesteps, capturing local temporal patterns (e.g., syllable transitions).
-2. **Multi-Head Self-Attention** models long-range dependencies across the full temporal window, letting the model learn which timestep relationships matter.
-3. **Mean pooling** aggregates attended features into a fixed-size vector for the final sigmoid output.
+The alternatives used Piper TTS for training speech, while LiveKit WakeWord used LiveKit
+Inference TTS. Benchmark voices were held out of training, but the benchmark also uses LiveKit
+Inference, which may favor our models.
 
-### Results
+We tested nanowakeword 3.0 and openWakeWord 0.6 (100,000 samples). For microWakeWord, training
+time and clip counts use its scaled-up recipe (25,000 samples, 40,000 steps); accuracy is the
+better result from that recipe and its notebook default.
 
-To compare, we evaluated an openWakeWord DNN, a livekit-wakeword DNN (same architecture, better training pipeline), and a livekit-wakeword conv-attention model on the same "hey livekit" validation set (15,000 positive clips, 45,084 negative clips, 25 hours of audio). The livekit-wakeword models were trained with the [prod config](configs/prod.yaml).
+Each pipeline ran alone on one RTX PRO 6000 GPU with the same 8 CPU cores. Training times exclude
+one-time downloads: 3.8 GB for LiveKit WakeWord and 21–35 GB for the alternatives. The micro
+training time includes its standard teacher model. CPU measurements use one core and one thread
+with streaming audio.
 
-| Metric              | openWakeWord (DNN) | livekit-wakeword (DNN) | livekit-wakeword (conv-attention) |
-| ------------------- | :----------------: | :--------------------: | :-------------------------------: |
-| **AUT\***           |       0.0720       |         0.0423         |            **0.0012**             |
-| **FPPH\***          |        8.50        |          3.07          |             **0.08**              |
-| **Recall\***        |       68.6%        |         85.3%          |             **86.1%**             |
-| Optimal Threshold\* |        0.01        |          0.01          |               0.68                |
+</details>
 
-<table>
-<tr>
-<td align="center"><strong>openWakeWord (DNN)</strong></td>
-<td align="center"><strong>livekit-wakeword (DNN)</strong></td>
-<td align="center"><strong>livekit-wakeword (conv-attention)</strong></td>
-</tr>
-<tr>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_openwakeword.png" alt="DET curve: openWakeWord" width="280"></td>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword_dnn.png" alt="DET curve: livekit-wakeword DNN" width="280"></td>
-<td><img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_livekit_wakeword.png" alt="DET curve: livekit-wakeword conv-attention" width="280"></td>
-</tr>
-</table>
+## Guides and examples
 
-The livekit-wakeword DNN already outperforms openWakeWord's DNN thanks to the improved training pipeline (focal loss, embedding mixup, 3-phase training, checkpoint averaging). However, both DNN models fail to meet the FPPH target: their optimal thresholds fall to 0.01, meaning no operating point can keep false positives low enough.
+Each client has a README with installation and usage instructions, along with examples you can
+run. Use a [ready-made model](#models) or one you trained yourself.
 
-The conv-attention head is what unlocks the low false positive rate: **60x lower AUT** and **100x fewer false positives per hour** than openWakeWord, while detecting 17% more wake words.
+| Platform | Installation and usage | Examples |
+|---|---|---|
+| Python | [Python README](client/python/README.md) | [Audio clip inference](client/python/examples/inference.py) · [Microphone listener](client/python/examples/listener.py) |
+| Swift | [Swift README](client/swift/README.md) | [SwiftUI demo for iOS and macOS, with setup instructions](client/swift/Example/README.md) |
+| ESP32 | [ESP32 README](client/esp32/README.md) | [I2S microphone detection](client/esp32/examples/i2s_mic) · [Wake word to LiveKit agent](client/esp32/examples/livekit_agent) · [Build and flash instructions](client/esp32/README.md#examples) |
 
-_\***AUT** (Area Under the DET curve): summarizes the full DET (Detection Error Tradeoff) curve, which plots false positive rate vs false negative rate across all thresholds. Lower is better (0 = perfect). A DET curve that hugs the bottom-left corner indicates strong separation between wake words and non-wake-words._
+## Models
 
-_\***FPPH** (False Positives Per Hour): how many times the model falsely triggers per hour of non-wake-word audio. Lower is better. For production use, < 0.5 FPPH is typical._
-
-_\***Recall**: the percentage of actual wake words correctly detected. Higher is better._
-
-_\***Optimal Threshold**: the detection threshold that maximizes recall while keeping FPPH at or below the target (configurable, default 0.1). A threshold of 0.01 indicates no threshold could meet the FPPH target; the evaluator fell back to the highest balanced accuracy._
-
-### Why conv-attention wins
-
-- **Temporal awareness**: the conv-attention model sees the _order_ of speech events, not just their presence, reducing false triggers from phonetically similar but differently ordered phrases.
-- **Better accuracy at the same model size**: attention lets a small model selectively focus on discriminative time regions rather than learning dense connections over the full flattened input.
-- **Lower false-positive rates**: temporal structure helps reject partial or reordered matches that a flat DNN would accept.
-
-The conv-attention head is the default. You can switch to the original DNN or an RNN head via `model_type` in your config:
-
-```yaml
-model:
-  model_type: conv_attention # conv_attention (default) | dnn | rnn
-  model_size: small # tiny, small, medium, large
-```
-
-## Using a Pre-trained Model
-
-### Python
-
-**System dependencies (for microphone listener):**
+The [latest release](https://github.com/livekit/livekit-wakeword/releases/latest) has ready-made
+models and the pretrained encoders that training starts from:
 
 ```bash
-# macOS
-brew install portaudio
-
-# Ubuntu/Debian
-sudo apt install portaudio19-dev
+gh release download -R livekit/livekit-wakeword -p "*.onnx" -p "*.tflite" -p "*.json"
 ```
 
-**Installation:**
+| model | bench score |
+|---|:---:|
+| `hey_livekit.onnx` | 0.909 |
+| `hey_livekit_micro.tflite` | 0.767 |
+| `hey_jarvis.onnx` | 0.914 |
+| `hey_jarvis_micro.tflite` | 0.716 |
+
+hey livekit is scored on the bench with party scenes (the one in the comparison above), and hey
+jarvis on the plain bench. **standard** is ONNX (about 7 MB, about 1 ms per 80 ms step on one CPU
+thread). **micro** is int8 TFLite (451 KB, 11.5 million multiply-accumulates per second of
+audio) for TensorFlow Lite Micro. At the default threshold of 0.5, these four models give 0.5 to 2.5
+false alarms per hour on the bench's conversational speech; raise the threshold if you see too many.
+
+## Train a wake word
+
+You need Python 3.12+, a CUDA GPU or an Apple silicon Mac, [uv](https://docs.astral.sh/uv/) and a LiveKit Cloud project
+(the free plan works) for the TTS.
+
+**1. Get LiveKit credentials.** Sign up at [cloud.livekit.io](https://cloud.livekit.io) and create a
+project, then install the [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/)
+and log in:
 
 ```bash
-pip install livekit-wakeword
-# or
-uv add livekit-wakeword
+brew install livekit-cli                         # macOS
+curl -sSL https://get.livekit.io/cli | bash      # Linux
+winget install LiveKit.LiveKitCLI                # Windows
+
+lk cloud auth                                    # log in in the browser and pick your project
+lk app env -w                                    # writes LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET to .env.local
+set -a && source .env.local && set +a            # export them in this shell
 ```
 
-For microphone listening, install with the `listener` extra:
+You can also create an API key in the project settings of the LiveKit Cloud dashboard and export
+the three variables yourself.
+
+**2. Get the code:**
 
 ```bash
-pip install livekit-wakeword[listener]
+git clone https://github.com/livekit/livekit-wakeword && cd livekit-wakeword
+uv sync --all-packages --extra tflite            # --extra tflite is for --type micro
 ```
 
-**Basic inference:**
+`setup` downloads the pretrained encoders from the v2.0.0 release once.
 
-```python
-from livekit.wakeword import WakeWordModel
-
-model = WakeWordModel(models=["hey_livekit.onnx"])
-
-# Feed audio frames (16kHz, int16 or float32)
-scores = model.predict(audio_frame)
-if scores["hey_livekit"] > 0.5:
-    print("Wake word detected!")
-```
-
-**Async listener with microphone:**
-
-```python
-import asyncio
-from livekit.wakeword import WakeWordModel, WakeWordListener
-
-model = WakeWordModel(models=["hey_livekit.onnx"])
-
-async def main():
-    async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
-        while True:
-            detection = await listener.wait_for_detection()
-            print(f"Detected {detection.name}! ({detection.confidence:.2f})")
-
-asyncio.run(main())
-```
-
-### Rust
-
-For Rust applications, use the [`livekit-wakeword`](https://crates.io/crates/livekit-wakeword) crate:
-
-```toml
-[dependencies]
-livekit-wakeword = "0.1"
-```
-
-```rust
-use livekit_wakeword::WakeWordModel;
-
-let mut model = WakeWordModel::new(&["hey_livekit.onnx"], 16000)?;
-
-// Feed ~2s PCM audio chunks (i16, at configured sample rate)
-let scores = model.predict(&audio_chunk)?;
-if scores["hey_livekit"] > 0.5 {
-    println!("Wake word detected!");
-}
-```
-
-The mel spectrogram and speech embedding models are compiled into the binary; only the wake word classifier ONNX file is loaded at runtime. Audio at supported sample rates (22050–384000 Hz) is automatically resampled to 16 kHz.
-
-### Swift
-
-For Swift applications on iOS 16+ / macOS 14+, add the [`LiveKitWakeWord`](swift) Swift package:
-
-```swift
-// Package.swift
-.package(url: "https://github.com/livekit/livekit-wakeword", branch: "main"),
-```
-
-**Basic inference:**
-
-```swift
-import LiveKitWakeWord
-
-let classifier = Bundle.main.url(forResource: "hey_livekit", withExtension: "onnx")!
-let model = try WakeWordModel(models: [classifier], sampleRate: 16_000)
-
-// Feed ~2 s PCM chunks (Int16, at the configured sample rate):
-let scores = try model.predict(audioChunk)
-if (scores["hey_livekit"] ?? 0) > 0.5 {
-    print("Wake word detected!")
-}
-```
-
-**Async listener with microphone:**
-
-```swift
-import LiveKitWakeWord
-
-let classifier = Bundle.main.url(forResource: "hey_livekit", withExtension: "onnx")!
-let model = try WakeWordModel(models: [classifier], sampleRate: 16_000)
-let listener = WakeWordListener(model: model, threshold: 0.5, debounce: 2.0)
-
-try await listener.start()
-for await detection in listener.detections() {
-    print("Detected \(detection.name)! (confidence=\(String(format: "%.2f", detection.confidence)))")
-}
-```
-
-The mel spectrogram and speech embedding `.onnx` models ship inside the Swift package; only the classifier ships with your app. Audio at any sample rate is resampled to 16 kHz internally via `AVAudioConverter` (matches the Rust crate's 22050–384000 Hz input range); the listener handles mic-hardware resampling automatically. ONNX Runtime with the CoreML Execution Provider dispatches to ANE / GPU / CPU by default (override via `executionProvider:`).
-
-Add `NSMicrophoneUsageDescription` to Info.plist (and `com.apple.security.device.audio-input` on sandboxed macOS apps) for listener use. A runnable SwiftUI demo (iOS + macOS) lives in [examples/ios_wakeword/](examples/ios_wakeword/).
-
-## Training a Custom Wake Word
-
-### CLI quick start
-
-**System dependencies:**
+**3. Train:**
 
 ```bash
-# macOS
-brew install espeak-ng ffmpeg portaudio
-
-# Ubuntu/Debian
-sudo apt install espeak-ng libsndfile1 ffmpeg sox portaudio19-dev
+uv run livekit-wakeword setup --wakeword "hey robot" --eval  # training speech + held-out test set
+uv run livekit-wakeword train --wakeword "hey robot" --type standard
+uv run livekit-wakeword eval --wakeword "hey robot"    # bench score on a held-out test set
+uv run --with pyaudio livekit-wakeword listen hey_robot.onnx   # try it on your microphone
 ```
 
-**Installation (with pip):**
+A new phrase takes about 11 minutes on one data-center GPU (6 minutes of speech generation, 5 of
+training). The first run downloads about 4 GB of noise, room and speech sources once.
+
+**For ESP32**, also train a micro model (about 7 more minutes):
 
 ```bash
-pip install livekit-wakeword[train,eval,export]
+uv run livekit-wakeword train --wakeword "hey robot" --type micro   # -> hey_robot_micro.tflite
 ```
 
-**Installation (with uv):**
+**More speech, or a different output folder:**
 
 ```bash
-uv tool install livekit-wakeword[train,eval,export]
+uv run livekit-wakeword setup --wakeword "hey robot" --clips 4      # 4x the default training speech
+uv run livekit-wakeword train --wakeword "hey robot" --out models   # writes models/hey_robot.onnx
 ```
 
-**Installation (from source):**
+The [training guide](train/README.md#flags) lists every flag, with a full example from setup to
+evaluation.
+
+## Repository layout
+
+| | |
+|---|---|
+| [`train/`](train) | The `livekit-wakeword` CLI: generates speech with LiveKit Inference TTS, trains, calibrates and evaluates (GPU) |
+| [`client/python/`](client/python) | Python client: `WakeWordModel`, `WakeWordListener` |
+| [`client/swift/`](client/swift) | Swift package for iOS and macOS, plus a SwiftUI demo |
+| [`client/esp32/`](client/esp32) | ESP-IDF component and examples for micro models |
+| [`models/`](models) | The hey livekit models the tests and examples use |
+
+## Development
 
 ```bash
-# Install uv (if you don't have it)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone and install
-git clone https://github.com/livekit/livekit-wakeword
-cd livekit-wakeword
-uv sync --all-extras
+uv sync --all-packages --extra tflite
+uv run pytest                                    # Python: client and trainer
+uv run ruff check . && uv run mypy -p livekit.wakeword -p livekit.wakeword_train
+swift test                                       # Swift client
 ```
-
-**Download models and data:**
-
-```bash
-livekit-wakeword setup --config configs/prod.yaml
-```
-
-**Train a wake word:**
-
-```bash
-livekit-wakeword run configs/prod.yaml
-```
-
-Or run stages individually:
-
-```bash
-livekit-wakeword generate configs/prod.yaml  # TTS synthesis + adversarial negatives
-livekit-wakeword augment configs/prod.yaml   # Augment + extract features
-livekit-wakeword train configs/prod.yaml     # 3-phase adaptive training
-livekit-wakeword export configs/prod.yaml    # Export to ONNX (default)
-livekit-wakeword eval configs/prod.yaml      # Evaluate model (DET curve, AUT, FPPH)
-```
-
-The export format defaults to ONNX. Pass `--format tflite` (or set `output_format: tflite` in the config) to also emit an [openWakeWord](https://github.com/dscripka/openWakeWord)-compatible TFLite model — this requires the `tflite` extra and currently supports the `dnn` head only. See [Export & Inference](docs/export-and-inference.md#tflite-export-openwakeword-compatible) for details.
-
-```bash
-pip install livekit-wakeword[tflite]
-livekit-wakeword export configs/prod.yaml --format tflite
-```
-
-You can also evaluate any compatible ONNX model (e.g., one trained with openWakeWord):
-
-```bash
-livekit-wakeword eval configs/prod.yaml -m /path/to/other_model.onnx
-```
-
-Eval produces a DET curve plot and metrics JSON in the output directory. See [Evaluation](docs/evaluation.md) for details.
-
-### Configuration
-
-The full pipeline runs based on a single YAML configuration file. Example configs:
-
-| Config                                               | Wake word      | Use                                                      |
-| ---------------------------------------------------- | -------------- | -------------------------------------------------------- |
-| [configs/prod.yaml](configs/prod.yaml)               | "hey livekit"  | Production-scale for English with **Piper TTS** backbone |
-| [configs/test.yaml](configs/test.yaml)               | "hey livekit"  | Small end-to-end test run with **Piper TTS** backbone    |
-| [configs/prod_voxcpm.yaml](configs/prod_voxcpm.yaml) | "你好 livekit" | Production-scale multilingual with **VoxCPM** backbone   |
-| [configs/test_voxcpm.yaml](configs/test_voxcpm.yaml) | "你好 livekit" | Small end-to-end test run with **VoxCPM** backbone       |
-
-The bare minimum configuration required is as follows:
-
-```yaml
-model_name: hey_livekit
-target_phrases:
-  - "hey livekit"
-
-n_samples: 10000 # training samples per class
-model:
-  model_type: conv_attention # conv_attention, dnn, or rnn
-  model_size: small # tiny, small, medium, large
-steps: 50000
-target_fp_per_hour: 0.2
-```
-
-### Multilingual
-
-We support training wake words in 30 languages with [VoxCPM2 TTS](https://github.com/OpenBMB/VoxCPM) synthetic data generation:
-
-```
-Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese
-
-Chinese Dialect: 四川话, 粤语, 吴语, 东北话, 河南话, 陕西话, 山东话, 天津话, 闽南话
-```
-
-To use this, add `tts_backend` in your configuration YAML:
-
-```yaml
-tts_backend: voxcpm
-```
-
-And install `livekit-wakeword` with the `voxcpm` optional dependency:
-
-```bash
-pip install livekit-wakeword[train,eval,export,voxcpm]
-```
-
-> [!WARNING]
-> **Multilingual models currently achieve lower accuracy than English models.** This is due to two factors: (1) the frozen [Google speech embedding](https://www.kaggle.com/models/google/speech-embedding) model was trained predominantly on English data, so its representations are weaker for other languages, and (2) VoxCPM produces less diverse synthetic speech compared to the large Piper TTS speaker pool available for English.
->
-> <img src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/det_nihao_livekit_voxcpm.png" alt="DET curve: 你好 livekit (VoxCPM)" width="350">
->
-> _DET curve for "你好 livekit" trained with VoxCPM — note the higher error rates compared to the English "hey livekit" results [above](#results)._
->
-> To improve multilingual performance, increase the number of `voice_design_prompts` (50–100) and `n_samples` in your config so the model sees a wider range of speaker and prosody variation:
->
-> ```yaml
-> n_samples: 50000 # ↑ from 25000
-> n_samples_val: 10000 # ↑ from 5000
->
-> voxcpm_tts:
->   voice_design_prompts:
->     # Add 50-100 diverse prompts covering age, gender, pitch, pace, accent, energy, etc.
->     - "A young adult woman, clear mid-pitch voice, moderate pace, calm and professional"
->     - "A young adult man, warm baritone, steady pace, friendly and articulate"
->     - "A middle-aged woman, slightly low pitch, measured pace, confident tone"
->     # ... add more prompts for wider speaker diversity
-> ```
-
-More detail: [docs/data-generation.md](docs/data-generation.md) (Piper, VoxCPM, setup).
-
-### Python API
-
-The full training pipeline is available as a Python API, so you can import and drive it from your own code instead of using the CLI:
-
-```python
-from livekit.wakeword import (
-    WakeWordConfig,
-    load_config,
-    run_generate,
-    run_augment,
-    run_extraction,
-    run_train,
-    run_export,
-    run_eval,
-)
-
-# Load from YAML or construct directly
-config = load_config("configs/prod.yaml")
-
-# Or build a config programmatically
-config = WakeWordConfig(
-    model_name="hey_robot",
-    target_phrases=["hey robot"],
-    n_samples=5000,
-    steps=30000,
-)
-
-# Run individual stages
-run_generate(config)     # TTS synthesis + adversarial negatives
-run_augment(config)      # Add noise, reverb, pitch shifts
-run_extraction(config)   # Extract mel spectrograms + speech embeddings → .npy
-run_train(config)        # 3-phase adaptive training
-onnx_path = run_export(config)       # Export to ONNX
-
-# Evaluate the exported model
-results = run_eval(config, onnx_path)
-print(f"AUT={results['aut']:.4f}  FPPH={results['fpph']:.2f}  Recall={results['recall']:.1%}")
-```
-
-This is useful for integrating wake word training into larger pipelines, automating model iteration, or building custom tooling on top of the data generation and training stages.
-
-### Cloud GPUs with SkyPilot
-
-See [skypilot/train.yaml](skypilot/train.yaml) for an example training job on Nebius.
-
-```bash
-sky launch skypilot/train.yaml
-```
-
-## Further Reading
-
-- [Architecture Overview](docs/overview.md): system design and data flow
-- [Data Generation](docs/data-generation.md): TTS synthesis and adversarial negatives
-- [Augmentation](docs/augmentation.md): audio transforms and alignment
-- [Feature Extraction](docs/feature-extraction.md): mel spectrograms and embeddings
-- [Training](docs/training.md): 3-phase training and checkpoint averaging
-- [Export & Inference](docs/export-and-inference.md): ONNX export and Python API
-- [Evaluation](docs/evaluation.md): DET curves, AUT, and model comparison
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
-
-<br/><table>
-
-<thead><tr><th colspan="2">LiveKit Ecosystem</th></tr></thead>
-<tbody>
-<tr><td>Agents SDKs</td><td><a href="https://github.com/livekit/agents">Python</a> · <a href="https://github.com/livekit/agents-js">Node.js</a></td></tr><tr></tr>
-<tr><td>LiveKit SDKs</td><td><a href="https://github.com/livekit/client-sdk-js">Browser</a> · <a href="https://github.com/livekit/client-sdk-swift">Swift</a> · <a href="https://github.com/livekit/client-sdk-android">Android</a> · <a href="https://github.com/livekit/client-sdk-flutter">Flutter</a> · <a href="https://github.com/livekit/client-sdk-react-native">React Native</a> · <a href="https://github.com/livekit/rust-sdks">Rust</a> · <a href="https://github.com/livekit/node-sdks">Node.js</a> · <a href="https://github.com/livekit/python-sdks">Python</a> · <a href="https://github.com/livekit/client-sdk-unity">Unity</a> · <a href="https://github.com/livekit/client-sdk-unity-web">Unity (WebGL)</a> · <a href="https://github.com/livekit/client-sdk-esp32">ESP32</a> · <a href="https://github.com/livekit/client-sdk-cpp">C++</a></td></tr><tr></tr>
-<tr><td>Starter Apps</td><td><a href="https://github.com/livekit-examples/agent-starter-python">Python Agent</a> · <a href="https://github.com/livekit-examples/agent-starter-node">TypeScript Agent</a> · <a href="https://github.com/livekit-examples/agent-starter-react">React App</a> · <a href="https://github.com/livekit-examples/agent-starter-swift">SwiftUI App</a> · <a href="https://github.com/livekit-examples/agent-starter-android">Android App</a> · <a href="https://github.com/livekit-examples/agent-starter-flutter">Flutter App</a> · <a href="https://github.com/livekit-examples/agent-starter-react-native">React Native App</a> · <a href="https://github.com/livekit-examples/agent-starter-embed">Web Embed</a></td></tr><tr></tr>
-<tr><td>UI Components</td><td><a href="https://github.com/livekit/components-js">React</a> · <a href="https://github.com/livekit/components-android">Android Compose</a> · <a href="https://github.com/livekit/components-swift">SwiftUI</a> · <a href="https://github.com/livekit/components-flutter">Flutter</a></td></tr><tr></tr>
-<tr><td>Server APIs</td><td><a href="https://github.com/livekit/node-sdks">Node.js</a> · <a href="https://github.com/livekit/server-sdk-go">Golang</a> · <a href="https://github.com/livekit/server-sdk-ruby">Ruby</a> · <a href="https://github.com/livekit/server-sdk-kotlin">Java/Kotlin</a> · <a href="https://github.com/livekit/python-sdks">Python</a> · <a href="https://github.com/livekit/rust-sdks">Rust</a> · <a href="https://github.com/agence104/livekit-server-sdk-php">PHP (community)</a> · <a href="https://github.com/pabloFuente/livekit-server-sdk-dotnet">.NET (community)</a></td></tr><tr></tr>
-<tr><td>Resources</td><td><a href="https://docs.livekit.io">Docs</a> · <a href="https://docs.livekit.io/mcp">Docs MCP Server</a> · <a href="https://github.com/livekit/livekit-cli">CLI</a> · <a href="https://cloud.livekit.io">LiveKit Cloud</a></td></tr><tr></tr>
-<tr><td>LiveKit Server OSS</td><td><a href="https://github.com/livekit/livekit">LiveKit server</a> · <a href="https://github.com/livekit/egress">Egress</a> · <a href="https://github.com/livekit/ingress">Ingress</a> · <a href="https://github.com/livekit/sip">SIP</a></td></tr><tr></tr>
-<tr><td>Community</td><td><a href="https://community.livekit.io">Developer Community</a> · <a href="https://livekit.io/join-slack">Slack</a> · <a href="https://x.com/livekit">X</a> · <a href="https://www.youtube.com/@livekit_io">YouTube</a></td></tr>
-</tbody>
-</table>
+Apache 2.0, see [LICENSE](LICENSE).

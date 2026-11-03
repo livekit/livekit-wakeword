@@ -1,0 +1,97 @@
+menu "LiveKit Example"
+
+    choice LK_EXAMPLE_BOARD
+        prompt "Board"
+        default LK_EXAMPLE_BOARD_M5STACK_TAB5 if IDF_TARGET_ESP32P4
+        default LK_EXAMPLE_BOARD_CODEC_BOARD
+
+        config LK_EXAMPLE_BOARD_CODEC_BOARD
+            bool "A board known to codec_board (ESP32-S3-BOX-3, ESP32-S3-Korvo-2, ...)"
+        config LK_EXAMPLE_BOARD_M5STACK_TAB5
+            bool "M5Stack Tab5"
+            depends on IDF_TARGET_ESP32P4
+    endchoice
+
+    config LK_EXAMPLE_CODEC_BOARD_TYPE
+        string "Codec board type"
+        depends on LK_EXAMPLE_BOARD_CODEC_BOARD
+        default "DUMMY_CODEC_BOARD"
+        help
+            The model of dev board you are using. See board_cfg.txt from the codec
+            board component for a list of supported boards.
+
+    config LK_EXAMPLE_MIC_CHANNELS
+        int "Microphone: interleaved channels to open"
+        depends on LK_EXAMPLE_BOARD_CODEC_BOARD
+        default 4
+        range 1 8
+    config LK_EXAMPLE_MIC_CHANNEL_MASK
+        hex "Microphone: channels kept (0: all)"
+        depends on LK_EXAMPLE_BOARD_CODEC_BOARD
+        default 0x3
+    config LK_EXAMPLE_MIC_LAYOUT
+        string "Microphone: layout of the kept channels"
+        depends on LK_EXAMPLE_BOARD_CODEC_BOARD
+        default "MR"
+        help
+            One letter per kept channel: M microphone, R playback reference (echo cancellation),
+            N unused. The capturer and the wake word both use it. "MR" fits the ESP32-S3-BOX-3.
+
+    config LK_EXAMPLE_MIC_GAIN_DB
+        int "Microphone gain (dB)"
+        depends on LK_EXAMPLE_BOARD_M5STACK_TAB5
+        default 30
+        range 0 37
+
+    choice LK_EXAMPLE_CONNECTION_METHOD
+        prompt "Choose room connection method"
+        help
+            Choose how to connect to the room in the example.
+
+        config LK_EXAMPLE_USE_SANDBOX
+            bool "Sandbox token"
+            help
+                Use a sandbox token server for room authentication.
+
+        config LK_EXAMPLE_USE_PREGENERATED
+            bool "Pre-generated token"
+            help
+                Use a pre-generated token and server URL for room connection.
+    endchoice
+
+    config LK_EXAMPLE_SERVER_URL
+        depends on LK_EXAMPLE_USE_PREGENERATED
+        string "Server URL"
+        default "ws://localhost:7880"
+        help
+            The server URL to use for room connection.
+    config LK_EXAMPLE_TOKEN
+        depends on LK_EXAMPLE_USE_PREGENERATED
+        string "Token"
+        help
+            The token to use for room connection.
+
+    config LK_EXAMPLE_SANDBOX_ID
+        depends on LK_EXAMPLE_USE_SANDBOX
+        string "Sandbox ID"
+        help
+            The ID of the sandbox token server to use.
+    config LK_EXAMPLE_ROOM_NAME
+        depends on LK_EXAMPLE_USE_SANDBOX
+        string "Room name (optional)"
+        help
+            Specific room name sandbox tokens will be generated with.
+    config LK_EXAMPLE_PARTICIPANT_NAME
+        depends on LK_EXAMPLE_USE_SANDBOX
+        string "Participant name (optional)"
+        help
+            Specific participant name sandbox tokens will be generated with.
+
+    config LK_EXAMPLE_SPEAKER_VOLUME
+        int "Default speaker volume (0-100%)"
+        default 85
+        range 0 100
+        help
+            Default playback volume for speaker output.
+
+endmenu

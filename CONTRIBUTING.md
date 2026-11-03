@@ -12,11 +12,15 @@ If you'd like to contribute code, it's recommended to first discuss your idea on
 Please make sure your change passes all of the following:
 
 ```sh
-uv run ruff check src/ tests/                # lints
-uv run ruff format --check src/ tests/       # formatting
-uv run mypy src/livekit/wakeword/            # types
-uv run pytest tests/                         # tests
+uv sync --all-packages --extra tflite
+uv run ruff check . && uv run ruff format --check .           # lints and formatting
+uv run mypy -p livekit.wakeword -p livekit.wakeword_train     # types
+uv run pytest                                                 # client + trainer tests
+swift test                                                    # Swift client (macOS)
 ```
+
+Changes to the ESP32 component (`client/esp32`) should build both examples for the ESP32-S3 and
+ESP32-P4 with ESP-IDF 5.5 (see [client/esp32/README.md](client/esp32/README.md#examples)).
 
 ## Pull requests
 

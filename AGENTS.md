@@ -4,104 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-livekit-wakeword — wake word detection library using frozen ONNX feature extraction with trainable PyTorch classifiers. Hybrid architecture: ONNX mel spectrogram + speech embedding → PyTorch DNN/RNN classifier head.
+livekit-wakeword v2: type a wake word, get a streaming model. Training adapts pretrained encoders
+(standard and micro; downloaded from the GitHub release by `setup`, or `LIVEKIT_WAKEWORD_ENCODERS`) to the phrase and
+fine-tunes them on speech generated with livekit-wakeword-bench. Two tiers: standard (streaming
+ONNX) and micro (int8 TFLite).
+
+## Layout
+
+- **`train/`**: `livekit-wakeword-train` (import `livekit.wakeword_train`, Python 3.12+), the
+  `livekit-wakeword` CLI. `config.py` (`WakeWordConfig`), `pipeline.py` (`run_setup`, `run_train`,
+  `run_eval`), `cli.py`; internals: `encoders.py` (load, `bake(phrase)` -> plain `Detector`),
+  `nn.py`, `loop.py`, `data.py`, `augment.py`, `export.py` (streaming ONNX; state is plain inputs,
+  runtimes zero it and warm up on 2 s of silence), `micro.py` (BC-ResNet, int8 TFLite,
+  `MicroRuntime` host reference).
+- **`client/python/`**: `livekit-wakeword` (import `livekit.wakeword`, Python 3.11+, numpy +
+  onnxruntime only): `WakeWordModel` (`predict()` streams, `predict_clip()`), `WakeWordListener`.
+- **`client/swift/`**: Swift package sources and tests (manifest: root `Package.swift`), `Example/`
+  SwiftUI demo.
+- **`client/esp32/`**: ESP-IDF component `livekit_wakeword/` (the only copy of the C front end and
+  TFLM wrapper), `examples/`, `tools/` (host test, front-end CLI, table generator).
+- **`models/`**: hey livekit standard + micro, used by tests and examples.
+- Root `pyproject.toml` is a uv workspace (members `client/python`, `train`) holding the dev tools
+  and ruff/mypy/pytest config.
 
 ## Commands
 
 **Always use `uv` for package management. Always use `git` for version separation (branches, commits).**
 
 ```bash
-# Install
-uv sync                              # All deps including optional groups
-uv sync --group dev                  # Dev only
-
-# Test
-uv run pytest tests/                 # All tests
-uv run pytest tests/test_config.py   # Single file
-uv run pytest -k "test_name"         # Single test
-uv run pytest --cov=src/livekit/wakeword tests/  # With coverage
-
-# Lint & format
-uv run ruff check src/ tests/       # Lint (rules: E, F, I, UP)
-uv run ruff format src/ tests/      # Auto-format
-uv run mypy src/livekit/wakeword/       # Type check (strict mode)
-
-# CLI (entry point: livekit-wakeword = livekit.wakeword.cli:app)
-uv run livekit-wakeword setup [--config YAML]   # Data deps; Piper if piper_vits / VoxCPM snapshot if voxcpm; else always Piper when no --config
-uv run livekit-wakeword generate <config> # VITS TTS + SLERP speaker blending + adversarial negatives
-uv run livekit-wakeword augment <config>  # Augment + extract features → .npy
-uv run livekit-wakeword train <config>    # 3-phase adaptive training
-uv run livekit-wakeword export <config>   # Export classifier to ONNX
-uv run livekit-wakeword run <config>      # Full pipeline (generate→augment→extract→train→export)
+uv sync --all-packages --extra tflite           # everything
+uv run pytest                                    # client + trainer tests
+uv run ruff check . && uv run ruff format .
+uv run mypy -p livekit.wakeword -p livekit.wakeword_train
+swift test                                       # Swift client
+uv run livekit-wakeword setup|train|eval|listen  # the CLI
 ```
 
-## Architecture
+## Key design decisions
 
-### Processing Pipeline (inference)
-```
-Raw audio (16kHz) → MelSpectrogramFrontend (ONNX) → SpeechEmbedding (ONNX) → Classifier (PyTorch) → [0,1]
-                    n_fft=512, hop=160, n_mels=32     76×32×1 → 96-dim         16×96 → 1 score
-```
-
-### Source Layout (`src/livekit/wakeword/`)
-
-- **`config.py`** — Pydantic models + YAML loading (`load_config(path)`); `TtsBackend`, `PiperTtsConfig`, `VoxCpmTtsConfig`, `piper_checkpoint_path`, `voxcpm_local_model_path`
-- **`cli.py`** — Typer CLI with all commands
-- **`models/`**
-  - `feature_extractor.py` — `MelSpectrogramFrontend` (ONNX primary, torchaudio fallback) and `SpeechEmbedding` (ONNX only)
-  - `classifier.py` — `DNNClassifier` (FC+LayerNorm), `RNNClassifier` (Bi-LSTM), `build_classifier()` factory
-  - `pipeline.py` — `WakeWordClassifier` (training wrapper for classifier head)
-- **`data/`**
-  - `generate.py` — Synthetic clip orchestration (`run_generate`); default TTS via `tts/` backends (`tts_backend` in config)
-  - `tts/` — `SpeechSynthesizer` protocol, `get_tts_backend()`, `PiperVitsBackend`, `VoxCpmBackend`
-  - `piper/` — Piper-style VITS: `generate_samples` (904-speaker SLERP), `vits/` model, `vits_utils.py`, `defaults.py` (checkpoint paths/URLs), `text.py` (CMUDict phrase prep)
-  - `augment.py` — `AudioAugmentor` (EQ, distortion, RIR, background mixing) for all 6 splits; positives aligned to END of window, negatives/backgrounds center-padded
-  - `dataset.py` — `WakeWordDataset` (memory-mapped .npy, mixed-class batch generator)
-  - `features.py` — Extract features through ONNX pipeline → .npy files
-- **`training/`**
-  - `trainer.py` — `WakeWordTrainer` with 3-phase training (full → refinement → fine-tuning), hard example mining, adaptive negative weighting, checkpoint averaging
-  - `metrics.py` — FPPH (false positives per hour), recall, balanced accuracy
-- **`export/onnx.py`** — Export classifier to ONNX with optional INT8 quantization
-- **`inference/`**
-  - `model.py` — `WakeWordModel` class for simple prediction API
-  - `listener.py` — `WakeWordListener` class for async microphone detection
-- **`swift/`** — `LiveKitWakeWord` Swift package: ONNX Runtime-based pipeline for iOS 16+ / macOS 14+. `WakeWordModel` (stateless predict) + `WakeWordListener` (actor around `AVAudioEngine`). The mel + embedding `.onnx` files from `src/livekit/wakeword/resources/` are bundled as package resources; classifier `.onnx` files are loaded from disk. ORT's CoreML Execution Provider (ANE/GPU/CPU) is used by default via `ExecutionProvider.coreML`. Depends on the [official ORT SPM package](https://github.com/microsoft/onnxruntime-swift-package-manager).
-- **`examples/ios_wakeword/`** — SwiftUI demo app (iOS + macOS) that consumes the `swift/` package via a local SPM dependency (`path: ../../swift`). `WakewordEngine` wraps `AVAudioEngine` + a 2 s Int16 ring buffer + background `WakeWordModel.predict()`; `ContentView` renders score/volume graphs and an execution-provider picker. Generated from `project.yml` via `xcodegen`.
-
-### Key Design Decisions
-
-- **Feature extraction is numpy-based** (ONNX runtime), not torch tensors. Both frozen models (`melspectrogram.onnx`, `embedding_model.onnx`) are bundled with the package via `importlib.resources` (see `resources/__init__.py`).
-- **Embedding shape**: always `(batch, 16, 96)` — 16 timesteps of 96-dim vectors. Last 16 steps taken or left-padded.
-- **Model sizes** (tiny/small/medium/large) map to `layer_dim` and `n_blocks` in config. Factory: `build_classifier(model_type, model_size)`.
-- **Training loss**: BCE with hard example mining (only non-trivial predictions contribute) and linearly increasing negative class weight.
-- **Checkpoint averaging**: final model averages top checkpoints by 90th-pct accuracy and 10th-pct FPPH.
-- **Config format**: YAML loaded via `load_config(path)`. See `configs/hey_livekit.yaml` for reference.
-
-## Documentation
-
-For detailed documentation on each pipeline stage, see `docs/`:
-
-- [docs/overview.md](docs/overview.md) — Architecture and data flow
-- [docs/data-generation.md](docs/data-generation.md) — TTS synthesis and adversarial negatives
-- [docs/augmentation.md](docs/augmentation.md) — Audio transforms and alignment
-- [docs/feature-extraction.md](docs/feature-extraction.md) — Mel spectrograms and embeddings
-- [docs/training.md](docs/training.md) — 3-phase training and checkpoint averaging
-- [docs/export-and-inference.md](docs/export-and-inference.md) — ONNX export and Python API
+- Exported models are plain detectors: the phrase conditioning is folded into weights at `bake`,
+  so runtimes never see the text encoder.
+- Data generation goes only through livekit-wakeword-bench (no in-repo TTS).
+- Formats: standard is ONNX (onnxruntime in Python/Swift, pure-Rust tract in the Rust SDK; the
+  trainer's tests check exports load in tract), micro is int8 TFLite (TFLite Micro).
+- No v1 compatibility: clients load streaming models only.
+- Encoder pretraining and experiments live outside this repo; keep recipe details (data,
+  objectives, ablations) out of public code, docs and model cards.
 
 ## Release process
 
 - Versions are cut with a PR, then a tag
-  - Run `scripts/update_version.sh X.Y.Z` (or `X.Y.Z-rc.N`) to bump `pyproject.toml`,
-    `livekit.wakeword.__version__` and `uv.lock`
-  - Open a PR (e.g., "Release v0.4.0") with the bumped version and merge it
+  - Run `scripts/update_version.sh X.Y.Z` (or `X.Y.Z-rc.N`): it bumps both Python packages, the
+    trainer's `livekit-wakeword==` pin, the ESP32 component and `uv.lock`
+  - Open a PR (e.g., "Release v2.1.0") with the bumped version and merge it
   - Publish a GitHub release on the merge commit with tag `vX.Y.Z` (mark `-rc.N` tags as
-    pre-releases) and include the automatically generated changelog
-  - The tag triggers `.github/workflows/publish.yml`, which checks the tag matches the package
-    version and publishes to PyPI (an `-rc.N` version installs only with `pip install --pre`)
+    pre-releases), include the automatically generated changelog, and attach the ready-made
+    models (`*.onnx`, `*_micro.tflite`, `*_micro.json`)
+  - The tag triggers `.github/workflows/publish.yml`: it checks the tag matches both package
+    versions and publishes them to PyPI; Swift Package Manager picks up the tag directly
+- The pretrained encoders (`encoders.tar.gz`) live on the release named in
+  `encoders.ENCODERS_RELEASE`; only a new encoder needs a new asset there (and a new sha256)
 - See `CONTRIBUTING.md` for the PR checklist
 
 ## Code Style
 
-- Python 3.11+, line length 100
-- Ruff for linting/formatting, mypy strict mode
-- Build system: hatchling, src layout (`src/livekit/wakeword/`)
+- Line length 100; ruff (E, F, I, UP); mypy strict with the pydantic plugin.
+- Build system: hatchling, src layout in each package.

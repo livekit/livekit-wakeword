@@ -30,18 +30,22 @@ jobs:
 
       # The version is cut in a "Release vX.Y.Z" PR (scripts/update_version.sh); the tag
       # must name the same version, so a tag on the wrong commit fails here.
-      - name: Check the tag matches the package version
+      - name: Check the tag matches the package versions
         if: github.ref_type == 'tag'
         run: |
-          version=$(uv version --short)
           tag="${GITHUB_REF_NAME#v}"
-          if [ "$(uvx --from packaging python -c "from packaging.version import Version as V; print(V('$tag') == V('$version'))")" != "True" ]; then
-            echo "tag $GITHUB_REF_NAME does not match pyproject version $version" >&2
-            exit 1
-          fi
+          for pkg in livekit-wakeword livekit-wakeword-train; do
+            version=$(uv version --short --package "$pkg")
+            if [ "$(uvx --from packaging python -c "from packaging.version import Version as V; print(V('$tag') == V('$version'))")" != "True" ]; then
+              echo "tag $GITHUB_REF_NAME does not match $pkg version $version" >&2
+              exit 1
+            fi
+          done
 
-      - name: Build package
-        run: uv build
+      # livekit-wakeword (client) and livekit-wakeword-train; uv replaces the workspace
+      # source with a plain PyPI requirement in the trainer's metadata.
+      - name: Build packages
+        run: uv build --all-packages
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

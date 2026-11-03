@@ -9,43 +9,25 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  python:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv python install 3.12
+      - run: uv sync --all-packages --frozen
+      - run: uv run --no-sync ruff check . && uv run --no-sync ruff format --check .
+      - run: uv run --no-sync mypy -p livekit.wakeword -p livekit.wakeword_train
+      - run: uv run --no-sync pytest --tb=short -q
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev libsndfile1 espeak-ng ffmpeg sox
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --extra train --extra export
-
-      - name: Run tests
-        run: uv run pytest --tb=short -q
-
-  # onnxruntime's arm64 kernels differ from x86 (KleidiAI); run the pretrained-model check on Apple silicon too.
-  inference-arm64:
+  # onnxruntime's arm64 kernels differ from x86 (KleidiAI); run the client on Apple silicon too, and the Swift package.
+  apple:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run inference tests
-        run: uv run pytest tests/test_pretrained.py --noconftest --tb=short -q
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv python install 3.12
+      # the client alone (numpy + onnxruntime); the dev group lives on the workspace root
+      - run: uv sync --package livekit-wakeword --frozen && uv pip install pytest pytest-asyncio
+      - run: uv run --no-sync pytest client/python/tests --tb=short -q
+      - run: swift test

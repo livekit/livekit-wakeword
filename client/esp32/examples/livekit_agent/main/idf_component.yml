@@ -1,0 +1,22 @@
+dependencies:
+  idf: ">=5.4"
+  livekit/livekit: "~0.3.11"
+  livekit/sandbox_token: "~0.1.0"
+  livekit/example_utils: "~0.2.0"
+  tempotian/codec_board: "~1.0.0"
+  # M5Stack Tab5: I/O expanders (speaker amplifier, ESP32-C6 power) and Wi-Fi through the ESP32-C6
+  espressif/esp_io_expander_pi4ioe5v6408:
+    version: "^1.0.1"
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_wifi_remote:
+    version: ">=0.10"
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_hosted:
+    version: "*"
+    rules:
+      - if: "target in [esp32p4]"
+  livekit/livekit_wakeword:
+    version: "*"
+    override_path: ../../../livekit_wakeword

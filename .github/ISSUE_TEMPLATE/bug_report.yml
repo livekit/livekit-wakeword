@@ -8,14 +8,26 @@ body:
     attributes:
       label: Version
       description: What version of livekit-wakeword are you using?
-      placeholder: "v0.3.0"
+      placeholder: "v2.0.0"
+  - type: dropdown
+    id: component
+    validations: { required: true }
+    attributes:
+      label: Component
+      description: Which part of livekit-wakeword?
+      options:
+        - Training (livekit-wakeword-train)
+        - Python client
+        - Swift client
+        - ESP32 component
+        - Ready-made models
   - type: input
     id: platforms
     validations: { required: true }
     attributes:
       label: Affected Platforms
       description: What platforms, versions, and CPU architectures have you observed the issue on?
-      placeholder: "macOS v15.5 (aarch64), Python 3.12"
+      placeholder: "macOS v15.5 (aarch64), Python 3.12 / ESP32-S3, ESP-IDF 5.5"
   - type: textarea
     id: description
     validations: { required: true }
