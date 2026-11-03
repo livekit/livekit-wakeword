@@ -11,9 +11,9 @@ uv add livekit-wakeword                          # detection only: numpy + onnxr
 ```python
 from livekit.wakeword import WakeWordModel
 
-model = WakeWordModel(models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])  # sample_rate=48000 etc.: resampled internally
 
-# stream audio as it arrives: 16 kHz mono, int16 or float32, any chunk size
+# stream audio as it arrives: mono at sample_rate (default 16 kHz), int16 or float32, any chunk size
 scores = model.predict(audio_chunk)
 if scores["hey_livekit"] > 0.5:  # 0.5 is calibrated to about 0.5 false alarms per hour
     print("Wake word detected!")

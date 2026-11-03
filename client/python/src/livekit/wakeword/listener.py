@@ -15,8 +15,7 @@ from .model import WakeWordModel
 
 logger = logging.getLogger(__name__)
 
-SAMPLE_RATE = 16000
-FRAME_SAMPLES = 1280  # 80 ms
+FRAME_SECONDS = 0.08  # one model step per read
 PYAUDIO_HINT = (
     "pip install 'livekit-wakeword[listener]' (or `uv run --with pyaudio ...`); PyAudio needs "
     "PortAudio: brew install portaudio / apt install portaudio19-dev"
@@ -43,6 +42,9 @@ class WakeWordListener:
 
     def __init__(self, model: WakeWordModel, threshold: float = 0.5, debounce: float = 2.0):
         self._model = model
+        # model-like objects without a rate get 16 kHz, the rate models run at
+        self._rate = int(getattr(model, "sample_rate", 16000))
+        self._frame = round(self._rate * FRAME_SECONDS)  # samples per microphone read
         self._threshold = threshold
         self._debounce = debounce
         self._stream: Any = None
@@ -68,9 +70,9 @@ class WakeWordListener:
             self._stream = self._pa.open(
                 format=pyaudio.paInt16,
                 channels=1,
-                rate=SAMPLE_RATE,
+                rate=self._rate,  # the model resamples other rates to 16 kHz
                 input=True,
-                frames_per_buffer=FRAME_SAMPLES,
+                frames_per_buffer=self._frame,
             )
         except BaseException:
             self._pa.terminate()
@@ -119,7 +121,7 @@ class WakeWordListener:
                     break
                 data = await loop.run_in_executor(
                     self._executor,
-                    lambda: self._stream.read(FRAME_SAMPLES, exception_on_overflow=False),
+                    lambda: self._stream.read(self._frame, exception_on_overflow=False),
                 )
                 if not self._running:
                     break

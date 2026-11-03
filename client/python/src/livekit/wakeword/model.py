@@ -9,6 +9,8 @@ from typing import Any
 import numpy as np
 from onnxruntime import InferenceSession, SessionOptions
 
+from ._resample import MODEL_RATE, Resampler
+
 logger = logging.getLogger(__name__)
 
 FRAME_SAMPLES = 1280  # 80 ms at 16 kHz
@@ -65,15 +67,23 @@ class _Stream:
 
 
 class WakeWordModel:
-    """Wake word models (`.onnx` from `livekit-wakeword train`), streamed over 16 kHz audio::
+    """Wake word models (`.onnx` from `livekit-wakeword train`), streamed over mono audio::
 
     model = WakeWordModel(models=["hey_livekit.onnx"])
     scores = model.predict(frame)  # {"hey_livekit": 0.97}; frames of any length
+
+    `sample_rate` is the rate of the audio passed to `predict()`; models run at 16 kHz, and audio
+    at any other rate is resampled internally.
     """
 
     def __init__(
-        self, models: list[str | Path] | None = None, sess_options: SessionOptions | None = None
+        self,
+        models: list[str | Path] | None = None,
+        sess_options: SessionOptions | None = None,
+        sample_rate: int = MODEL_RATE,
     ):
+        self.sample_rate = int(sample_rate)
+        self._resampler = Resampler(self.sample_rate) if self.sample_rate != MODEL_RATE else None
         self._sess_options = sess_options
         self._models: dict[str, _Stream] = {}
         for path in models or []:
@@ -121,13 +131,20 @@ class WakeWordModel:
 
     def reset(self) -> None:
         """Forget all audio heard so far (e.g. after a detection)."""
+        if self._resampler is not None:
+            self._resampler.reset()
         for m in self._models.values():
             m.reset()
 
     def predict(self, audio: np.ndarray) -> dict[str, float]:
-        """Feed the next audio (16 kHz mono, int16 or float in [-1, 1], any length). Returns each
-        model's highest score among the 80 ms steps this call completed (0.0 if none)."""
+        """Feed the next audio (mono at `sample_rate`, int16 or float in [-1, 1], any length).
+        Returns each model's highest score among the 80 ms steps this call completed (0.0 if
+        none)."""
+        if not self._models:
+            return {}
         x = _as_float(audio)
+        if self._resampler is not None:
+            x = self._resampler(x)
         return {name: m.feed(x) for name, m in self._models.items()}
 
     def predict_clip(self, audio: np.ndarray) -> dict[str, float]:
