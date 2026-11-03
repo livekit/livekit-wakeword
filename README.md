@@ -192,7 +192,8 @@ The model file is named after the phrase; set `model_name` in the config (for ex
 In English, words outside the dictionary (names, brands, made-up words) need a pronunciation in
 [ARPAbet](http://www.speech.cs.cmu.edu/cgi-bin/cmudict), so every voice says them the same way;
 `setup` names any word it is missing. Words made of dictionary words, such as "livekit", work
-without one. Phrases in other languages need none: their speech is generated from the text.
+without one. Phrases in other languages need none: their speech is generated from the text, by
+every TTS model that speaks the language.
 
 ```bash
 uv run livekit-wakeword setup --wakeword "hey zork" --pronounce "zork=Z AO1 R K"

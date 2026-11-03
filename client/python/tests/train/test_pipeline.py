@@ -177,6 +177,8 @@ def test_phrase_pronunciations() -> None:
     vi = WakeWordConfig(wakeword="xin chào", language="vi")
     assert phrase_problems(vi) == [] and not phoneme_steered(vi)
     assert _wanted(vi) == {"natural": (1000, 500, 150)}
+    es = WakeWordConfig(wakeword="hola amigo", language="es")  # dictionary words, still Spanish
+    assert not phoneme_steered(es) and _wanted(es) == {"natural": (1000, 500, 150)}
 
 
 def test_generate_knobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

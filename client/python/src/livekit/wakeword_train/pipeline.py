@@ -75,10 +75,10 @@ def unknown_words(config: WakeWordConfig) -> list[str]:
 
 
 def phoneme_steered(config: WakeWordConfig) -> bool:
-    """Whether TTS can be steered with phonemes (every word has a pronunciation). Phrases in other
-    languages with words outside ARPAbet use plain-text TTS only; English ones need
-    `pronunciations` (see `phrase_problems`)."""
-    return not unknown_words(config)
+    """Whether TTS is steered with phonemes: English phrases whose words all have an ARPAbet
+    pronunciation (`phrase_problems` asks for missing ones). ARPAbet is English, so phrases in
+    other languages use plain-text TTS only."""
+    return config.language.lower().split("-")[0] == "en" and not unknown_words(config)
 
 
 def phrase_problems(config: WakeWordConfig) -> list[str]:
@@ -185,7 +185,7 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
         raise SetupError(str(e)) from None
     d = config.dataset_dir
     if not phoneme_steered(config):
-        logger.info("no phonemes for %r: generating with plain-text TTS only", config.wakeword)
+        logger.info("%r: generating with plain-text TTS only", config.wakeword)
     for kind, (n_pos, n_conf, n_sent) in _wanted(config).items():
         out = d / kind
         if _done(out, "train") and _train_counts(out) == (n_pos, n_conf, n_sent):
