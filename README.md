@@ -121,7 +121,7 @@ false alarms per hour on the bench's conversational speech; raise the threshold 
 
 ## Train a wake word
 
-You need Python 3.12+, a CUDA GPU or an Apple silicon Mac, [uv](https://docs.astral.sh/uv/) and a LiveKit Cloud project
+You need a CUDA GPU or an Apple silicon Mac, [uv](https://docs.astral.sh/uv/) and a LiveKit Cloud project
 (the free plan works) for the TTS.
 
 **1. Get LiveKit credentials.** Sign up at [cloud.livekit.io](https://cloud.livekit.io) and create a
@@ -141,38 +141,44 @@ set -a && source .env.local && set +a            # export them in this shell
 You can also create an API key in the project settings of the LiveKit Cloud dashboard and export
 the three variables yourself.
 
-**2. Get the code:**
+**2. Install the CLI:**
 
 ```bash
-git clone https://github.com/livekit/livekit-wakeword && cd livekit-wakeword
-uv sync --extra train                            # or --extra tflite for --type micro
+uv tool install --python 3.13 "livekit-wakeword[tflite]"   # or [train] if you only need standard models
 ```
 
-`setup` downloads the pretrained encoders from the v2.0.0 release once.
+This puts `livekit-wakeword` on your PATH; you do not need to clone this repo. uv downloads
+Python 3.13 if you do not have it. `uv tool upgrade livekit-wakeword` updates it later. `setup`
+downloads the pretrained encoders from the v2.0.0 release once.
 
-**3. Train:**
+**3. Train** (in an empty folder: it holds the config, the models and a `.cache` of noise sources):
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hey robot" --eval  # training speech + held-out test set
-uv run livekit-wakeword train --wakeword "hey robot" --type standard
-uv run livekit-wakeword eval --wakeword "hey robot"    # bench score on a held-out test set
-uv run --with pyaudio livekit-wakeword listen hey_robot.onnx   # try it on your microphone
+livekit-wakeword setup --wakeword "hey robot" --eval  # training speech + held-out test set
+livekit-wakeword train --wakeword "hey robot" --type standard
+livekit-wakeword eval --wakeword "hey robot"          # bench score on a held-out test set
+livekit-wakeword listen hey_robot.onnx                # try it on your microphone (see below)
 ```
 
 A new phrase takes about 11 minutes on one data-center GPU (6 minutes of speech generation, 5 of
-training). The first run downloads about 4 GB of noise, room and speech sources once.
+training). On an M4 Pro Mac, speech generation took 22 minutes and training 37. The first run
+downloads about 4 GB of noise, room and speech sources once.
+
+`listen` needs PyAudio. Add it to the CLI with
+`uv tool install --python 3.13 "livekit-wakeword[tflite,listener]"`; PyAudio builds against
+PortAudio (`brew install portaudio` on macOS, `apt install portaudio19-dev` on Debian/Ubuntu).
 
 **For ESP32**, also train a micro model (about 7 more minutes):
 
 ```bash
-uv run livekit-wakeword train --wakeword "hey robot" --type micro   # -> hey_robot_micro.tflite
+livekit-wakeword train --wakeword "hey robot" --type micro  # -> hey_robot_micro.tflite
 ```
 
 **More speech, or a different output folder:**
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hey robot" --clips 4      # 4x the default training speech
-uv run livekit-wakeword train --wakeword "hey robot" --out models   # writes models/hey_robot.onnx
+livekit-wakeword setup --wakeword "hey robot" --clips 4     # 4x the default training speech
+livekit-wakeword train --wakeword "hey robot" --out models  # writes models/hey_robot.onnx
 ```
 
 **Multilingual wake words.** A phrase can be in any language and script. Pass its language with
@@ -180,10 +186,10 @@ uv run livekit-wakeword train --wakeword "hey robot" --out models   # writes mod
 by voices that speak it; `train` and `eval` read it from the saved config:
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hola asistente" --language es --eval
-uv run livekit-wakeword setup --wakeword "xin chào robot" --language vi
-uv run livekit-wakeword setup --wakeword "ねえ ロボット" --language ja
-uv run livekit-wakeword train --wakeword "ねえ ロボット"             # -> ねえ_ロボット.onnx
+livekit-wakeword setup --wakeword "hola asistente" --language es --eval
+livekit-wakeword setup --wakeword "xin chào robot" --language vi
+livekit-wakeword setup --wakeword "ねえ ロボット" --language ja
+livekit-wakeword train --wakeword "ねえ ロボット"  # -> ねえ_ロボット.onnx
 ```
 
 The model file is named after the phrase; set `model_name` in the config (for example
@@ -196,7 +202,7 @@ without one. Phrases in other languages need none: their speech is generated fro
 every TTS model that speaks the language.
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hey zork" --pronounce "zork=Z AO1 R K"
+livekit-wakeword setup --wakeword "hey zork" --pronounce "zork=Z AO1 R K"
 ```
 
 The [training guide](https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md#flags) lists every flag, with a full example from setup to
