@@ -36,6 +36,20 @@ def test_negative_clip_rejected(model: WakeWordModel) -> None:
     assert model.predict_clip(clip("negative.wav"))["hey_livekit"] < THRESHOLD
 
 
+@pytest.mark.parametrize("rate", [44100, 48000])
+def test_other_sample_rates(rate: int) -> None:
+    """Audio at another rate is resampled to 16 kHz before it reaches the model."""
+    audio = clip("positive.wav").astype(np.float32) / 32768
+    n = int(len(audio) * rate / 16000)
+    upsampled = np.interp(np.arange(n) * 16000 / rate, np.arange(len(audio)), audio)
+    model = WakeWordModel(models=[MODEL], sample_rate=rate)
+    assert model.sample_rate == rate
+    score = model.predict_clip(upsampled.astype(np.float32))["hey_livekit"]
+    assert score >= THRESHOLD
+    native = WakeWordModel(models=[MODEL]).predict_clip(audio)["hey_livekit"]
+    assert score == pytest.approx(native, abs=0.05)
+
+
 def test_caller_options_are_kept() -> None:
     options = SessionOptions()
     options.intra_op_num_threads = 1

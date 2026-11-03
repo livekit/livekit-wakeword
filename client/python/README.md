@@ -11,15 +11,18 @@ uv add livekit-wakeword                          # detection only: numpy + onnxr
 ```python
 from livekit.wakeword import WakeWordModel
 
-model = WakeWordModel(models=["hey_livekit.onnx"])
+model = WakeWordModel(models=["hey_livekit.onnx"])  # sample_rate=48000 etc.: resampled internally
 
-# stream audio as it arrives: 16 kHz mono, int16 or float32, any chunk size
+# stream audio as it arrives: mono at sample_rate (default 16 kHz), int16 or float32, any chunk size
 scores = model.predict(audio_chunk)
 if scores["hey_livekit"] > 0.5:  # 0.5 is calibrated to about 0.5 false alarms per hour
     print("Wake word detected!")
     model.reset()  # start fresh after a detection
 
 model.predict_clip(clip)  # highest score in a whole clip
+
+model.load_model("another.onnx", model_name="custom")  # add or replace models at runtime
+model.unload_model("custom")
 ```
 
 `predict()` returns one score per loaded model, keyed by file name stem. Each 80 ms of audio is one

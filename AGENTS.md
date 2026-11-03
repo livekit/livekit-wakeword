@@ -61,7 +61,7 @@ uv run livekit-wakeword setup|train|eval|listen  # the CLI
   - Open a PR (e.g., "Release v2.1.0") with the bumped version and merge it
   - Publish a GitHub release on the merge commit with tag `vX.Y.Z` (mark `-rc.N` tags as
     pre-releases), include the automatically generated changelog, and attach the ready-made
-    models (`*.onnx`, `*_micro.tflite`, `*_micro.json`) and `NOTICE`
+    models (`*.onnx`, `*_micro.tflite`) and `NOTICE`
   - The tag triggers `.github/workflows/publish.yml`: it checks the tag matches the package
     version and publishes `livekit-wakeword` to PyPI; Swift Package Manager picks up the tag
 - The pretrained encoders (`encoders.tar.gz`) live on the release named in

@@ -13,7 +13,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from .config import ModelType, WakeWordConfig
+from .config import ModelType, WakeWordConfig, is_english
 
 logger = logging.getLogger(__name__)
 # share of training clips with overlapping talkers (party scenes); calibration keeps the plain mix
@@ -78,7 +78,7 @@ def phoneme_steered(config: WakeWordConfig) -> bool:
     """Whether TTS is steered with phonemes: English phrases whose words all have an ARPAbet
     pronunciation (`phrase_problems` asks for missing ones). ARPAbet is English, so phrases in
     other languages use plain-text TTS only."""
-    return config.language.lower().split("-")[0] == "en" and not unknown_words(config)
+    return is_english(config.language) and not unknown_words(config)
 
 
 def phrase_problems(config: WakeWordConfig) -> list[str]:
@@ -92,7 +92,7 @@ def phrase_problems(config: WakeWordConfig) -> list[str]:
         if err := validate_arpabet(arpabet):
             problems.append(f"pronunciation for {word!r} is not ARPAbet ({err}), e.g. Z AO1 R K")
     missing = unknown_words(config)
-    if missing and config.language == "en":
+    if missing and is_english(config.language):
         flags = " ".join(f'--pronounce "{w}=<ARPAbet>"' for w in missing)
         problems.append(
             f"no pronunciation for {', '.join(map(repr, missing))} (not in the CMU dictionary): "
@@ -105,7 +105,7 @@ def phrase_problems(config: WakeWordConfig) -> list[str]:
 def natural_positives_help(phrase: str, language: str = "en") -> bool:
     """Whether plain-text TTS positives help: only when TTS reads the words as users say them
     (dictionary words; brand names like "livekit" get varied readings)."""
-    if language != "en":
+    if not is_english(language):
         return True
     import pronouncing
 
@@ -143,15 +143,39 @@ def _done(d: Path, split: str) -> bool:
     return any((d / "data").glob(f"{split}-*.parquet"))
 
 
-def _train_counts(d: Path) -> tuple[int, int, int] | None:
-    """(positive, confusable, sentence) clip counts a generated training set was made with."""
+def _bench_config(d: Path) -> dict[str, Any] | None:
+    """The bench config a generated dataset was made with."""
     import yaml
 
     try:
-        split = yaml.safe_load((d / "bench_config.yaml").read_text())["splits"]["train"]
-        return int(split["n_positive"]), int(split["n_adversarial"]), int(split["n_speech"])
-    except (OSError, KeyError, TypeError):
+        cfg = yaml.safe_load((d / "bench_config.yaml").read_text())
+    except (OSError, yaml.YAMLError):
         return None
+    return cfg if isinstance(cfg, dict) else None
+
+
+def _train_counts(d: Path) -> tuple[int, int, int] | None:
+    """(positive, confusable, sentence) clip counts a generated training set was made with."""
+    try:
+        split = (_bench_config(d) or {})["splits"]["train"]
+        return int(split["n_positive"]), int(split["n_adversarial"]), int(split["n_speech"])
+    except (KeyError, TypeError):
+        return None
+
+
+def _same_phrase(d: Path, config: WakeWordConfig) -> bool:
+    """Whether the dataset in `d` was generated for the config's phrase, language and
+    pronunciations (a changed pronunciation means the old clips say the phrase differently).
+    Datasets without a readable bench config are kept."""
+    bench = _bench_config(d)
+    if bench is None:
+        return True
+    made = {str(k).lower(): str(v) for k, v in (bench.get("pronunciations") or {}).items()}
+    return (
+        str(bench.get("wake_word", config.wakeword)) == config.wakeword
+        and str(bench.get("language", config.language)) == config.language
+        and all(made.get(w.lower()) == a for w, a in config.pronunciations.items())
+    )
 
 
 def _wanted(config: WakeWordConfig) -> dict[str, tuple[int, int, int]]:
@@ -188,17 +212,18 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
         logger.info("%r: generating with plain-text TTS only", config.wakeword)
     for kind, (n_pos, n_conf, n_sent) in _wanted(config).items():
         out = d / kind
-        if _done(out, "train") and _train_counts(out) == (n_pos, n_conf, n_sent):
+        done = _done(out, "train")
+        if done and _train_counts(out) == (n_pos, n_conf, n_sent) and _same_phrase(out, config):
             continue
-        if _done(out, "train"):  # new clip counts: the old checkpoint learned from other speech
-            logger.info("clip counts changed: regenerating %s", out)
+        if done:  # the old checkpoint learned from other speech
+            logger.info("clip counts, phrase or pronunciations changed: regenerating %s", out)
             (config.runs_dir / "standard.pt").unlink(missing_ok=True)
         logger.info("generating %s training speech for %r", kind, config.wakeword)
         _generate(
             config,
             out,
             ["train"],
-            overwrite=_done(out, "train"),
+            overwrite=done,
             **({"tts__phonemes": False} if kind == "natural" else {}),
             splits__train__n_positive=n_pos,
             splits__train__n_adversarial=n_conf,
@@ -212,12 +237,15 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
 def test_dataset(config: WakeWordConfig) -> Path:
     """The held-out test set (unseen voices, noise and rooms; cached)."""
     d = config.dataset_dir / "test"
-    if not _done(d, "test"):
+    stale = _done(d, "test") and not _same_phrase(d, config)
+    if stale:
+        logger.info("phrase, language or pronunciations changed: regenerating %s", d)
+    if not _done(d, "test") or stale:
         problems = check_environment(config)
         if problems:
             raise SetupError("cannot generate the test set:\n  - " + "\n  - ".join(problems))
         logger.info("generating the test set for %r", config.wakeword)
-        _generate(config, d, ["test"])
+        _generate(config, d, ["test"], overwrite=stale)
     return d
 
 
@@ -287,6 +315,14 @@ def _train_micro(
     return files.get("tflite", files["onnx"])
 
 
+def _is_streaming_onnx(path: Path) -> bool:
+    """A standard model takes raw audio (`chunk`); a micro `.onnx` takes log-mels (`mel`)."""
+    import onnx
+
+    graph = onnx.load(str(path), load_external_data=False).graph
+    return any(i.name == "chunk" for i in graph.input)
+
+
 def run_eval(
     config: WakeWordConfig,
     model_path: str | Path | None = None,
@@ -303,7 +339,7 @@ def run_eval(
         raise SetupError(f"no model at {path}: train it first (`livekit-wakeword train`)")
     if media is not None and not Path(media).is_dir():
         raise SetupError(f"no media set at {media}: build it once with `lkwb media -o {media}`")
-    if path.suffix == ".onnx" and not path.stem.endswith("_micro"):
+    if path.suffix == ".onnx" and _is_streaming_onnx(path):
         spec = f"livekit:{path}"
     else:  # micro: the host reference runtime, same numerics as the device
         spec = f"livekit.wakeword_train.micro:MicroRuntime?path={path}"

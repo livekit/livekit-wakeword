@@ -15,8 +15,7 @@ from .model import WakeWordModel
 
 logger = logging.getLogger(__name__)
 
-SAMPLE_RATE = 16000
-FRAME_SAMPLES = 1280  # 80 ms
+FRAME_SECONDS = 0.08  # one model step per read
 PYAUDIO_HINT = (
     "pip install 'livekit-wakeword[listener]' (or `uv run --with pyaudio ...`); PyAudio needs "
     "PortAudio: brew install portaudio / apt install portaudio19-dev"
@@ -34,7 +33,7 @@ class WakeWordListener:
     """Streams the microphone through ``WakeWordModel.predict()`` in 80 ms frames.
 
     After a detection the loop pauses (and the model is reset) until ``wait_for_detection()`` is
-    called again::
+    called again. ``debounce`` is the minimum time between two detections of the same wake word::
 
         async with WakeWordListener(model, threshold=0.5, debounce=2.0) as listener:
             while True:
@@ -43,13 +42,16 @@ class WakeWordListener:
 
     def __init__(self, model: WakeWordModel, threshold: float = 0.5, debounce: float = 2.0):
         self._model = model
+        # model-like objects without a rate get 16 kHz, the rate models run at
+        self._rate = int(getattr(model, "sample_rate", 16000))
+        self._frame = round(self._rate * FRAME_SECONDS)  # samples per microphone read
         self._threshold = threshold
         self._debounce = debounce
         self._stream: Any = None
         self._pa: Any = None
         self._task: asyncio.Task[None] | None = None
         self._running = False
-        self._last_detection_time = 0.0
+        self._last_detection: dict[str, float] = {}  # per wake word, for `debounce`
         self._detection_queue: asyncio.Queue[Detection] = asyncio.Queue()
         self._error: BaseException | None = None
         # one worker thread for mic reads and predict(), off the event loop
@@ -64,13 +66,19 @@ class WakeWordListener:
             raise ImportError(f"WakeWordListener needs PyAudio: {PYAUDIO_HINT}") from e
 
         self._pa = pyaudio.PyAudio()
-        self._stream = self._pa.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=SAMPLE_RATE,
-            input=True,
-            frames_per_buffer=FRAME_SAMPLES,
-        )
+        try:
+            self._stream = self._pa.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=self._rate,  # the model resamples other rates to 16 kHz
+                input=True,
+                frames_per_buffer=self._frame,
+            )
+        except BaseException:
+            self._pa.terminate()
+            self._pa = None
+            raise
+        self._last_detection = {}
         self._running = True
         self._listening.set()
         self._done_event.clear()
@@ -99,8 +107,10 @@ class WakeWordListener:
         if self._stream:
             self._stream.stop_stream()
             self._stream.close()
+            self._stream = None
         if self._pa:
             self._pa.terminate()
+            self._pa = None
 
     async def _audio_loop(self) -> None:
         loop = asyncio.get_running_loop()
@@ -111,7 +121,7 @@ class WakeWordListener:
                     break
                 data = await loop.run_in_executor(
                     self._executor,
-                    lambda: self._stream.read(FRAME_SAMPLES, exception_on_overflow=False),
+                    lambda: self._stream.read(self._frame, exception_on_overflow=False),
                 )
                 if not self._running:
                     break
@@ -121,11 +131,9 @@ class WakeWordListener:
                     break
                 now = time.monotonic()
                 for name, score in scores.items():
-                    if (
-                        score >= self._threshold
-                        and now - self._last_detection_time >= self._debounce
-                    ):
-                        self._last_detection_time = now
+                    last = self._last_detection.get(name)
+                    if score >= self._threshold and (last is None or now - last >= self._debounce):
+                        self._last_detection[name] = now
                         self._listening.clear()
                         self._model.reset()
                         await self._detection_queue.put(

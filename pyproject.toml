@@ -99,6 +99,7 @@ plugins = ["pydantic.mypy"]
 module = [
     "ai_edge_litert",
     "ai_edge_litert.*",
+    "flatbuffers",
     "livekit_wakeword_bench",
     "livekit_wakeword_bench.*",
     "onnx2tf",

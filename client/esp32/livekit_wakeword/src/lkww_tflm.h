@@ -625,6 +625,7 @@ class LkwwDetector {
 #else
         interpreter_(model_, Resolver(), arena, arena_bytes) {
 #endif
+    LoadMelParams();
     if (interpreter_.AllocateTensors() != kTfLiteOk) return;
     ok_ = MapTensors() && PlanStateCopy();
     if (warm) Reset();
@@ -635,6 +636,8 @@ class LkwwDetector {
   LkwwDetector& operator=(const LkwwDetector&) = delete;
 
   bool ok() const { return ok_; }
+  // The log-mel parameters in use: from the model's metadata, else the LKWW_MEL_* defaults.
+  bool has_mel_params() const { return has_mel_params_; }
   size_t arena_used() { return interpreter_.arena_used_bytes(); }
   int num_states() const { return n_states_; }
   size_t state_bytes(int i) const { return state_[i]->bytes; }
@@ -667,6 +670,30 @@ class LkwwDetector {
 
  private:
   static constexpr int kWarmupSteps = 25;  // 2 s
+
+  // The trainer stores the log-mel parameters (floor, offset, scale) the model was trained with
+  // as metadata "livekit_wakeword.mel_params": 3 little-endian float32. Models without it use
+  // the LKWW_MEL_* defaults.
+  void LoadMelParams() {
+    const auto* metadata = model_->metadata();
+    const auto* buffers = model_->buffers();
+    if (metadata == nullptr || buffers == nullptr) return;
+    for (const auto* entry : *metadata) {
+      if (entry->name() == nullptr ||
+          strcmp(entry->name()->c_str(), "livekit_wakeword.mel_params") != 0 ||
+          entry->buffer() >= buffers->size()) {
+        continue;
+      }
+      const auto* data = buffers->Get(entry->buffer())->data();
+      if (data == nullptr || data->size() != 3 * sizeof(float)) continue;
+      float p[3];
+      memcpy(p, data->data(), sizeof(p));  // the buffer need not be float-aligned
+      if (p[2] == 0.0f) continue;
+      lkww_frontend_init(&fe_, p[0], p[1], p[2]);
+      has_mel_params_ = true;
+      return;
+    }
+  }
 
   float Step() {
 #ifdef LKWW_PROFILE
@@ -890,6 +917,7 @@ class LkwwDetector {
   uint8_t* temp_ = nullptr;
   size_t temp_bytes_ = 0;
   bool ok_ = false;
+  bool has_mel_params_ = false;
 };
 
 #endif  // LKWW_TFLM_H

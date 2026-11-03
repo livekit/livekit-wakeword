@@ -81,7 +81,8 @@ esp_err_t lkww_process(lkww_handle_t ww, const int16_t *pcm, size_t samples, flo
 esp_err_t lkww_feed(lkww_handle_t ww, const int16_t *pcm, size_t frames, uint8_t channels,
                     uint8_t channel);
 
-/** Forget everything heard so far. */
+/** Forget everything heard so far. Safe while a pipeline runs (and from on_detect): the inference
+ * task then resets before its next samples. */
 void lkww_reset(lkww_handle_t ww);
 
 /** Latest score (0..1) and the duration of the last 80 ms step. */
@@ -111,7 +112,8 @@ typedef struct {
     .skip_open = false,                                \
 }
 
-/** Listen on an esp_codec_dev record device (exclusively; lkww_stop() releases it). */
+/** Listen on an esp_codec_dev record device (exclusively; lkww_stop() releases it).
+ * ESP_ERR_INVALID_STATE if a pipeline is already running: lkww_stop() it first. */
 esp_err_t lkww_start_codec_dev(lkww_handle_t ww, const lkww_codec_dev_config_t *dev);
 
 typedef struct {
@@ -130,7 +132,8 @@ typedef struct {
     .gain_shift = 2,                                       \
 }
 
-/** Listen on a standard-mode I2S MEMS microphone (32-bit slots, 24-bit samples). */
+/** Listen on a standard-mode I2S MEMS microphone (32-bit slots, 24-bit samples).
+ * ESP_ERR_INVALID_STATE if a pipeline is already running: lkww_stop() it first. */
 esp_err_t lkww_start_i2s(lkww_handle_t ww, const lkww_i2s_config_t *mic);
 
 /** Stop a running pipeline and close a record device opened by lkww_start_codec_dev(). */

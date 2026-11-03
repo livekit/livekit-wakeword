@@ -74,6 +74,16 @@ def _concat(sets: list[ClipSet]) -> ClipSet:
     )
 
 
+def _cache_fresh(cdir: Path, dataset: Path) -> bool:
+    """Whether the clip cache in `cdir` was built from the dataset as it is now (`setup`
+    regenerates a dataset in place when its clip counts or phrase change)."""
+    ends = [cdir / c / "ends.npy" for c in _CATS]
+    if not all(e.exists() for e in ends):
+        return False
+    built = min(e.stat().st_mtime for e in ends)
+    return all(f.stat().st_mtime <= built for f in dataset.glob("data/*.parquet"))
+
+
 def load_clipsets(dataset: str | Path | list[str]) -> dict[str, ClipSet]:
     """A bench dataset's (dir or HF repo; a list is merged) train split as a ClipSet per category,
     cached as mmap-able .npy."""
@@ -83,7 +93,7 @@ def load_clipsets(dataset: str | Path | list[str]) -> dict[str, ClipSet]:
     from livekit_wakeword_bench import WakeWordData
 
     cdir = CACHE / "clipsets" / str(dataset).strip("/").replace("/", "_")
-    if all((cdir / c / "ends.npy").exists() for c in _CATS):
+    if _cache_fresh(cdir, Path(dataset)):
         return {
             c: ClipSet(
                 *(

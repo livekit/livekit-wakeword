@@ -25,6 +25,10 @@ enum ORTRuntime {
 
     static func sessionOptions(for provider: ExecutionProvider) throws -> ORTSessionOptions {
         let options = try wrap { try ORTSessionOptions() }
+        // ONNX Runtime 1.27.0 on arm64 runs batch-1 convolutions through KleidiAI kernels that
+        // return wrong results (CPU provider, and CoreML's CPU fallback); older versions accept
+        // the entry and ignore it. Same default as the Python and Rust clients.
+        try wrap { try options.addConfigEntry(withKey: "mlas.disable_kleidiai", value: "1") }
         if provider == .cpu { return options }
         let coreml = ORTCoreMLExecutionProviderOptions()
         coreml.useCPUAndGPU = provider == .coreMLCPUAndGPU

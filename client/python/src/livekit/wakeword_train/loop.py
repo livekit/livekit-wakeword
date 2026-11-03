@@ -40,7 +40,10 @@ def default_device() -> str:
 def default_aug(det: nn.Module) -> AugConfig:
     """Augmentation for `det`: encoders with the low log-mel floor also get quiet/device audio."""
     fe = getattr(getattr(det, "encoder", None), "frontend", None)
-    if fe is not None and tuple(fe.params) != MEL_DEFAULT:
+    # the params are float32 buffers: 1e-6 comes back as 9.99999997e-07, so compare loosely
+    if fe is not None and not all(
+        math.isclose(float(a), b, rel_tol=1e-5) for a, b in zip(fe.params, MEL_DEFAULT, strict=True)
+    ):
         return robust_aug()
     return AugConfig(p_codec=0.25)
 

@@ -88,6 +88,7 @@ public final class WakeWordModel: @unchecked Sendable {
 
     /// Forgets all audio heard so far.
     public func reset() {
+        resampler?.reset()
         for model in snapshot().values { model.reset() }
     }
 
@@ -111,6 +112,7 @@ public final class WakeWordModel: @unchecked Sendable {
     private func run(_ pcm: UnsafeBufferPointer<Int16>, fresh: Bool) throws -> [String: Float] {
         let models = snapshot()
         if models.isEmpty { return [:] }
+        if fresh { resampler?.reset() }
         let audio = try resampler?.resample(samples: pcm) ?? pcm.map { Float($0) / 32768 }
         var scores = [String: Float]()
         for (name, model) in models {
