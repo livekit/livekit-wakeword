@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 FRAME_SECONDS = 0.08  # one model step per read
 PYAUDIO_HINT = (
-    "pip install 'livekit-wakeword[listener]' (or `uv run --with pyaudio ...`); PyAudio needs "
+    "pip install 'livekit-wakeword[listener]', or run "
+    "uvx --from 'livekit-wakeword[listener]' livekit-wakeword listen <model.onnx>; PyAudio needs "
     "PortAudio: brew install portaudio / apt install portaudio19-dev"
 )
 

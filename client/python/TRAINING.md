@@ -77,7 +77,7 @@ For example, generate four times the default training speech and write the model
 livekit-wakeword setup --wakeword "hey robot" --clips 4 --eval
 livekit-wakeword train --wakeword "hey robot" --out ./models
 livekit-wakeword eval --wakeword "hey robot" --model ./models/hey_robot.onnx
-livekit-wakeword listen ./models/hey_robot.onnx
+uvx --from "livekit-wakeword[listener]" livekit-wakeword listen ./models/hey_robot.onnx
 ```
 
 `--clips 4` sets `n_positive` to 2,000, `n_confusable` to 2,000 and `n_sentence` to 600, four times
