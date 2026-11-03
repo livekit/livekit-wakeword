@@ -88,6 +88,18 @@ For detailed documentation on each pipeline stage, see `docs/`:
 - [docs/training.md](docs/training.md) — 3-phase training and checkpoint averaging
 - [docs/export-and-inference.md](docs/export-and-inference.md) — ONNX export and Python API
 
+## Release process
+
+- Versions are cut with a PR, then a tag
+  - Run `scripts/update_version.sh X.Y.Z` (or `X.Y.Z-rc.N`) to bump `pyproject.toml`,
+    `livekit.wakeword.__version__` and `uv.lock`
+  - Open a PR (e.g., "Release v0.4.0") with the bumped version and merge it
+  - Publish a GitHub release on the merge commit with tag `vX.Y.Z` (mark `-rc.N` tags as
+    pre-releases) and include the automatically generated changelog
+  - The tag triggers `.github/workflows/publish.yml`, which checks the tag matches the package
+    version and publishes to PyPI (an `-rc.N` version installs only with `pip install --pre`)
+- See `CONTRIBUTING.md` for the PR checklist
+
 ## Code Style
 
 - Python 3.11+, line length 100

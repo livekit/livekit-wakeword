@@ -2,45 +2,72 @@ name: Publish to PyPI
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
+
+# One publish run at a time. A second tag push waits; it does not cancel the
+# in-flight run because cancelling a half-uploaded publish is worse than
+# letting it finish.
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Python
         run: uv python install 3.12
 
+      # The version is cut in a "Release vX.Y.Z" PR (scripts/update_version.sh); the tag
+      # must name the same version, so a tag on the wrong commit fails here.
+      - name: Check the tag matches the package version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(uv version --short)
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$(uvx --from packaging python -c "from packaging.version import Version as V; print(V('$tag') == V('$version'))")" != "True" ]; then
+            echo "tag $GITHUB_REF_NAME does not match pyproject version $version" >&2
+            exit 1
+          fi
+
       - name: Build package
         run: uv build
 
-      - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
 
+  # Uses OIDC trusted publishing: no API key is stored in GitHub secrets.
+  # The trusted publisher at pypi.org is: repository livekit/livekit-wakeword,
+  # workflow publish.yml, environment pypi.
   publish:
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      id-token: write  # required for OIDC trusted publisher
     steps:
-      - name: Download dist artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
 
+      - name: Show collected distributions
+        run: ls -lh dist/
+
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true

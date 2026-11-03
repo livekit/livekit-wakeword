@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Developer Community
+    url: https://community.livekit.io/c/robotics
+    about: Ask questions, suggest improvements, and discuss contributions
