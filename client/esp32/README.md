@@ -101,7 +101,9 @@ The component's `src/` is plain C99 plus a small C++ TensorFlow Lite Micro wrapp
 any TFLM target. Every 80 ms (1280 samples at 16 kHz):
 
 1. `lkww_frontend_process(&fe, pcm, mel)` (`lkww_micro.h`, `lkww_frontend.c`) turns the new samples
-   into `mel` (8 x 40 floats). It matches the training front end to 1e-4.
+   into `mel` (8 x 40 floats). It matches the training front end to 1e-4. Set it up once with
+   `lkww_frontend_init(&fe, floor, offset, scale)`, using the three float32 values in the model's
+   `livekit_wakeword.mel_params` metadata.
 2. Run the model on `mel` (1, 8, 40) and the states `s0..sK`.
 3. Copy each new state (signature output `output_{i+1}`) into `s<i>`; `output_0` is the score.
 

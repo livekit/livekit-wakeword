@@ -183,9 +183,9 @@ esp_err_t lkww_create(const lkww_config_t *cfg, lkww_handle_t *out)
         return ESP_FAIL;
     }
     ww->done = xSemaphoreCreateBinary();
-    ESP_LOGI(TAG, "model loaded: %u bytes, arena %u/%u bytes used, %d state tensors",
+    ESP_LOGI(TAG, "model loaded: %u bytes, arena %u/%u bytes used, %d state tensors, log-mel %s",
              (unsigned)cfg->model_size, (unsigned)ww->det->arena_used(), (unsigned)arena_bytes,
-             ww->det->num_states());
+             ww->det->num_states(), ww->det->has_mel_params() ? "from the model" : "defaults");
     *out = ww;
     return ESP_OK;
 }

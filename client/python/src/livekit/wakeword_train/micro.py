@@ -21,6 +21,63 @@ from .nn import FRAME, MEL_DEFAULT, N_CTX, Detector, LogMel
 
 logger = logging.getLogger(__name__)
 
+# The log-mel parameters (floor, offset, scale) the model was trained with, stored in the model
+# file: TFLite metadata (3 little-endian float32, read by the ESP32 component) and ONNX
+# metadata_props (JSON list).
+MEL_PARAMS_KEY = "livekit_wakeword.mel_params"
+
+
+def embed_mel_params(model: bytes, params: tuple[float, float, float]) -> bytes:
+    """`model` (a .tflite flatbuffer) with `params` in its metadata (replacing any earlier)."""
+    import struct
+
+    import flatbuffers
+    from ai_edge_litert import schema_py_generated as schema
+
+    m = schema.ModelT.InitFromPackedBuf(bytearray(model), 0)
+    buf = schema.BufferT()
+    buf.data = np.frombuffer(struct.pack("<3f", *params), np.uint8)
+    m.buffers.append(buf)
+    entry = schema.MetadataT()
+    entry.name = MEL_PARAMS_KEY
+    entry.buffer = len(m.buffers) - 1
+    keep = [e for e in (m.metadata or []) if _name(e.name) != MEL_PARAMS_KEY]
+    m.metadata = [*keep, entry]
+    b = flatbuffers.Builder(len(model) + 1024)
+    b.Finish(m.Pack(b), file_identifier=b"TFL3")
+    return bytes(b.Output())
+
+
+def _name(name: str | bytes | None) -> str:
+    return name.decode() if isinstance(name, bytes) else (name or "")
+
+
+def read_mel_params(path: str | Path) -> tuple[float, float, float] | None:
+    """The log-mel parameters stored in a micro model (`.tflite` or `.onnx`), if any."""
+    import struct
+
+    path = Path(path)
+    if path.suffix == ".tflite":
+        from ai_edge_litert import schema_py_generated as schema
+
+        data = path.read_bytes()
+        m = schema.Model.GetRootAs(data, 0)
+        for i in range(m.MetadataLength()):
+            e = m.Metadata(i)
+            if _name(e.Name()) == MEL_PARAMS_KEY:
+                raw = m.Buffers(e.Buffer()).DataAsNumpy()
+                if isinstance(raw, np.ndarray) and raw.size == 12:
+                    a, b, c = struct.unpack("<3f", raw.tobytes())
+                    return (a, b, c)
+        return None
+    import onnx
+
+    for prop in onnx.load(str(path), load_external_data=False).metadata_props:
+        if prop.key == MEL_PARAMS_KEY:
+            a, b, c = (float(v) for v in json.loads(prop.value))
+            return (a, b, c)
+    return None
+
 
 class CausalConv2dT(nn.Conv2d):
     """2-D conv, causal along time (last dim), 'same' along frequency."""
@@ -337,11 +394,8 @@ def export_micro(
         dynamo=False,
     )
     _simplify(onnx_path)
+    _add_onnx_mel_params(onnx_path, m.mel_params)
     out = {"onnx": onnx_path}
-    # the host front end must use the encoder's log-mel floor (C: lkww_frontend_init)
-    side = out_dir / f"{name}_micro.json"
-    side.write_text(json.dumps({"mel_params": list(m.mel_params)}) + "\n")
-    out["frontend"] = side
     if tflite is None:
         import importlib.util
 
@@ -356,6 +410,17 @@ def export_micro(
         tfl.unlink(missing_ok=True)
         logger.warning("TFLite conversion failed (%s); %s is still usable", e, onnx_path)
     return out
+
+
+def _add_onnx_mel_params(path: Path, params: tuple[float, float, float]) -> None:
+    import onnx
+
+    model = onnx.load(str(path))
+    props = [p for p in model.metadata_props if p.key != MEL_PARAMS_KEY]
+    del model.metadata_props[:]
+    model.metadata_props.extend(props)
+    model.metadata_props.add(key=MEL_PARAMS_KEY, value=json.dumps(list(map(float, params))))
+    onnx.save(model, str(path))
 
 
 def _simplify(path: Path) -> None:
@@ -458,7 +523,7 @@ def convert_micro_tflite(
         conv.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
         conv.inference_input_type = tf.int8
         conv.inference_output_type = tf.int8
-        out.write_bytes(conv.convert())
+        out.write_bytes(embed_mel_params(conv.convert(), m.mel_params))
     return out
 
 
@@ -492,19 +557,20 @@ class MicroRuntime:
     def __init__(self, path: str | Path) -> None:
         path = Path(path)
         self.name = f"micro:{path.name}"
-        side = path.with_suffix(".json")
-        self.mel_params: tuple[float, float, float] = MEL_DEFAULT
-        if side.exists():
+        params = read_mel_params(path)
+        side = path.with_suffix(".json")  # models exported before the params were embedded
+        if params is None and side.exists():
             p = json.loads(side.read_text())["mel_params"]
-            self.mel_params = (float(p[0]), float(p[1]), float(p[2]))
-        else:
+            params = (float(p[0]), float(p[1]), float(p[2]))
+        if params is None:
+            params = MEL_DEFAULT
             logger.warning(
-                "%s not found: using the default log-mel parameters %s, which may not be the "
-                "ones %s was trained with (keep the .json next to the model)",
-                side.name,
-                self.mel_params,
+                "%s has no log-mel parameters: using the defaults %s, which may not be the ones "
+                "it was trained with (re-export it)",
                 path.name,
+                params,
             )
+        self.mel_params: tuple[float, float, float] = params
         if path.suffix == ".tflite":
             from ai_edge_litert.interpreter import Interpreter
 

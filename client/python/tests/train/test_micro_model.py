@@ -97,3 +97,21 @@ def test_micro_runtime_matches_streaming_model(det: torch.nn.Module, tmp_path: P
             st = list(r[1:])
     np.testing.assert_allclose(rt.scores(x), ref, atol=1e-5)
     np.testing.assert_allclose(rt.scores(x), ref, atol=1e-5)  # reset() restores the warm state
+
+
+def test_mel_params_live_in_the_model(det: torch.nn.Module, tmp_path: Path) -> None:
+    """No sidecar file: the log-mel parameters travel inside the .onnx / .tflite."""
+    from livekit.wakeword_train.micro import MicroRuntime, embed_mel_params, read_mel_params
+
+    files = export_micro(det, tmp_path, "ww", tflite=False)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["ww_micro.onnx"]
+    params = StreamingMicro(det).mel_params
+    assert read_mel_params(files["onnx"]) == pytest.approx(params)
+    assert MicroRuntime(files["onnx"]).mel_params == pytest.approx(params)
+
+    pytest.importorskip("ai_edge_litert")
+    shipped = Path(__file__).resolve().parents[4] / "models" / "hey_livekit_micro.tflite"
+    assert read_mel_params(shipped) == pytest.approx((1e-9, 9.0, 6.0))  # what the device reads
+    again = tmp_path / "again.tflite"
+    again.write_bytes(embed_mel_params(shipped.read_bytes(), (1e-6, 6.0, 4.0)))
+    assert read_mel_params(again) == pytest.approx((1e-6, 6.0, 4.0))  # replaced, not duplicated

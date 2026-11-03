@@ -20,7 +20,9 @@ extern "C" {
 #define LKWW_FRAMES 8 /* mel frames per step */
 #define LKWW_TAIL (LKWW_N_FFT - LKWW_HOP)
 
-/* log-mel = (log(mel + floor) + offset) / scale, from `mel_params` in `<name>_micro.json`. */
+/* log-mel = (log(mel + floor) + offset) / scale. The trainer stores the model's values in the
+ * .tflite (metadata "livekit_wakeword.mel_params"), and the component passes them to
+ * lkww_frontend_init; these defaults are for models without them. */
 #ifndef LKWW_MEL_FLOOR
 #define LKWW_MEL_FLOOR 1e-9f
 #endif

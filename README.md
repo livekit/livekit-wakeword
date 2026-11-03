@@ -103,7 +103,7 @@ The [latest release](https://github.com/livekit/livekit-wakeword/releases/latest
 models and the pretrained encoders that training starts from:
 
 ```bash
-gh release download -R livekit/livekit-wakeword -p "*.onnx" -p "*.tflite" -p "*.json"
+gh release download -R livekit/livekit-wakeword -p "*.onnx" -p "*.tflite"
 ```
 
 | model | bench score |
