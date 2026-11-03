@@ -54,11 +54,11 @@ respectively. Streaming inference used 16.5, 30.5 and 29.5 ms of CPU time per se
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/speed_dark.png">
-  <img width="100%" alt="Faster to train, lighter to run. Train time: LiveKit 11 min, LiveKit micro 18 min, nanowakeword 34, openWakeWord 94, microWakeWord 39. Wake-word clips: 1k and 1k against 2.5k, 100k and 25k. CPU per second of audio: 16.5 and 18 ms against 30.5, 29.5 and 2.2 ms." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/speed_light.png">
+  <img width="100%" alt="Faster to train, lighter to run. Train time: LiveKit 11 min, LiveKit micro 18 min, nanowakeword 34, openWakeWord 94, microWakeWord 39. Wake-word clips: 1k and 1k against 2.5k, 100k and 25k. CPU per second of audio: 16.5 and 4.4 ms against 30.5, 29.5 and 2.2 ms." src="https://raw.githubusercontent.com/livekit/livekit-wakeword/main/.github/assets/speed_light.png">
 </picture>
 
 The micro model detected 78% of wake words at the same false-alarm rate. microWakeWord scored
-0% at that operating point, although it used less CPU: 2.2 ms per second of audio versus 18 ms
+0% at that operating point, although it used less CPU: 2.2 ms per second of audio versus 4.4 ms
 for LiveKit micro. These results compare the complete training workflows for one phrase,
 including their different speech generators; they do not isolate encoder performance.
 
