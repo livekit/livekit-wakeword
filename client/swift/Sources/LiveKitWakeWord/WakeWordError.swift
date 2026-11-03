@@ -22,6 +22,8 @@ public enum WakeWordError: Error, LocalizedError, Sendable {
     case resamplingFailed(underlying: Error?)
     /// ONNX Runtime failed.
     case runtimeFailure(underlying: Error)
+    /// The listener is not running (stopped, or never started).
+    case listenerStopped
 
     public var errorDescription: String? {
         switch self {
@@ -38,6 +40,8 @@ public enum WakeWordError: Error, LocalizedError, Sendable {
             return "LiveKitWakeWord: resampling failed\(underlying.map { " (\($0))" } ?? "")."
         case .runtimeFailure(let underlying):
             return "LiveKitWakeWord: ONNX Runtime error (\(underlying))."
+        case .listenerStopped:
+            return "LiveKitWakeWord: the listener is not running."
         }
     }
 }

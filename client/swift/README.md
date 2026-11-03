@@ -21,9 +21,13 @@ let listener = WakeWordListener(model: model, threshold: 0.5, debounce: 2.0)
 try await listener.start()
 for await detection in listener.detections() {
     print("Detected \(detection.name) (\(detection.confidence))")
+    await talkToAgent()  // the listener is paused until the loop asks for the next detection
 }
-// the stream ends on stop(), or if the model fails: then `await listener.error` says why
+// the loop ends on stop(), or if the model fails: then `await listener.error` says why
 ```
+
+After a detection the listener pauses (as in Python) until the next `waitForDetection()`, which
+each turn of the `detections()` loop calls, so it cannot fire again while you handle one.
 
 `executionProvider:` picks the ONNX Runtime provider. The listener needs `NSMicrophoneUsageDescription`
 in Info.plist (and `com.apple.security.device.audio-input` for sandboxed macOS apps).
