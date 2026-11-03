@@ -4,7 +4,7 @@ Streaming wake word detection with ONNX Runtime (Python 3.11+). Models come from
 [`train/`](../../train) or the [release](../../README.md#models).
 
 ```bash
-uv add "livekit-wakeword @ git+https://github.com/livekit/livekit-wakeword#subdirectory=client/python"
+uv add livekit-wakeword                          # detection only: numpy + onnxruntime
 # microphone listener: add the [listener] extra (needs portaudio: brew install portaudio / apt install portaudio19-dev)
 ```
 

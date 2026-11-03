@@ -16,8 +16,8 @@ body:
       label: Component
       description: Which part of livekit-wakeword?
       options:
-        - Training (livekit-wakeword-train)
-        - Python client
+        - Training (livekit-wakeword[train])
+        - Python detection (livekit-wakeword)
         - Swift client
         - ESP32 component
         - Ready-made models

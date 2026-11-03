@@ -1,4 +1,4 @@
-"""livekit-wakeword: run wake word models trained with livekit-wakeword-train."""
+"""livekit-wakeword: run wake word models (training: `livekit.wakeword_train`)."""
 
 from importlib.metadata import version
 

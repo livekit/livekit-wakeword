@@ -1,8 +1,7 @@
 #!/bin/sh
 # Set the release version everywhere it is written down, then sync uv.lock:
-#   client/python/pyproject.toml   livekit-wakeword
-#   train/pyproject.toml           livekit-wakeword-train, and its livekit-wakeword pin
-#   client/esp32/livekit_wakeword/idf_component.yml
+#   pyproject.toml                                    the livekit-wakeword Python package
+#   client/esp32/livekit_wakeword/idf_component.yml   the ESP32 component
 # (Swift Package Manager versions come from the git tag.) Commit the result in a
 # "Release vX.Y.Z" PR; the publish workflow checks that the pushed tag matches.
 # Usage: scripts/update_version.sh <version>
@@ -27,9 +26,7 @@ edit() {  # edit <file> <sed expression>
     echo "updated $1"
 }
 
-edit "$REPO_ROOT/client/python/pyproject.toml" "s/^version = \".*\"/version = \"$VERSION\"/"
-edit "$REPO_ROOT/train/pyproject.toml" \
-    "s/^version = \".*\"/version = \"$VERSION\"/; s/\"livekit-wakeword==[^\"]*\"/\"livekit-wakeword==$VERSION\"/"
+edit "$REPO_ROOT/pyproject.toml" "s/^version = \".*\"/version = \"$VERSION\"/"
 edit "$REPO_ROOT/client/esp32/livekit_wakeword/idf_component.yml" \
     "s/^version: \".*\"/version: \"$VERSION\"/"
 

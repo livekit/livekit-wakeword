@@ -1,6 +1,69 @@
-# uv workspace: the trainer (train/) and the Python client (client/python/).
-[tool.uv.workspace]
-members = ["client/python", "train"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "livekit-wakeword"
+version = "2.0.0"
+description = "Type a wake word, get a streaming model: training and streaming detection for LiveKit wake word models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "LiveKit", email = "hello@livekit.io" }]
+keywords = ["wake-word", "keyword-spotting", "voice", "speech", "livekit", "onnx", "tflite"]
+# detection (livekit.wakeword) needs only these; training is the `train` extra
+dependencies = [
+    "numpy>=1.24",
+    "onnxruntime>=1.17",
+]
+
+[project.optional-dependencies]
+listener = ["pyaudio>=0.2.14"]
+train = [  # livekit.wakeword_train and the CLI (Python 3.12+: dataset generation)
+    "livekit-wakeword-bench>=0.1.0; python_version >= '3.12'",  # LiveKit Inference TTS
+    "torch>=2.5",
+    "torchaudio>=2.5",
+    "pydantic>=2.0",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "huggingface-hub>=0.20",
+    "safetensors>=0.4",  # pretrained encoders
+    "soundfile>=0.12",
+    "soxr>=0.3",
+    "librosa>=0.10",  # mel filterbank
+    "pronouncing>=0.2",
+    "setuptools>=69.0,<81",  # pronouncing imports pkg_resources
+    "pyarrow>=14",
+    "onnx>=1.15",
+]
+tflite = [  # micro models as int8 TFLite (without it, micro exports ONNX only)
+    "livekit-wakeword[train]",
+    "onnx2tf>=1.22",
+    "tensorflow>=2.15",
+    "tf-keras>=2.15",
+    "onnx-graphsurgeon>=0.3.27",
+    "sng4onnx>=1.0.4",
+    "psutil>=5.9",
+    "ai-edge-litert>=1.0",
+    "onnxsim>=0.4",
+]
+
+[project.scripts]
+livekit-wakeword = "livekit.wakeword._cli:main"
+
+[project.urls]
+Homepage = "https://github.com/livekit/livekit-wakeword"
+Issues = "https://github.com/livekit/livekit-wakeword/issues"
+
+# one distribution from two source trees: the client (client/python) and the trainer (train)
+[tool.hatch.build.targets.wheel]
+only-include = ["client/python/src/livekit", "train/src/livekit"]
+sources = ["client/python/src", "train/src"]
+dev-mode-dirs = ["client/python/src", "train/src"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["client/python/src", "train/src", "README.md", "LICENSE"]
 
 [dependency-groups]
 dev = [

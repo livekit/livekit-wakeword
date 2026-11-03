@@ -33,7 +33,7 @@ def check_environment(config: WakeWordConfig, require_gpu: bool = False) -> list
         try:
             import livekit_wakeword_bench  # noqa: F401
         except ImportError:
-            problems.append("livekit-wakeword-bench is missing: run `uv sync --all-packages`")
+            problems.append("livekit-wakeword-bench is missing: `uv sync --extra train`")
     missing = [
         k for k in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET") if not os.getenv(k)
     ]
@@ -52,7 +52,7 @@ def check_environment(config: WakeWordConfig, require_gpu: bool = False) -> list
         if require_gpu and not (torch.cuda.is_available() or torch.backends.mps.is_available()):
             problems.append("no CUDA GPU or Apple silicon GPU found (training on CPU is very slow)")
     except ImportError:
-        problems.append("torch is missing: run `uv sync --all-packages`")
+        problems.append("torch is missing: `uv sync --extra train`")
     free = shutil.disk_usage(Path.home()).free / 2**30
     if free < 10:
         problems.append(f"only {free:.0f} GB free in your home directory (about 10 GB is needed)")

@@ -1,4 +1,4 @@
-# Training (`livekit-wakeword-train`)
+# Training (`livekit-wakeword[train]`)
 
 Setup (credentials, install) is in the [main README](../README.md#train-a-wake-word).
 

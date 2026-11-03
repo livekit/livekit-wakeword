@@ -12,7 +12,7 @@ If you'd like to contribute code, it's recommended to first discuss your idea on
 Please make sure your change passes all of the following:
 
 ```sh
-uv sync --all-packages --extra tflite
+uv sync --extra tflite
 uv run ruff check . && uv run ruff format --check .           # lints and formatting
 uv run mypy -p livekit.wakeword -p livekit.wakeword_train     # types
 uv run pytest                                                 # client + trainer tests

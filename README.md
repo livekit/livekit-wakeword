@@ -145,7 +145,7 @@ the three variables yourself.
 
 ```bash
 git clone https://github.com/livekit/livekit-wakeword && cd livekit-wakeword
-uv sync --all-packages --extra tflite            # --extra tflite is for --type micro
+uv sync --extra train                            # or --extra tflite for --type micro
 ```
 
 `setup` downloads the pretrained encoders from the v2.0.0 release once.
@@ -191,7 +191,7 @@ evaluation.
 ## Development
 
 ```bash
-uv sync --all-packages --extra tflite
+uv sync --extra tflite
 uv run pytest                                    # Python: client and trainer
 uv run ruff check . && uv run mypy -p livekit.wakeword -p livekit.wakeword_train
 swift test                                       # Swift client

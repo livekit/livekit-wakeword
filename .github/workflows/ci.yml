@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: uv python install 3.12
-      - run: uv sync --all-packages --frozen
+      - run: uv sync --extra train --frozen
       - run: uv run --no-sync ruff check . && uv run --no-sync ruff format --check .
       - run: uv run --no-sync mypy -p livekit.wakeword -p livekit.wakeword_train
       - run: uv run --no-sync pytest --tb=short -q
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: uv python install 3.12
-      # the client alone (numpy + onnxruntime); the dev group lives on the workspace root
-      - run: uv sync --package livekit-wakeword --frozen && uv pip install pytest pytest-asyncio
+      # detection alone (numpy + onnxruntime, no extras)
+      - run: uv sync --frozen
       - run: uv run --no-sync pytest client/python/tests --tb=short -q
       - run: swift test
