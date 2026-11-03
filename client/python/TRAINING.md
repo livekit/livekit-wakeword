@@ -3,9 +3,9 @@
 Setup (credentials, install) is in the [main README](../../README.md#train-a-wake-word).
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hey livekit" --eval
-uv run livekit-wakeword train --wakeword "hey livekit" --type standard   # or --type micro
-uv run livekit-wakeword eval --wakeword "hey livekit"
+livekit-wakeword setup --wakeword "hey livekit" --eval
+livekit-wakeword train --wakeword "hey livekit" --type standard  # or --type micro
+livekit-wakeword eval --wakeword "hey livekit"
 ```
 
 or, in Python:
@@ -51,7 +51,7 @@ if __name__ == "__main__":  # required: training starts worker processes (spawne
 
 Use `--wakeword` (or `-w`) to select the phrase for `setup`, `train` and `eval`. Run these commands
 from the same directory so they can find the settings saved by `setup`. Each command has
-`--help`, for example `uv run livekit-wakeword train --help`.
+`--help`, for example `livekit-wakeword train --help`.
 
 | Command | Option | Behavior |
 |---|---|---|
@@ -74,10 +74,10 @@ from the same directory so they can find the settings saved by `setup`. Each com
 For example, generate four times the default training speech and write the model to `./models`:
 
 ```bash
-uv run livekit-wakeword setup --wakeword "hey robot" --clips 4 --eval
-uv run livekit-wakeword train --wakeword "hey robot" --out ./models
-uv run livekit-wakeword eval --wakeword "hey robot" --model ./models/hey_robot.onnx
-uv run --with pyaudio livekit-wakeword listen ./models/hey_robot.onnx
+livekit-wakeword setup --wakeword "hey robot" --clips 4 --eval
+livekit-wakeword train --wakeword "hey robot" --out ./models
+livekit-wakeword eval --wakeword "hey robot" --model ./models/hey_robot.onnx
+livekit-wakeword listen ./models/hey_robot.onnx
 ```
 
 `--clips 4` sets `n_positive` to 2,000, `n_confusable` to 2,000 and `n_sentence` to 600, four times
