@@ -20,7 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 listener = ["pyaudio>=0.2.14"]
 train = [  # livekit.wakeword_train and the CLI (Python 3.12+: dataset generation)
-    "livekit-wakeword-bench>=0.1.0; python_version >= '3.12'",  # LiveKit Inference TTS
+    "livekit-wakeword-bench>=0.1.1; python_version >= '3.12'",  # LiveKit Inference TTS
     "torch>=2.5",
     "torchaudio>=2.5",
     "pydantic>=2.0",
