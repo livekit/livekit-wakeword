@@ -33,7 +33,7 @@ train = [  # livekit.wakeword_train and the CLI (Python 3.12+: dataset generatio
     "soxr>=0.3",
     "librosa>=0.10",  # mel filterbank
     "pronouncing>=0.2",
-    "setuptools>=69.0,<81",  # pronouncing imports pkg_resources
+    "setuptools>=84.1.0,<85",  # pronouncing imports pkg_resources
     "pyarrow>=14",
     "onnx>=1.15",
 ]
