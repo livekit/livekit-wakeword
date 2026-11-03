@@ -3,6 +3,7 @@ device side (mic high-pass, quiet input, self-noise, int16 quantization)."""
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -46,7 +47,9 @@ class GpuNoise:
     """Noise pool on the GPU (float16), sampled as random crops."""
 
     def __init__(self, noise: np.ndarray, device: str = "cuda") -> None:
-        self.x = torch.from_numpy(np.ascontiguousarray(noise)).to(device)
+        with warnings.catch_warnings():  # read-only pools (memory-mapped) are never written to
+            warnings.filterwarnings("ignore", message="The given NumPy array is not writable")
+            self.x = torch.from_numpy(np.ascontiguousarray(noise)).to(device)
 
     def sample(self, n: int, length: int, gen: torch.Generator | None = None) -> torch.Tensor:
         starts = torch.randint(0, len(self.x) - length, (n,), device=self.x.device, generator=gen)

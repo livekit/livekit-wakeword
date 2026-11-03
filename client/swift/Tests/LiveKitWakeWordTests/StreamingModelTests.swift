@@ -12,7 +12,7 @@ import XCTest
 @testable import LiveKitWakeWord
 
 /// The Swift runtime reproduces the Python one step for step (fixtures from
-/// `train/tests/make_streaming_tiny.py`: per-80 ms scores of a deterministic chirp).
+/// `client/python/tests/train/make_streaming_tiny.py`: per-80 ms scores of a deterministic chirp).
 final class StreamingModelTests: XCTestCase {
     private struct Expected: Decodable {
         let scores: [Float]

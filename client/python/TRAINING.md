@@ -1,6 +1,6 @@
 # Training (`livekit-wakeword[train]`)
 
-Setup (credentials, install) is in the [main README](../README.md#train-a-wake-word).
+Setup (credentials, install) is in the [main README](../../README.md#train-a-wake-word).
 
 ```bash
 uv run livekit-wakeword setup --wakeword "hey livekit" --eval
@@ -8,8 +8,17 @@ uv run livekit-wakeword train --wakeword "hey livekit" --type standard   # or --
 uv run livekit-wakeword eval --wakeword "hey livekit"
 ```
 
-or, in Python, `run_setup(config)`, `run_train(config, type=...)`, `run_eval(config, path)` from
-`livekit.wakeword_train`, with `config = WakeWordConfig(wakeword="hey livekit")`.
+or, in Python:
+
+```python
+from livekit.wakeword_train import WakeWordConfig, run_eval, run_setup, run_train
+
+if __name__ == "__main__":  # required: training starts worker processes (spawned on macOS)
+    config = WakeWordConfig(wakeword="hey livekit")
+    run_setup(config, eval=True)
+    model = run_train(config, type="standard")  # or "micro"
+    print(run_eval(config, model)["score"])
+```
 
 ## What each step does
 
@@ -27,15 +36,16 @@ or, in Python, `run_setup(config)`, `run_train(config, type=...)`, `run_eval(con
    datasets, on-the-fly noise, reverberation, codec and microphone augmentation, quiet input
    and party scenes with several people talking included), calibrates it on held-out speech and on speech-free noise so a score of 0.5 means
    about `target_fpph` (default 0.5) false alarms per hour in both, and exports `<name>.onnx`: one
-   stateful streaming model for the [clients](../client).
+   stateful streaming model for the [clients](..).
 3. **`train --type micro`** does the same from `livekit-wakeword-encoder-micro`, with the phrase's
    standard model as its teacher (trained first if it does not exist), and exports
    `<name>_micro.tflite` (int8; needs the `tflite` extra) plus
-   `<name>_micro.onnx`, for the [ESP32 client](../client/esp32).
+   `<name>_micro.onnx`, for the [ESP32 client](../esp32).
 4. **`eval`** scores a model on the phrase's held-out test set (unseen voices, noise and rooms,
    confusables, real conversational speech) and prints the bench score (recall at 0.5 false alarms
    per hour) and the numbers at the 0.5 threshold. `--media DIR` adds false alarms per hour on
-   long-form TV, music and podcasts (`lkwb media -o DIR` builds that set once).
+   long-form TV, music and podcasts (`lkwb media -o DIR` builds that set once; it downloads a
+   gated Hugging Face dataset, so log in with `hf auth login` and accept its terms first).
 
 ## Flags
 
@@ -45,7 +55,8 @@ from the same directory so they can find the settings saved by `setup`. Each com
 
 | Command | Option | Behavior |
 |---|---|---|
-| `setup` | `--language`, `-l` | Language of the phrase; defaults to `en` for a new config. |
+| `setup` | `--language`, `-l` | Language of the phrase (ISO 639-1, such as `es` or `ja`); defaults to `en` for a new config. See [multilingual wake words](../../README.md#train-a-wake-word). |
+| `setup` | `--pronounce WORD=ARPABET` | Pronunciation of an English word outside the dictionary, such as `"zork=Z AO1 R K"`; repeat for several words. Saved in the config. |
 | `setup` | `--plan` | TTS concurrency preset: `build` (5 requests), `ship` (20), or `scale` (50). Defaults to `build` for a new config. |
 | `setup` | `--concurrency` | Concurrent TTS requests; overrides the plan's preset. |
 | `setup` | `--clips N` | Multiply the default training clip counts by `N`; accepts decimals of at least `0.1`. |
@@ -55,10 +66,10 @@ from the same directory so they can find the settings saved by `setup`. Each com
 | `train` | `--out`, `-o` | Directory for exported models; defaults to the saved `output_dir`, or the current directory for a new config. |
 | `eval` | `--type`, `-t` | Select the standard (default) or micro model path from the config. |
 | `eval` | `--model`, `-m` | Evaluate a specific model file instead of the path selected by `--type`. |
-| `eval` | `--media DIR` | Also measure false alarms on long-form media prepared with `lkwb media`. |
+| `eval` | `--media DIR` | Also measure false alarms on long-form media prepared with `lkwb media` (needs a Hugging Face login). |
 | `eval` | `--json` | Print the full evaluation summary as JSON. |
 | `listen` | Model file paths | Listen for one or more standard ONNX models. |
-| `listen` | `--threshold`, `-t` | Detection score threshold; defaults to `0.5`. |
+| `listen` | `--threshold` | Detection score threshold; defaults to `0.5`. |
 
 For example, generate four times the default training speech and write the model to `./models`:
 
@@ -97,6 +108,7 @@ same directory without additional flags.
 | field | default | |
 |---|---|---|
 | `language` | `en` | TTS voices; phrases can be in any language and script |
+| `pronunciations` | none | ARPAbet for English words outside the dictionary, e.g. `zork: Z AO1 R K` (`setup --pronounce`) |
 | `plan` / `concurrency` | `build` / none | LiveKit plan sets concurrent TTS requests (build 5, ship 20, scale 50); `concurrency` overrides it |
 | `n_positive`, `n_confusable`, `n_sentence` | 500, 500, 150 | generated clips per category (`--clips` scales all three; `n_positive` doubles for phrases with no plain-text positives, e.g. brand names) |
 | `steps`, `micro_steps` | 5000, 5000 | fine-tuning steps |
@@ -117,7 +129,7 @@ about 36 minutes after the same speech generation, and a micro model about 1.5 h
 ## Requirements
 
 - A CUDA GPU or an Apple silicon Mac, and LiveKit credentials (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`;
-  see [Get LiveKit credentials](../README.md#train-a-wake-word)).
+  see [Get LiveKit credentials](../../README.md#train-a-wake-word)).
 - Python 3.12+ for dataset generation (`livekit-wakeword-bench`).
 - Network access for the one-time encoder download from the GitHub release. To use your own copy
   instead, point `LIVEKIT_WAKEWORD_ENCODERS` at a directory with `standard/` and `micro/`.

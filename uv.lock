@@ -1851,7 +1851,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'train'", specifier = ">=0.20" },
     { name = "librosa", marker = "extra == 'train'", specifier = ">=0.10" },
     { name = "livekit-wakeword", extras = ["train"], marker = "extra == 'tflite'" },
-    { name = "livekit-wakeword-bench", marker = "python_full_version >= '3.12' and extra == 'train'", specifier = ">=0.1.0" },
+    { name = "livekit-wakeword-bench", marker = "python_full_version >= '3.12' and extra == 'train'", specifier = ">=0.1.1" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "onnx", marker = "extra == 'train'", specifier = ">=1.15" },
     { name = "onnx-graphsurgeon", marker = "extra == 'tflite'", specifier = ">=0.3.27" },
@@ -1889,7 +1889,7 @@ dev = [
 
 [[package]]
 name = "livekit-wakeword-bench"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp", marker = "python_full_version >= '3.12'" },
@@ -1910,9 +1910,9 @@ dependencies = [
     { name = "typer", marker = "python_full_version >= '3.12'" },
     { name = "wordfreq", marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/7b/d2b3c549fbd098891afd0b277efb902f2309c90c5dc2065e7bc767f6c416/livekit_wakeword_bench-0.1.0.tar.gz", hash = "sha256:ea84e7ca50546534d6d5799c03c0abc7029974bca55fc91344da9ce6b52f62f7", size = 79313, upload-time = "2026-10-28T16:52:43.639Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/fc/65c54997828309685b3021868202ab2e9ccf3f85f113bb6913c3e83abdf6/livekit_wakeword_bench-0.1.1.tar.gz", hash = "sha256:7dd51f1155ac11d0efdb16289a42ef10fd2b4d9d88b4f7dc68438dd85b9eed97", size = 81877, upload-time = "2026-11-03T04:29:44.501Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/b9/25f3546f88abecbc0ee50448c76d6560d5fcddc20d4a593d1e21260e245f/livekit_wakeword_bench-0.1.0-py3-none-any.whl", hash = "sha256:454cbf3fcf2f6da5a248ffa4a2a25f5e466dde82f0daf71675b541d1afa8c707", size = 91666, upload-time = "2026-10-28T16:52:42.253Z" },
+    { url = "https://files.pythonhosted.org/packages/db/cc/1c9eac6e733355044186cca01cdc929c087a8423b9f9b7513d434b745ca0/livekit_wakeword_bench-0.1.1-py3-none-any.whl", hash = "sha256:0551e189a1b032dd5e38ce2dc36fa466a0a6a708b3e09ea793070fb4b335e21a", size = 94253, upload-time = "2026-11-03T04:29:43.034Z" },
 ]
 
 [[package]]

@@ -237,7 +237,7 @@ def train(
                     e.mul_(d).add_(p.detach(), alpha=1 - d)
                 else:  # counters and the fixed log-mel settings
                     e.copy_(p)
-        hist.append(float(loss))
+        hist.append(loss.detach().item())
         if (step + 1) % log_every == 0:
             logger.info(
                 "step %d/%d  loss %.4f  %.2fs/step",

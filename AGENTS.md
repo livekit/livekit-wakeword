@@ -11,15 +11,17 @@ ONNX) and micro (int8 TFLite).
 
 ## Layout
 
-- One Python package, `livekit-wakeword` (root `pyproject.toml`), built from two source trees:
-  `client/python/src` (detection) and `train/src` (training, the `train` extra).
-- **`train/`**: import `livekit.wakeword_train` (the `train` extra, Python 3.12+), the
-  `livekit-wakeword` CLI (entry point `livekit.wakeword._cli`, which explains a missing extra). `config.py` (`WakeWordConfig`), `pipeline.py` (`run_setup`, `run_train`,
-  `run_eval`), `cli.py`; internals: `encoders.py` (load, `bake(phrase)` -> plain `Detector`),
-  `nn.py`, `loop.py`, `data.py`, `augment.py`, `export.py` (streaming ONNX; state is plain inputs,
-  runtimes zero it and warm up on 2 s of silence), `micro.py` (BC-ResNet, int8 TFLite,
-  `MicroRuntime` host reference).
-- **`client/python/`**: import `livekit.wakeword` (Python 3.11+, numpy + onnxruntime only): `WakeWordModel` (`predict()` streams, `predict_clip()`), `WakeWordListener`.
+- One Python package, `livekit-wakeword` (root `pyproject.toml`), from `client/python/src`:
+  `livekit.wakeword` (detection) and `livekit.wakeword_train` (training, the `train` extra).
+- **`client/python/`**: `src/livekit/wakeword` (Python 3.11+, numpy + onnxruntime only):
+  `WakeWordModel` (`predict()` streams, `predict_clip()`), `WakeWordListener`, and the
+  `livekit-wakeword` CLI entry point (`_cli.py`, which explains a missing extra).
+  `src/livekit/wakeword_train` (the `train` extra, Python 3.12+): `config.py` (`WakeWordConfig`),
+  `pipeline.py` (`run_setup`, `run_train`, `run_eval`), `cli.py`; internals: `encoders.py` (load,
+  `bake(phrase)` -> plain `Detector`), `nn.py`, `loop.py`, `data.py`, `augment.py`, `export.py`
+  (streaming ONNX; state is plain inputs, runtimes zero it and warm up on 2 s of silence),
+  `micro.py` (BC-ResNet, int8 TFLite, `MicroRuntime` host reference). Tests: `tests/` (client)
+  and `tests/train/` (trainer). Guides: `README.md` (client), `TRAINING.md` (trainer).
 - **`client/swift/`**: Swift package sources and tests (manifest: root `Package.swift`), `Example/`
   SwiftUI demo.
 - **`client/esp32/`**: ESP-IDF component `livekit_wakeword/` (the only copy of the C front end and

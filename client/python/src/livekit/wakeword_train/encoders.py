@@ -36,12 +36,12 @@ from .nn import ConformerBlock, Detector, Encoder
 logger = logging.getLogger(__name__)
 
 Tier = Literal["standard", "micro"]
-# repo, tag, asset, sha256: encoders.tar.gz holds encoders/standard/ and encoders/micro/
+# repo, tag, asset, sha256: encoders.tar.gz holds encoders/{standard,micro}/, NOTICE, LICENSE
 ENCODERS_RELEASE = (
     "livekit/livekit-wakeword",
     "v2.0.0",
     "encoders.tar.gz",
-    "0a82beb65f3493e05a7c8f125c7a06e0874f84da4fb5c6429ab0b434cce65100",
+    "a13a83c34752f6e1c20c47f1b048c02217f6d147ee721ea101eb58e59d4922e7",
 )
 CHARS = " abcdefghijklmnopqrstuvwxyz'-"
 
