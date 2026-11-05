@@ -4,18 +4,9 @@ Streaming wake word detection in the browser and in Node, on ONNX Runtime. Model
 [training](../python/TRAINING.md) or the [release](../../README.md#models). Detection runs on the
 device: in a browser, no audio leaves the page.
 
-The package is not on npm yet. Build it from source (Node 20+ and
-[pnpm](https://pnpm.io/installation)), then install the tarball into your app with the runtime you
-use:
-
 ```bash
-git clone https://github.com/livekit/livekit-wakeword
-cd livekit-wakeword/client/js
-pnpm install && pnpm pack                        # -> livekit-wakeword-<version>.tgz
-
-cd /path/to/your/app
-npm install /path/to/livekit-wakeword-<version>.tgz onnxruntime-web    # browser
-npm install /path/to/livekit-wakeword-<version>.tgz onnxruntime-node   # Node
+npm install @livekit/wakeword onnxruntime-web    # browser
+npm install @livekit/wakeword onnxruntime-node   # Node
 ```
 
 `@livekit/wakeword` picks the right binding itself: onnxruntime-web (WebAssembly) in browsers and

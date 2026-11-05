@@ -70,8 +70,8 @@ uv run livekit-wakeword setup|train|eval|listen  # the CLI
     pre-releases), include the automatically generated changelog, and attach the ready-made
     models (`*.onnx`, `*_micro.tflite`) and `NOTICE`
   - The tag triggers `.github/workflows/publish.yml`: it checks the tag matches the package
-    version and publishes `livekit-wakeword` to PyPI; Swift Package Manager picks up the tag. The
-    JS package is not on npm yet (install from source, see `client/js/README.md`)
+    version and publishes `livekit-wakeword` to PyPI and `@livekit/wakeword` to npm (`-rc.N` to
+    the `next` dist-tag); Swift Package Manager picks up the tag
 - The pretrained encoders (`encoders.tar.gz`) live on the release named in
   `encoders.ENCODERS_RELEASE`; only a new encoder needs a new asset there (and a new sha256),
   and the tarball must include `NOTICE`
