@@ -81,7 +81,7 @@
     "@types/node": "^26.6.6",
     "onnxruntime-node": "1.31.1",
     "onnxruntime-web": "1.31.1",
-    "playwright": "1.56.1",
+    "playwright": "1.64.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"
