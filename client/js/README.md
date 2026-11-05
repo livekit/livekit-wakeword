@@ -18,9 +18,6 @@ npm install /path/to/livekit-wakeword-<version>.tgz onnxruntime-web    # browser
 npm install /path/to/livekit-wakeword-<version>.tgz onnxruntime-node   # Node
 ```
 
-Releases from v2.1.1 on also attach the tarball, so you can install it by URL instead:
-`npm install https://github.com/livekit/livekit-wakeword/releases/download/vX.Y.Z/livekit-wakeword-X.Y.Z.tgz`.
-
 `@livekit/wakeword` picks the right binding itself: onnxruntime-web (WebAssembly) in browsers and
 bundlers, onnxruntime-node in Node. Install the runtime you use; both are optional peer
 dependencies.

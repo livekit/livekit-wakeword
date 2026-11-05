@@ -1,4 +1,4 @@
-name: Publish
+name: Publish to PyPI
 
 on:
   push:
@@ -72,50 +72,3 @@ jobs:
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           skip-existing: true
-
-  # @livekit/wakeword from client/js, with npm trusted publishing (OIDC, provenance): no token is
-  # stored in GitHub secrets. The trusted publisher at npmjs.com is: repository
-  # livekit/livekit-wakeword, workflow publish.yml, environment npm. -rc.N versions go to the
-  # `next` dist-tag, so `npm install @livekit/wakeword` keeps giving the latest release.
-  # Off until the package exists on npm: set the repository variable NPM_PUBLISH to `true`.
-  npm:
-    name: Publish to npm
-    if: github.ref_type == 'tag' && vars.NPM_PUBLISH == 'true'
-    runs-on: ubuntu-latest
-    environment: npm
-    permissions:
-      contents: read
-      id-token: write  # required for OIDC trusted publishing
-    defaults:
-      run:
-        working-directory: client/js
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-        with:
-          package_json_file: client/js/package.json
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Check the tag matches the package version
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
-            echo "tag $GITHUB_REF_NAME does not match client/js/package.json version $version" >&2
-            exit 1
-          fi
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-
-      # prepack builds dist/ and copies LICENSE and NOTICE in
-      - name: Publish
-        run: |
-          case "$GITHUB_REF_NAME" in
-            *-rc.*) npm publish --access public --tag next ;;
-            *) npm publish --access public ;;
-          esac
