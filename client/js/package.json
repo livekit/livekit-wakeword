@@ -1,6 +1,6 @@
 {
   "name": "@livekit/wakeword",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Streaming wake word detection in the browser and Node, for models trained with livekit-wakeword",
   "license": "Apache-2.0",
   "author": "LiveKit",
