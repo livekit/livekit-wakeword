@@ -1,4 +1,4 @@
-version: "2.1.0"
+version: "2.1.1"
 description: On-device wake word detection for ESP32 (livekit-wakeword micro models, TensorFlow Lite Micro)
 url: https://github.com/livekit/livekit-wakeword
 repository: https://github.com/livekit/livekit-wakeword.git

@@ -1777,7 +1777,7 @@ wheels = [
 
 [[package]]
 name = "livekit-wakeword"
-version = "2.1.0"
+version = "2.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
