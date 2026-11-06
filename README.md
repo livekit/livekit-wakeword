@@ -216,6 +216,7 @@ evaluation.
 |---|---|
 | [`client/python/`](https://github.com/livekit/livekit-wakeword/tree/main/client/python) | Python client (`livekit.wakeword`: `WakeWordModel`, `WakeWordListener`) and the trainer behind the `livekit-wakeword` CLI (`livekit.wakeword_train`, the `train` extra: generates speech with LiveKit Inference TTS, trains, calibrates and evaluates; [training guide](https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md)) |
 | [`client/swift/`](https://github.com/livekit/livekit-wakeword/tree/main/client/swift) | Swift package for iOS and macOS, plus a SwiftUI demo |
+| [`client/js/`](https://github.com/livekit/livekit-wakeword/tree/main/client/js) | JavaScript/TypeScript package `@livekit/wakeword` for the browser (onnxruntime-web) and Node (onnxruntime-node), plus a browser demo |
 | [`client/esp32/`](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32) | ESP-IDF component and examples for micro models |
 | [`models/`](https://github.com/livekit/livekit-wakeword/tree/main/models) | The hey livekit models the tests and examples use |
 
@@ -226,6 +227,7 @@ uv sync --extra tflite
 uv run pytest                                    # Python: client and trainer
 uv run ruff check . && uv run mypy -p livekit.wakeword -p livekit.wakeword_train
 swift test                                       # Swift client
+(cd client/js && pnpm install && pnpm test)      # JavaScript client
 ```
 
 ## License
