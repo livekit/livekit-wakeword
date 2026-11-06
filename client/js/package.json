@@ -1,0 +1,90 @@
+{
+  "name": "@livekit/wakeword",
+  "version": "2.1.0",
+  "description": "Streaming wake word detection in the browser and Node, for models trained with livekit-wakeword",
+  "license": "Apache-2.0",
+  "author": "LiveKit",
+  "homepage": "https://github.com/livekit/livekit-wakeword/tree/main/client/js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livekit/livekit-wakeword.git",
+    "directory": "client/js"
+  },
+  "keywords": [
+    "wake word",
+    "keyword spotting",
+    "hotword",
+    "livekit",
+    "onnx",
+    "voice"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "types": "./dist/web.d.ts",
+      "default": "./dist/web.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "default": "./dist/web.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "prepack": "pnpm build && cp ../../LICENSE ../../NOTICE .",
+    "test:browser": "node scripts/browser-test.mjs",
+    "example": "vite example"
+  },
+  "dependencies": {
+    "onnxruntime-common": "^1.31.1"
+  },
+  "peerDependencies": {
+    "onnxruntime-node": "^1.31.1",
+    "onnxruntime-web": "^1.31.1"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": {
+      "optional": true
+    },
+    "onnxruntime-web": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.5",
+    "@types/node": "^26.6.6",
+    "onnxruntime-node": "1.31.1",
+    "onnxruntime-web": "1.31.1",
+    "playwright": "1.64.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "packageManager": "pnpm@10.34.5"
+}

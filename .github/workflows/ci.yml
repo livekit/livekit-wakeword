@@ -31,3 +31,25 @@ jobs:
       - run: uv sync --frozen
       - run: uv run --no-sync pytest client/python/tests --ignore=client/python/tests/train --tb=short -q
       - run: swift test
+
+  js:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client/js
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: client/js/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: client/js/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser

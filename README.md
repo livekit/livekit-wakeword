@@ -8,6 +8,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://github.com/livekit/livekit-wakeword/tree/main/client/python)
 [![Swift](https://img.shields.io/badge/swift-iOS%20%7C%20macOS-orange)](https://github.com/livekit/livekit-wakeword/tree/main/client/swift)
+[![JavaScript](https://img.shields.io/badge/js-browser%20%7C%20Node-yellow)](https://github.com/livekit/livekit-wakeword/tree/main/client/js)
 [![ESP32](https://img.shields.io/badge/ESP32-TFLite%20Micro-red)](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/livekit/livekit-wakeword/blob/main/LICENSE)
 
@@ -17,7 +18,7 @@
 
 LiveKit WakeWord is an open-source toolkit for training and running wake word models. You provide
 a phrase, and the training CLI generates speech with LiveKit Inference TTS and adapts a pretrained
-encoder to recognize it. The resulting model runs locally in Python, Swift or on an ESP32, without
+encoder to recognize it. The resulting model runs locally in Python, Swift, JavaScript (browser and Node) or on an ESP32, without
 sending audio to a server. You do not need to record your own training data.
 
 > [!IMPORTANT]
@@ -35,7 +36,7 @@ Training a standard model for “hey livekit” took 11 minutes on one RTX PRO 6
 used 1,000 generated wake-word clips. The same workflow produces a micro model in about 18 minutes,
 including the standard model it learns from.
 
-The standard model is about 7 MB and runs in Python or Swift through ONNX Runtime. The micro
+The standard model is about 7 MB and runs in Python, Swift, the browser or Node through ONNX Runtime. The micro
 model is 451 KB and runs on ESP32 through TensorFlow Lite Micro. You can start with a
 [ready-made model](#models), or [train a model](#train-a-wake-word) for your own phrase. Running
 detection requires neither a GPU nor LiveKit Cloud credentials.
@@ -95,6 +96,7 @@ run. Use a [ready-made model](#models) or one you trained yourself.
 |---|---|---|
 | Python | [Python README](https://github.com/livekit/livekit-wakeword/blob/main/client/python/README.md) | [Audio clip inference](https://github.com/livekit/livekit-wakeword/blob/main/client/python/examples/inference.py) · [Microphone listener](https://github.com/livekit/livekit-wakeword/blob/main/client/python/examples/listener.py) |
 | Swift | [Swift README](https://github.com/livekit/livekit-wakeword/blob/main/client/swift/README.md) | [SwiftUI demo for iOS and macOS, with setup instructions](https://github.com/livekit/livekit-wakeword/blob/main/client/swift/Example/README.md) |
+| JavaScript | [JavaScript README](https://github.com/livekit/livekit-wakeword/blob/main/client/js/README.md) | [Browser demo with a live score meter](https://github.com/livekit/livekit-wakeword/tree/main/client/js/example) |
 | ESP32 | [ESP32 README](https://github.com/livekit/livekit-wakeword/blob/main/client/esp32/README.md) | [I2S microphone detection](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32/examples/i2s_mic) · [Wake word to LiveKit agent](https://github.com/livekit/livekit-wakeword/tree/main/client/esp32/examples/livekit_agent) · [Build and flash instructions](https://github.com/livekit/livekit-wakeword/blob/main/client/esp32/README.md#examples) |
 
 ## Models

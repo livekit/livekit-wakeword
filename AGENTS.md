@@ -24,6 +24,11 @@ ONNX) and micro (int8 TFLite).
   and `tests/train/` (trainer). Guides: `README.md` (client), `TRAINING.md` (trainer).
 - **`client/swift/`**: Swift package sources and tests (manifest: root `Package.swift`), `Example/`
   SwiftUI demo.
+- **`client/js/`**: `@livekit/wakeword` npm package (TypeScript, pnpm): `src/model.ts` (runtime-agnostic
+  `WakeWordModel` on any ONNX Runtime JS package), `web.ts` (onnxruntime-web/wasm, plus the
+  AudioWorklet `WakeWordListener` in `listener.ts`), `node.ts` (onnxruntime-node), `core.ts`,
+  `resample.ts` (port of the Python resampler); `example/` Vite demo; tests check scores step by
+  step against the Python client (`scripts/make_parity.py` -> `test/fixtures/parity.json`).
 - **`client/esp32/`**: ESP-IDF component `livekit_wakeword/` (the only copy of the C front end and
   TFLM wrapper), `examples/`, `tools/` (host test, front-end CLI, table generator).
 - **`models/`**: hey livekit standard + micro, used by tests and examples.
@@ -39,6 +44,8 @@ uv run pytest                                    # client + trainer tests
 uv run ruff check . && uv run ruff format .
 uv run mypy -p livekit.wakeword -p livekit.wakeword_train
 swift test                                       # Swift client
+cd client/js && pnpm install && pnpm lint && pnpm typecheck && pnpm test   # JS client
+(cd client/js && pnpm test:browser)              # JS listener in headless Chromium
 uv run livekit-wakeword setup|train|eval|listen  # the CLI
 ```
 
@@ -47,7 +54,7 @@ uv run livekit-wakeword setup|train|eval|listen  # the CLI
 - Exported models are plain detectors: the phrase conditioning is folded into weights at `bake`,
   so runtimes never see the text encoder.
 - Data generation goes only through livekit-wakeword-bench (no in-repo TTS).
-- Formats: standard is ONNX (onnxruntime in Python/Swift, pure-Rust tract in the Rust SDK; the
+- Formats: standard is ONNX (onnxruntime in Python/Swift/JS, pure-Rust tract in the Rust SDK; the
   trainer's tests check exports load in tract), micro is int8 TFLite (TFLite Micro).
 - No v1 compatibility: clients load streaming models only.
 - Encoder pretraining and experiments live outside this repo; keep recipe details (data,
@@ -57,13 +64,14 @@ uv run livekit-wakeword setup|train|eval|listen  # the CLI
 
 - Versions are cut with a PR, then a tag
   - Run `scripts/update_version.sh X.Y.Z` (or `X.Y.Z-rc.N`): it bumps the Python package, the
-    ESP32 component and `uv.lock`
+    ESP32 component, the npm package (`client/js/package.json`) and `uv.lock`
   - Open a PR (e.g., "Release v2.1.0") with the bumped version and merge it
   - Publish a GitHub release on the merge commit with tag `vX.Y.Z` (mark `-rc.N` tags as
     pre-releases), include the automatically generated changelog, and attach the ready-made
     models (`*.onnx`, `*_micro.tflite`) and `NOTICE`
   - The tag triggers `.github/workflows/publish.yml`: it checks the tag matches the package
-    version and publishes `livekit-wakeword` to PyPI; Swift Package Manager picks up the tag
+    version and publishes `livekit-wakeword` to PyPI; Swift Package Manager picks up the tag. The
+    JS package is not on npm yet (install from source, see `client/js/README.md`)
 - The pretrained encoders (`encoders.tar.gz`) live on the release named in
   `encoders.ENCODERS_RELEASE`; only a new encoder needs a new asset there (and a new sha256),
   and the tarball must include `NOTICE`
