@@ -29,7 +29,7 @@
       html, body { margin: 0; }
       body {
         display: grid;
-        grid-template-rows: 1fr auto;
+        grid-template-rows: 1fr;
         min-height: 100dvh;
         background: var(--bg1);
         color: var(--fg1);
@@ -80,7 +80,7 @@
         align-items: center;
         justify-content: center;
         gap: clamp(24px, 4vh, 40px);
-        padding: 48px 16px 0;
+        padding: 48px 16px;
         text-align: center;
       }
       h1 {
@@ -172,7 +172,7 @@
       .chip button:hover { color: var(--fg0); }
       .chip button svg { width: 14px; height: 14px; }
 
-      .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 16px 32px; }
+      .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; }
       #start {
         --level: 0;
         position: relative;
@@ -234,15 +234,15 @@
           <input id="file" class="sr" type="file" accept=".onnx" multiple />
         </label>
       </div>
+      <div class="controls">
+        <button id="start" type="button" aria-label="Start listening" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7a5 5 0 0 1 10 0v5a5 5 0 0 1-10 0z"/><path fill="currentColor" d="m5.25 13.87-.13-.49-.96.27.13.48a8.5 8.5 0 0 0 7.21 5.85V22h1v-2.02a8.5 8.5 0 0 0 7.21-5.85l.14-.48-.97-.27-.13.49A7.5 7.5 0 0 1 12 19a7.5 7.5 0 0 1-6.75-5.13"/></svg>
+        </button>
+        <div id="status" class="eyebrow" role="status">loading</div>
+      </div>
       <ol id="log" class="sr" aria-label="Detections" aria-live="polite"></ol>
     </main>
 
-    <div class="controls">
-      <button id="start" type="button" aria-label="Start listening" disabled>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7a5 5 0 0 1 10 0v5a5 5 0 0 1-10 0z"/><path fill="currentColor" d="m5.25 13.87-.13-.49-.96.27.13.48a8.5 8.5 0 0 0 7.21 5.85V22h1v-2.02a8.5 8.5 0 0 0 7.21-5.85l.14-.48-.97-.27-.13.49A7.5 7.5 0 0 1 12 19a7.5 7.5 0 0 1-6.75-5.13"/></svg>
-      </button>
-      <div id="status" class="eyebrow" role="status">loading</div>
-    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
