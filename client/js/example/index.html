@@ -3,64 +3,255 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LiveKit WakeWord</title>
+    <title>LiveKit Wakeword</title>
+    <meta name="description" content="Wake word detection in your browser, with @livekit/wakeword." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23070707'/%3E%3Cpath fill='%231FD5F9' d='M14.4 9.6H9.6v4.8h4.8zM19.2 4.8h-4.8v4.8h4.8zM19.2 14.4h-4.8v4.8h4.8zM24 0h-4.8v4.8H24zM24 19.2h-4.8V24H24zM4.8 19.2V0H0v24h14.4v-4.8z'/%3E%3C/svg%3E" />
     <style>
       :root {
-        color-scheme: light dark;
-        --bg: #f6f6f7;
-        --fg: #111113;
-        --muted: #6b6b73;
-        --card: #ffffff;
-        --line: #e3e3e6;
-        --accent: #1f8cf9;
-        --hit: #12b76a;
-        font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --bg1: #070707;
+        --bg2: #131313;
+        --bg3: #1f1f1f;
+        --fg0: #ffffff;
+        --fg1: #cccccc;
+        --fg3: #999999;
+        --fg4: #666666;
+        --accent: #1fd5f9;
+        --accent-deep: #0489a4;
+        --accent-fill: #051518;
+        --separator1: #202020;
+        --separator2: #30302f;
+        --separator-accent: #035c6d;
+        --serious: #ff7566;
+        --sans: 'Public Sans Variable', ui-sans-serif, system-ui, sans-serif;
+        --mono: 'Commit Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+        color-scheme: dark;
       }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0b0b0d;
-          --fg: #ededf0;
-          --muted: #8d8d96;
-          --card: #151518;
-          --line: #26262b;
-        }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        background: var(--bg1);
+        color: var(--fg1);
+        font: 400 16px/1.5 var(--sans);
+        letter-spacing: 0.01em;
+        -webkit-font-smoothing: antialiased;
       }
-      body { margin: 0; background: var(--bg); color: var(--fg); }
-      main { max-width: 560px; margin: 0 auto; padding: 48px 16px; }
-      h1 { font-size: 22px; margin: 0 0 4px; }
-      p { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
-      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
-      button {
-        font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px;
-        background: var(--accent); color: #fff; cursor: pointer;
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
+        background-size: 24px 24px;
+        mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 30%, transparent 100%);
       }
-      button:disabled { opacity: 0.5; cursor: default; }
-      .row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
-      .label { font-size: 13px; color: var(--muted); min-width: 92px; font-variant-numeric: tabular-nums; }
-      .meter { flex: 1; height: 10px; border-radius: 5px; background: var(--line); position: relative; overflow: hidden; }
-      .meter > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); transition: width 80ms linear; }
-      .meter > b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--muted); }
-      #status { margin-left: auto; font-size: 13px; color: var(--muted); }
-      #log { list-style: none; padding: 0; margin: 20px 0 0; font-size: 14px; }
-      #log li { padding: 8px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; }
-      #log li:first-child { color: var(--hit); font-weight: 600; }
+      main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+      header { display: flex; align-items: center; justify-content: space-between; }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--fg0); text-decoration: none; }
+      .brand svg { width: 20px; height: 20px; }
+      .eyebrow {
+        font: 400 12px/1 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .icon-link { color: var(--fg3); display: grid; transition: color 150ms ease-out; }
+      .icon-link:hover { color: var(--fg0); }
+      .icon-link svg { width: 20px; height: 20px; }
+      :focus-visible { outline: none; box-shadow: 0 0 0 1px var(--bg1), 0 0 0 2px var(--accent); }
+
+      h1 {
+        margin: 64px 0 24px;
+        font: 300 clamp(32px, 6vw, 48px) / 1.05 var(--sans);
+        letter-spacing: -0.03em;
+        color: var(--fg3);
+        text-wrap: balance;
+      }
+      h1 em { font-style: normal; color: var(--fg0); transition: color 300ms ease-out; }
+      h1.hit em { color: var(--accent); }
+
+      .stage {
+        position: relative;
+        height: 240px;
+        border: 1px solid var(--separator1);
+        border-radius: 8px;
+        background: var(--bg2);
+        overflow: hidden;
+        transition: border-color 300ms ease-out, box-shadow 300ms ease-out;
+      }
+      .stage.hit { border-color: var(--separator-accent); box-shadow: 0 0 16px rgb(31 213 249 / 0.25); }
+      .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .stage .drop {
+        position: absolute;
+        inset: 8px;
+        display: grid;
+        place-items: center;
+        border: 1px dashed var(--separator-accent);
+        border-radius: 4px;
+        background: rgb(5 21 24 / 0.85);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 150ms ease-out;
+      }
+      body.dragging .stage .drop { opacity: 1; }
+
+      .models { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--separator1);
+        border-radius: 4px;
+        background: var(--bg2);
+        font: 400 12px/1 var(--mono);
+        color: var(--fg1);
+      }
+      .chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+      .chip output { min-width: 3.2ch; color: var(--fg3); font-variant-numeric: tabular-nums; text-align: right; }
+      .chip.hot output { color: var(--c); }
+      .add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 10px 0 6px;
+        border: 1px dashed var(--separator2);
+        border-radius: 4px;
+        font: 400 12px/1 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg3);
+        cursor: pointer;
+        transition: color 150ms ease-out, border-color 150ms ease-out;
+      }
+      .add:hover { color: var(--accent); border-color: var(--separator-accent); }
+      .add svg { width: 18px; height: 18px; }
+      .chip button {
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--fg4);
+        cursor: pointer;
+        transition: color 150ms ease-out;
+      }
+      .chip button:hover { color: var(--fg0); }
+      .chip button svg { width: 14px; height: 14px; }
+
+      .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 40px 0 8px; }
+      #start {
+        --level: 0;
+        position: relative;
+        width: 72px;
+        height: 72px;
+        border: 1px solid var(--separator2);
+        border-radius: 50%;
+        background: var(--bg2);
+        color: var(--fg1);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: background 300ms ease-out, color 150ms ease-out, transform 150ms ease-out;
+      }
+      #start:hover { color: var(--fg0); border-color: var(--fg4); }
+      #start:active { transform: scale(0.99); }
+      #start:disabled { opacity: 0.6; cursor: not-allowed; }
+      #start svg { width: 26px; height: 26px; position: relative; }
+      #start::before {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 calc(var(--level) * 28px) rgb(31 213 249 / 0.12);
+        transition: box-shadow 80ms linear;
+      }
+      #start.on {
+        border-color: transparent;
+        background: radial-gradient(circle, var(--accent) 0%, var(--accent-deep) 62%, var(--accent-fill) 100%);
+        color: #000;
+      }
+      #status { font: 400 12px/1 var(--mono); letter-spacing: 0.08em; color: var(--fg4); min-height: 12px; }
+      #status.error { color: var(--serious); letter-spacing: 0.02em; text-align: center; }
+
+      #log { list-style: none; margin: 32px 0 0; padding: 0; font: 400 13px/1 var(--mono); }
+      #log li {
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 0;
+        border-top: 1px solid var(--separator1);
+        animation: in 300ms var(--ease);
+      }
+      #log li i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+      #log li span { color: var(--fg1); }
+      #log li time, #log li output { color: var(--fg4); font-variant-numeric: tabular-nums; }
+      #log li output { color: var(--c); }
+      @keyframes in { from { opacity: 0; transform: translateY(-8px); } }
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 64px;
+        padding-top: 20px;
+        border-top: 1px solid var(--separator1);
+        font: 400 12px/1 var(--mono);
+      }
+      footer a { color: var(--fg3); text-decoration: none; transition: color 150ms ease-out; }
+      footer a:hover { color: var(--accent); }
+      footer code { font: inherit; }
+      .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      @media (prefers-reduced-motion: reduce) {
+        #log li { animation: none; }
+        h1 em, .stage, #start, #start::before { transition: none; }
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>Say “hey livekit”</h1>
-      <p>Detection runs in this tab with onnxruntime-web; no audio leaves the page.</p>
-      <div class="card">
-        <div class="row" style="margin-top: 0">
-          <button id="start" type="button">Start listening</button>
-          <span id="status">idle</span>
-        </div>
-        <div class="row">
-          <span class="label" id="score">score 0.00</span>
-          <div class="meter"><i id="bar"></i><b style="left: 50%"></b></div>
-        </div>
-        <ul id="log"></ul>
+      <header>
+        <a class="brand" href="https://livekit.io">
+          <span class="sr">LiveKit</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.4 9.6H9.6v4.8h4.8zM19.2 4.8h-4.8v4.8h4.8zM19.2 14.4h-4.8v4.8h4.8zM24 0h-4.8v4.8H24zM24 19.2h-4.8V24H24zM4.8 19.2V0H0v24h14.4v-4.8z"/></svg>
+          <span class="eyebrow">Wakeword</span>
+        </a>
+        <a class="icon-link" href="https://github.com/livekit/livekit-wakeword">
+          <span class="sr">GitHub</span>
+          <svg viewBox="0 0 45 44" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M22.48.93C10.49.93.76 10.65.76 22.65c0 9.6 6.22 17.74 14.85 20.6 1.09.2 1.49-.47 1.49-1.05l-.03-3.7c-6.04 1.32-7.32-2.91-7.32-2.91-.99-2.51-2.41-3.18-2.41-3.18-1.97-1.35.15-1.32.15-1.32 2.18.15 3.33 2.24 3.33 2.24 1.94 3.32 5.08 2.36 6.32 1.8.2-1.4.76-2.36 1.38-2.9-4.82-.55-9.9-2.41-9.9-10.73 0-2.37.85-4.31 2.24-5.83-.22-.55-.97-2.76.21-5.75 0 0 1.82-.58 5.97 2.23a20.8 20.8 0 0 1 10.88 0c4.14-2.81 5.96-2.23 5.96-2.23 1.19 2.99.44 5.2.22 5.75 1.39 1.52 2.23 3.46 2.23 5.83 0 8.34-5.08 10.18-9.92 10.72.78.67 1.47 2 1.47 4.02l-.03 5.96c0 .58.4 1.26 1.5 1.04 8.62-2.88 14.84-11.01 14.84-20.6C44.2 10.65 34.47.93 22.48.93"/></svg>
+        </a>
+      </header>
+
+      <h1 id="title">Say <em>“hey livekit”</em></h1>
+
+      <div class="stage" id="stage">
+        <canvas id="chart" aria-label="Live wake word scores"></canvas>
+        <div class="drop eyebrow">Drop .onnx</div>
       </div>
+
+      <div class="models" id="models">
+        <label class="add" title="Load your own model (.onnx from livekit-wakeword train)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M12.5 6v5.5H18v1h-5.5V18h-1v-5.5H6v-1h5.5V6z"/></svg>
+          .onnx
+          <input id="file" class="sr" type="file" accept=".onnx" multiple />
+        </label>
+      </div>
+
+      <div class="controls">
+        <button id="start" type="button" aria-label="Start listening" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7a5 5 0 0 1 10 0v5a5 5 0 0 1-10 0z"/><path fill="currentColor" d="m5.25 13.87-.13-.49-.96.27.13.48a8.5 8.5 0 0 0 7.21 5.85V22h1v-2.02a8.5 8.5 0 0 0 7.21-5.85l.14-.48-.97-.27-.13.49A7.5 7.5 0 0 1 12 19a7.5 7.5 0 0 1-6.75-5.13"/></svg>
+        </button>
+        <div id="status" role="status">loading</div>
+      </div>
+
+      <ol id="log" aria-label="Detections"></ol>
+      <footer>
+        <a href="https://www.npmjs.com/package/@livekit/wakeword"><code>npm i @livekit/wakeword</code></a>
+        <a href="https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md">Train yours</a>
+      </footer>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

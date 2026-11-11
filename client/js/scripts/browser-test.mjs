@@ -68,7 +68,8 @@ async function listen(url, wav, seconds = 8) {
     let best = 0;
     for (const end = Date.now() + seconds * 1000; Date.now() < end; ) {
       await page.waitForTimeout(100);
-      best = Math.max(best, Number.parseFloat((await page.textContent('#score')).slice(6)));
+      const score = await page.textContent('output[data-model="hey_livekit"]');
+      best = Math.max(best, Number.parseFloat(score));
     }
     const detections = await page.$$eval('#log li', (items) => items.length);
     await page.click('#start'); // stop: the detections() loop ends
@@ -100,7 +101,14 @@ try {
 
 const outDir = fileURLToPath(new URL('../example/dist', import.meta.url));
 await build({ root, logLevel: 'warn', build: { outDir, emptyOutDir: true } });
-const server = await preview({ root, preview: { port: 0 }, build: { outDir }, logLevel: 'warn' });
+// served under a subpath, as GitHub Pages serves it (the build uses relative URLs)
+const server = await preview({
+  root,
+  base: '/livekit-wakeword/',
+  preview: { port: 0 },
+  build: { outDir },
+  logLevel: 'warn',
+});
 try {
   await check('build', server.resolvedUrls.local[0]);
 } finally {
