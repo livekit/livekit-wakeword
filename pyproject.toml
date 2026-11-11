@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "livekit-wakeword"
-version = "2.1.1"
+version = "2.1.2"
 description = "Type a wake word, get a streaming model: training and streaming detection for LiveKit wake word models"
 readme = "README.md"
 requires-python = ">=3.11"
