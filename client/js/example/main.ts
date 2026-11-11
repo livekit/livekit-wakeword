@@ -3,7 +3,8 @@ import '@fontsource/commit-mono';
 import { WakeWordListener, WakeWordModel } from '@livekit/wakeword';
 
 const THRESHOLD = 0.5;
-const WINDOW_MS = 8_000; // history on the chart
+const WINDOW_MS = 6_000; // history on the chart
+const STEP_MS = 80; // the models score 80 ms steps
 const COLORS = ['#1FD5F9', '#DC85FF', '#23DE6B', '#FFB752'];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -20,6 +21,7 @@ interface Track {
   color: string;
   chip: HTMLElement;
   score: HTMLOutputElement;
+  count: HTMLElement;
 }
 const tracks = new Map<string, Track>();
 const steps: { t: number; scores: Record<string, number> }[] = [];
@@ -75,9 +77,10 @@ function addChip(name: string) {
     chip.remove();
     renderTitle();
   };
-  chip.append(document.createElement('i'), name, score, remove);
+  const count = document.createElement('b'); // detections so far
+  chip.append(document.createElement('i'), name, score, count, remove);
   chips.insertBefore(chip, chips.lastElementChild);
-  tracks.set(name, { color, chip, score });
+  tracks.set(name, { color, chip, score, count });
 }
 
 async function addModel(source: string | ArrayBuffer, name: string) {
@@ -107,7 +110,13 @@ try {
 button.disabled = false;
 
 function onScores(scores: Record<string, number>) {
+  // one step per 80 ms of audio, but they can arrive in bursts: space a burst out backwards
   steps.push({ t: performance.now(), scores });
+  for (let i = steps.length - 2; i >= 0; i--) {
+    const [a, b] = [steps[i], steps[i + 1]] as [(typeof steps)[number], (typeof steps)[number]];
+    if (a.t <= b.t - STEP_MS) break;
+    a.t = b.t - STEP_MS;
+  }
   for (const [name, s] of Object.entries(scores)) {
     const track = tracks.get(name);
     if (!track) continue;
@@ -118,16 +127,10 @@ function onScores(scores: Record<string, number>) {
 
 function onDetection(name: string, confidence: number) {
   hits.push({ t: performance.now(), name });
-  const color = tracks.get(name)?.color ?? COLORS[0];
-  const li = document.createElement('li');
-  li.style.setProperty('--c', color as string);
-  const time = document.createElement('time');
-  time.textContent = new Date().toLocaleTimeString([], { hour12: false });
-  const label = document.createElement('span');
-  label.textContent = name;
-  const score = document.createElement('output');
-  score.textContent = confidence.toFixed(2);
-  li.append(document.createElement('i'), label, time, score);
+  const track = tracks.get(name);
+  if (track) track.count.textContent = String(Number(track.count.textContent) + 1);
+  const li = document.createElement('li'); // for screen readers (and the browser test)
+  li.textContent = `${name} ${confidence.toFixed(2)}`;
   log.prepend(li);
   while (log.children.length > 8) log.lastElementChild?.remove();
   for (const el of [stage, title]) {
@@ -197,8 +200,11 @@ addEventListener('drop', (e) => {
   void addFiles(files);
 });
 
-// the chart: one trace per model over the last WINDOW_MS, the threshold, detections and mic level
+// the display: a dot matrix (as in LiveKit's product art), one column per moment over the last
+// WINDOW_MS; a column lights up to the highest score, in that model's color
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const PITCH = 10; // dot spacing, CSS px
+const DOT = 3;
 const wave = new Float32Array(1024);
 let level = 0;
 
@@ -212,11 +218,13 @@ function draw(now: number) {
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const top = 20;
-  const bottom = h - 12;
-  const x = (t: number) => w - ((now - t) / WINDOW_MS) * w;
-  const y = (s: number) => bottom - Math.min(1, Math.max(0, s)) * (bottom - top);
-  const old = now - WINDOW_MS - 500;
+  const cols = Math.max(1, Math.floor(w / PITCH));
+  const rows = Math.max(2, Math.floor(h / PITCH));
+  const x0 = (w - (cols - 1) * PITCH - DOT) / 2;
+  const y0 = (h - (rows - 1) * PITCH - DOT) / 2;
+  const span = WINDOW_MS / cols; // ms per column
+  const last = Math.floor(now / span);
+  const old = now - WINDOW_MS - span;
   while (steps.length && (steps[0] as { t: number }).t < old) steps.shift();
   while (levels.length && (levels[0] as { t: number }).t < old) levels.shift();
   while (hits.length && (hits[0] as { t: number }).t < old) hits.shift();
@@ -230,105 +238,98 @@ function draw(now: number) {
     button.style.setProperty('--level', level.toFixed(3));
   }
 
-  // mic level: a faint band along the bottom
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  for (const { t, v } of levels) {
-    const bh = v * (bottom - top) * 0.4;
-    ctx.fillRect(x(t), bottom - bh, 2, bh);
-  }
-
-  // threshold
-  ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = '#30302F';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, y(THRESHOLD));
-  ctx.lineTo(w, y(THRESHOLD));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.font = '10px "Commit Mono", ui-monospace, monospace';
-  ctx.fillStyle = '#666666';
-  ctx.fillText(THRESHOLD.toFixed(1), 10, y(THRESHOLD) - 6);
-
-  // detections
-  for (const { t, name } of hits) {
-    const color = tracks.get(name)?.color ?? (COLORS[0] as string);
-    const fade = Math.max(0, 1 - (now - t) / WINDOW_MS);
-    ctx.globalAlpha = 0.25 + 0.5 * fade;
-    ctx.fillStyle = color;
-    ctx.fillRect(x(t), top - 8, 1, bottom - top + 8);
-    ctx.beginPath();
-    ctx.arc(x(t), top - 8, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // one trace per model, the highest on top; flat at 0 until scores arrive
-  const latest = (name: string) => steps.at(-1)?.scores[name] ?? 0;
-  const order = [...tracks].sort(([a], [b]) => latest(a) - latest(b));
-  for (const [name, { color }] of order) {
-    const pts = steps
-      .filter((p) => name in p.scores)
-      .map((p) => [x(p.t), y(p.scores[name] as number)] as const);
-    if (pts.length < 2) pts.splice(0, pts.length, [0, bottom], [w, bottom]);
-    const line = new Path2D();
-    smooth(line, pts);
-    const [lx, ly] = pts.at(-1) as readonly [number, number];
-    const area = new Path2D();
-    area.moveTo((pts[0] as readonly [number, number])[0], bottom);
-    smooth(area, pts, true);
-    area.lineTo(lx, bottom);
-    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, `${color}55`);
-    gradient.addColorStop(1, `${color}00`);
-    ctx.fillStyle = gradient;
-    ctx.fill(area);
-    const hot = latest(name) >= THRESHOLD;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = hot ? 18 : 8;
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = session ? 1 : 0.5;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.stroke(line);
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    if (session) {
-      ctx.beginPath();
-      ctx.arc(lx, ly, 3, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
+  // per column: the highest score (and its model), the mic level, a detection
+  const col = (t: number) => cols - 1 - (last - Math.floor(t / span));
+  const score = new Float32Array(cols);
+  const owner: (string | undefined)[] = new Array(cols);
+  const mic = new Float32Array(cols);
+  const hit: (string | undefined)[] = new Array(cols);
+  // each step holds until the next, so a score covers its whole 80 ms, not one column
+  let i = 0;
+  for (let c = 0; c < cols; c++) {
+    const end = (last - (cols - 1 - c) + 1) * span; // this column's end time
+    while (i < steps.length && (steps[i] as { t: number }).t < end) {
+      const { t, scores } = steps[i] as (typeof steps)[number];
+      i++;
+      if (col(t) !== c) continue; // older than the window
+      for (const [name, s] of Object.entries(scores)) {
+        if (tracks.has(name) && s >= score[c]) {
+          score[c] = s;
+          owner[c] = name;
+        }
+      }
+    }
+    // no step in this column: hold the previous one (up to the latest step)
+    const newest = steps.at(-1)?.t ?? 0;
+    if (!owner[c] && c > 0 && owner[c - 1] && end - span <= newest) {
+      score[c] = score[c - 1] as number;
+      owner[c] = owner[c - 1];
     }
   }
-  requestAnimationFrame(draw);
-}
-
-/**
- * A smooth curve through every point of `pts` (Catmull-Rom, so peaks keep their true height;
- * control points are kept within the chart); `join` continues the current path.
- */
-function smooth(path: Path2D, pts: readonly (readonly [number, number])[], join = false) {
-  const at = (i: number) =>
-    pts[Math.max(0, Math.min(pts.length - 1, i))] as readonly [number, number];
-  const [x0, y0] = at(0);
-  if (join) path.lineTo(x0, y0);
-  else path.moveTo(x0, y0);
-  const lo = Math.min(...pts.map((p) => p[1]));
-  const hi = Math.max(...pts.map((p) => p[1]));
-  const clamp = (v: number) => Math.max(lo, Math.min(hi, v));
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [ax, ay] = at(i - 1);
-    const [bx, by] = at(i);
-    const [cx, cy] = at(i + 1);
-    const [dx, dy] = at(i + 2);
-    path.bezierCurveTo(
-      bx + (cx - ax) / 6,
-      clamp(by + (cy - ay) / 6),
-      cx - (dx - bx) / 6,
-      clamp(cy - (dy - by) / 6),
-      cx,
-      cy,
-    );
+  // a peak fades over the next columns (like a level meter), so a 160 ms spike stays readable
+  const newestCol = col(steps.at(-1)?.t ?? 0);
+  for (let c = 1; c <= newestCol; c++) {
+    const tail = (score[c - 1] as number) * 0.8;
+    if (owner[c - 1] && tail > (score[c] as number)) {
+      score[c] = tail;
+      owner[c] = owner[c - 1];
+    }
   }
+  for (const { t, v } of levels) {
+    const c = col(t);
+    if (c >= 0) mic[c] = Math.max(mic[c] as number, v);
+  }
+  for (const { t, name } of hits) {
+    const c = col(t);
+    if (c >= 0) hit[c] = name;
+  }
+  if (!session) {
+    for (let c = 0; c < cols; c++) mic[c] = 0.06 + 0.04 * Math.sin(c * 0.18 - now / 600); // idle hum
+  }
+
+  // batch the dots by style: one fill per style
+  const paths = new Map<string, Path2D>();
+  const add = (style: string, c: number, r: number) => {
+    let p = paths.get(style);
+    if (!p) {
+      p = new Path2D();
+      paths.set(style, p);
+    }
+    p.rect(x0 + c * PITCH, y0 + (rows - 1 - r) * PITCH, DOT, DOT);
+  };
+  const threshold = Math.round(THRESHOLD * rows - 0.5);
+  for (let c = 0; c < cols; c++) {
+    const s = score[c] as number;
+    const color = owner[c] ? tracks.get(owner[c] as string)?.color : undefined;
+    const marked = hit[c] ? tracks.get(hit[c] as string)?.color : undefined;
+    for (let r = 0; r < rows; r++) {
+      const v = (r + 0.5) / rows;
+      if (color && v <= s) add(s >= THRESHOLD ? `hot ${color}` : `lit ${color}`, c, r);
+      else if (marked) add(`mark ${marked}`, c, r);
+      else if (v <= (mic[c] as number) * 0.6) add('mic', c, r);
+      else if (r === threshold) add('threshold', c, r);
+      else add('off', c, r);
+    }
+  }
+  for (const [style, path] of paths) {
+    const [kind, color = ''] = style.split(' ');
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    if (kind === 'off') ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    else if (kind === 'mic') ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    else if (kind === 'threshold') ctx.fillStyle = '#035C6D';
+    else {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = kind === 'hot' ? 1 : kind === 'lit' ? 0.6 : 0.3;
+      if (kind === 'hot') {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+      }
+    }
+    ctx.fill(path);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
