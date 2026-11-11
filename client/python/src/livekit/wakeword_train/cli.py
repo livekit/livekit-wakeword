@@ -131,6 +131,12 @@ def setup(
         "--pronounce",
         help='ARPAbet for a word outside the CMU dictionary, e.g. "zork=Z AO1 R K" (repeatable)',
     ),
+    hard_negative: list[str] | None = typer.Option(
+        None,
+        "--hard-negative",
+        help='A close-sounding phrase the model must not fire on, e.g. "hey rabbit" or "喂小机" '
+        "(repeatable; added to the config; English also gets its own)",
+    ),
 ) -> None:
     """Check the environment, write the config (<name>.yaml) and generate the datasets."""
     from .config import WakeWordConfig, default_config_path
@@ -159,6 +165,13 @@ def setup(
     )
     if words:
         cfg = with_changes(cfg, pronunciations={**cfg.pronunciations, **words})
+    if hard_negative:
+        from pydantic import ValidationError
+
+        try:
+            cfg = with_changes(cfg, hard_negatives=[*cfg.hard_negatives, *hard_negative])
+        except ValidationError as e:
+            raise _fail(f"--hard-negative: {e.errors()[0]['msg'].removeprefix('Value error, ')}")
     problems = check_environment(cfg)  # before writing anything
     if problems:
         raise _fail("cannot set up:\n  - " + "\n  - ".join(problems))
@@ -166,6 +179,7 @@ def setup(
     if (
         not Path(path).exists()
         or words
+        or hard_negative
         or any(v is not None for v in (language, plan, concurrency, clips))
     ):
         cfg.save(path)

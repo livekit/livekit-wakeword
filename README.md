@@ -194,6 +194,17 @@ livekit-wakeword setup --wakeword "ねえ ロボット" --language ja
 livekit-wakeword train --wakeword "ねえ ロボット"  # -> ねえ_ロボット.onnx
 ```
 
+Close-sounding phrases teach the model what not to fire on. Add your own with
+`setup --hard-negative` (repeatable) or under `hard_negatives` in the config, such as names or
+words your users say often. English also gets them automatically; other languages have only
+yours, so list a few there, changing a sound (not only the tone) and skipping homophones:
+
+```yaml
+wakeword: 嘿小机
+language: zh
+hard_negatives: [喂小机, 嘿小七, 嘿小弟, 小机, 嘿小]
+```
+
 The model file is named after the phrase; set `model_name` in the config (for example
 `ne_robot`) for an ASCII file name, such as for ESP32 builds.
 

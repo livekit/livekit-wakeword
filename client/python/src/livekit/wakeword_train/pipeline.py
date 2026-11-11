@@ -99,7 +99,27 @@ def phrase_problems(config: WakeWordConfig) -> list[str]:
             f'run setup again with {flags} (e.g. "zork=Z AO1 R K"), or add them under '
             f"`pronunciations:` in {config.name}.yaml; {CMUDICT} spells similar words"
         )
+    hard = [w for w in unknown_hard_negative_words(config) if w not in missing]
+    if hard and phoneme_steered(config):  # bench drops phoneme-steered phrases it cannot spell
+        flags = " ".join(f'--pronounce "{w}=<ARPAbet>"' for w in hard)
+        problems.append(
+            f"no pronunciation for {', '.join(map(repr, hard))} in hard_negatives (not in the CMU "
+            f"dictionary): run setup again with {flags}, or add them under `pronunciations:`"
+        )
     return problems
+
+
+def unknown_hard_negative_words(config: WakeWordConfig) -> list[str]:
+    """Words of English hard negatives with no ARPAbet pronunciation (see `unknown_words`)."""
+    if not is_english(config.language) or not config.hard_negatives:
+        return []
+    try:
+        from livekit_wakeword_bench.scaffold import guess_pronunciations
+    except ImportError:
+        return []
+    given = {w.lower() for w in config.pronunciations}
+    words = (w for p in config.hard_negatives for w in guess_pronunciations(p)[1])
+    return [w for w in dict.fromkeys(words) if w not in given]
 
 
 def natural_positives_help(phrase: str, language: str = "en") -> bool:
@@ -114,14 +134,23 @@ def natural_positives_help(phrase: str, language: str = "en") -> bool:
 
 
 def _generate(
-    config: WakeWordConfig, out: Path, splits: list[str], overwrite: bool = False, **knobs: Any
+    config: WakeWordConfig,
+    out: Path,
+    splits: list[str],
+    overwrite: bool = False,
+    hard_negatives: bool = True,
+    **knobs: Any,
 ) -> None:
+    """Generate `splits` into `out` with bench; `hard_negatives`: send the config's (sets without
+    confusables leave them out, so changing them does not regenerate those)."""
     from livekit_wakeword_bench import generate
 
     if config.concurrency:
         knobs["tts__concurrency"] = config.concurrency
     for word, arpabet in config.pronunciations.items():  # JSON-quoted: bench parses knobs as YAML
         knobs[f"pronunciations__{word.lower()}"] = json.dumps(arpabet)
+    if hard_negatives and config.hard_negatives:
+        knobs["hard_negatives"] = json.dumps(config.hard_negatives, ensure_ascii=False)
     if not phoneme_steered(config):
         # plain-text TTS only; bench still wants an entry per word, unused without phonemes
         knobs["tts__phonemes"] = False
@@ -163,19 +192,23 @@ def _train_counts(d: Path) -> tuple[int, int, int] | None:
         return None
 
 
-def _same_phrase(d: Path, config: WakeWordConfig) -> bool:
-    """Whether the dataset in `d` was generated for the config's phrase, language and
-    pronunciations (a changed pronunciation means the old clips say the phrase differently).
-    Datasets without a readable bench config are kept."""
+def _config_change(d: Path, config: WakeWordConfig, confusables: bool = True) -> str | None:
+    """What the dataset in `d` was generated for that the config no longer says: the phrase,
+    language, pronunciations (the old clips say the phrase differently) or hard negatives (sets
+    with `confusables` only); None when it matches. Datasets without a bench config match."""
     bench = _bench_config(d)
     if bench is None:
-        return True
+        return None
     made = {str(k).lower(): str(v) for k, v in (bench.get("pronunciations") or {}).items()}
-    return (
-        str(bench.get("wake_word", config.wakeword)) == config.wakeword
-        and str(bench.get("language", config.language)) == config.language
-        and all(made.get(w.lower()) == a for w, a in config.pronunciations.items())
-    )
+    if str(bench.get("wake_word", config.wakeword)) != config.wakeword:
+        return "wakeword changed"
+    if str(bench.get("language", config.language)) != config.language:
+        return "language changed"
+    if any(made.get(w.lower()) != a for w, a in config.pronunciations.items()):
+        return "pronunciations changed"
+    if confusables and sorted(bench.get("hard_negatives") or []) != sorted(config.hard_negatives):
+        return "hard_negatives changed"
+    return None
 
 
 def _wanted(config: WakeWordConfig) -> dict[str, tuple[int, int, int]]:
@@ -187,6 +220,16 @@ def _wanted(config: WakeWordConfig) -> dict[str, tuple[int, int, int]]:
         # steered clips make up the whole positive share when there are no plain-text ones
         return {"steered": (2 * n_pos, n_conf, n_sent)}
     return {"steered": (n_pos, n_conf, n_sent), "natural": (n_pos, 0, 0)}
+
+
+def _stale(out: Path, config: WakeWordConfig, counts: tuple[int, int, int]) -> str | None:
+    """Why the training set in `out` does not match the config (missing, clip counts, phrase,
+    language, pronunciations or hard negatives); None when it is up to date."""
+    if not _done(out, "train"):
+        return "missing"
+    if _train_counts(out) != counts:
+        return "clip counts changed"
+    return _config_change(out, config, confusables=counts[1] > 0)
 
 
 def train_datasets(config: WakeWordConfig) -> list[str]:
@@ -210,13 +253,22 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
     d = config.dataset_dir
     if not phoneme_steered(config):
         logger.info("%r: generating with plain-text TTS only", config.wakeword)
+    if not is_english(config.language) and config.n_confusable and not config.hard_negatives:
+        logger.warning(
+            "no confusables for %r: they are generated for English only. Give close-sounding "
+            "phrases with `setup --hard-negative` or under `hard_negatives:` in %s.yaml so the "
+            "model learns to reject them",
+            config.wakeword,
+            config.name,
+        )
     for kind, (n_pos, n_conf, n_sent) in _wanted(config).items():
         out = d / kind
-        done = _done(out, "train")
-        if done and _train_counts(out) == (n_pos, n_conf, n_sent) and _same_phrase(out, config):
+        reason = _stale(out, config, (n_pos, n_conf, n_sent))
+        if reason is None:
             continue
+        done = reason != "missing"
         if done:  # the old checkpoint learned from other speech
-            logger.info("clip counts, phrase or pronunciations changed: regenerating %s", out)
+            logger.info("%s: regenerating %s", reason, out)
             (config.runs_dir / "standard.pt").unlink(missing_ok=True)
         logger.info("generating %s training speech for %r", kind, config.wakeword)
         _generate(
@@ -224,6 +276,7 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
             out,
             ["train"],
             overwrite=done,
+            hard_negatives=n_conf > 0,
             **({"tts__phonemes": False} if kind == "natural" else {}),
             splits__train__n_positive=n_pos,
             splits__train__n_adversarial=n_conf,
@@ -237,9 +290,10 @@ def run_setup(config: WakeWordConfig, eval: bool = False) -> list[str]:
 def test_dataset(config: WakeWordConfig) -> Path:
     """The held-out test set (unseen voices, noise and rooms; cached)."""
     d = config.dataset_dir / "test"
-    stale = _done(d, "test") and not _same_phrase(d, config)
+    change = _config_change(d, config) if _done(d, "test") else None
+    stale = change is not None
     if stale:
-        logger.info("phrase, language or pronunciations changed: regenerating %s", d)
+        logger.info("%s: regenerating %s", change, d)
     if not _done(d, "test") or stale:
         problems = check_environment(config)
         if problems:

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ModelType = Literal["standard", "micro"]
 PLANS = ("build", "ship", "scale")  # LiveKit Cloud plans: 5 / 20 / 50 concurrent TTS requests
@@ -24,6 +24,27 @@ def is_english(language: str) -> bool:
     return re.split(r"[-_]", language.strip().lower())[0] == "en"
 
 
+# scripts written without spaces between words: Han, kana, Thai, Lao, Myanmar, Khmer
+_UNSPACED = re.compile(
+    r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff]"
+)
+
+
+def _words(text: str) -> str:
+    return " ".join(re.findall(r"\w+", text.lower()))
+
+
+def says_phrase(text: str, phrase: str) -> bool:
+    """Whether `text` contains `phrase`, ignoring case and punctuation: as whole words where
+    words are spaced, as characters in scripts without spaces (Chinese, Japanese, Thai)."""
+    t, p = _words(text), _words(phrase)
+    if not p:
+        return False
+    if _UNSPACED.search(p):
+        return p.replace(" ", "") in t.replace(" ", "")
+    return f" {p} " in f" {t} "
+
+
 class WakeWordConfig(BaseModel):
     # a misspelt key would otherwise fall back to its default without a word
     model_config = ConfigDict(extra="forbid")
@@ -34,6 +55,11 @@ class WakeWordConfig(BaseModel):
     pronunciations: dict[str, str] = Field(
         default_factory=dict,
         description='ARPAbet for words outside the CMU dictionary, e.g. {"zork": "Z AO1 R K"}',
+    )
+    hard_negatives: list[str] = Field(
+        default_factory=list,
+        description="Close-sounding phrases the model must not fire on (English adds its own; "
+        "other languages have only these)",
     )
     output_dir: Path = Field(Path("."), description="Where models are written")
     data_dir: Path | None = Field(
@@ -56,6 +82,18 @@ class WakeWordConfig(BaseModel):
     micro_steps: int = Field(5000, ge=1, description="Fine-tuning steps, micro model")
     target_fpph: float = Field(0.5, gt=0, description="False alarms per hour at score 0.5")
 
+    @field_validator("hard_negatives")
+    @classmethod
+    def _clean_hard_negatives(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(p.strip() for p in v if p.strip()))
+
+    @model_validator(mode="after")
+    def _hard_negatives_are_not_the_phrase(self) -> WakeWordConfig:
+        said = [p for p in self.hard_negatives if says_phrase(p, self.wakeword)]
+        if said:  # they would teach the model not to fire on the wake word
+            raise ValueError(f"hard_negatives must not say the wake word: {', '.join(said)}")
+        return self
+
     @property
     def name(self) -> str:
         return self.model_name or slug(self.wakeword)
@@ -77,6 +115,8 @@ class WakeWordConfig(BaseModel):
         data = self.model_dump(mode="json", exclude_none=True)
         if not data["pronunciations"]:
             del data["pronunciations"]
+        if not data["hard_negatives"] and is_english(self.language):
+            del data["hard_negatives"]  # listed (empty) for other languages, to fill in
         path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
         return path
 

@@ -95,7 +95,8 @@ class _Stream(IterableDataset):  # type: ignore[type-arg]
         pos, adv, tts = sets["positive"], sets["adversarial"], sets["speech"]
         if cfg.n_adv and not len(adv) and wid == 0:  # e.g. languages without confusable phrases
             logger.warning(
-                "dataset %r has no confusable clips: the %d confusable rows per batch use %s",
+                "dataset %r has no confusable clips (list some under `hard_negatives`): the %d "
+                "confusable rows per batch use %s",
                 self.dataset,
                 cfg.n_adv,
                 "its sentence clips" if len(tts) else "background speech",
