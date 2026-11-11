@@ -58,8 +58,9 @@ async function listen(url, wav, seconds = 8) {
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(url);
-    await page.click('#start');
+    await page.goto(url); // listening starts by itself (after a tap, if autoplay is blocked)
+    await page.waitForFunction(() => document.getElementById('status')?.textContent !== 'loading');
+    await page.mouse.click(1, 1);
     await page.waitForFunction(
       () => document.getElementById('status')?.textContent === 'listening',
       null,
@@ -72,8 +73,8 @@ async function listen(url, wav, seconds = 8) {
       best = Math.max(best, Number.parseFloat(score));
     }
     const detections = await page.$$eval('#log li', (items) => items.length);
-    await page.click('#start'); // stop: the detections() loop ends
-    await page.waitForFunction(() => document.getElementById('status')?.textContent === 'stopped');
+    await page.click('#start'); // pause: the detections() loop ends
+    await page.waitForFunction(() => document.getElementById('status')?.textContent === 'paused');
     assert.deepEqual(errors, []);
     return { detections, best };
   } finally {

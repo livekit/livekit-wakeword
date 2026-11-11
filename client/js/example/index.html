@@ -29,7 +29,7 @@
       html, body { margin: 0; }
       body {
         display: grid;
-        grid-template-rows: auto 1fr auto;
+        grid-template-rows: 1fr auto;
         min-height: 100dvh;
         background: var(--bg1);
         color: var(--fg1);
@@ -49,23 +49,29 @@
           linear-gradient(90deg, var(--separator1) 1px, transparent 1px) 50% 50% / 64px 64px;
         mask-image: radial-gradient(ellipse 55% 50% at 50% 50%, rgb(0 0 0 / 0.6), transparent 100%);
       }
-      header {
-        display: flex;
+      .brand {
+        display: inline-flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 20px 24px;
+        gap: 10px;
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--separator1);
+        border-radius: 999px;
+        background: var(--bg2);
+        color: var(--fg0);
+        text-decoration: none;
+        transition: border-color 150ms ease-out;
       }
-      .brand { display: flex; align-items: center; gap: 10px; color: var(--fg0); text-decoration: none; }
-      .brand svg { width: 20px; height: 20px; }
+      .brand:hover { border-color: var(--separator2); }
+      .brand svg { width: 14px; height: 14px; }
+      .brand .gh { color: var(--fg4); transition: color 150ms ease-out; }
+      .brand:hover .gh { color: var(--fg0); }
       .eyebrow {
         font: 400 12px/1 var(--mono);
         letter-spacing: 0.12em;
         text-transform: uppercase;
         color: var(--fg3);
       }
-      .icon-link { color: var(--fg3); display: grid; transition: color 150ms ease-out; }
-      .icon-link:hover { color: var(--fg0); }
-      .icon-link svg { width: 20px; height: 20px; }
       :focus-visible { outline: none; box-shadow: 0 0 0 1px var(--bg1), 0 0 0 2px var(--accent); }
 
       main {
@@ -74,7 +80,7 @@
         align-items: center;
         justify-content: center;
         gap: clamp(24px, 4vh, 40px);
-        padding: 0 16px;
+        padding: 48px 16px 0;
         text-align: center;
       }
       h1 {
@@ -208,19 +214,12 @@
     </style>
   </head>
   <body>
-    <header>
-      <a class="brand" href="https://livekit.io">
-        <span class="sr">LiveKit</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.4 9.6H9.6v4.8h4.8zM19.2 4.8h-4.8v4.8h4.8zM19.2 14.4h-4.8v4.8h4.8zM24 0h-4.8v4.8H24zM24 19.2h-4.8V24H24zM4.8 19.2V0H0v24h14.4v-4.8z"/></svg>
-        <span class="eyebrow">Wakeword</span>
-      </a>
-      <a class="icon-link" href="https://github.com/livekit/livekit-wakeword">
-        <span class="sr">GitHub</span>
-        <svg viewBox="0 0 45 44" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M22.48.93C10.49.93.76 10.65.76 22.65c0 9.6 6.22 17.74 14.85 20.6 1.09.2 1.49-.47 1.49-1.05l-.03-3.7c-6.04 1.32-7.32-2.91-7.32-2.91-.99-2.51-2.41-3.18-2.41-3.18-1.97-1.35.15-1.32.15-1.32 2.18.15 3.33 2.24 3.33 2.24 1.94 3.32 5.08 2.36 6.32 1.8.2-1.4.76-2.36 1.38-2.9-4.82-.55-9.9-2.41-9.9-10.73 0-2.37.85-4.31 2.24-5.83-.22-.55-.97-2.76.21-5.75 0 0 1.82-.58 5.97 2.23a20.8 20.8 0 0 1 10.88 0c4.14-2.81 5.96-2.23 5.96-2.23 1.19 2.99.44 5.2.22 5.75 1.39 1.52 2.23 3.46 2.23 5.83 0 8.34-5.08 10.18-9.92 10.72.78.67 1.47 2 1.47 4.02l-.03 5.96c0 .58.4 1.26 1.5 1.04 8.62-2.88 14.84-11.01 14.84-20.6C44.2 10.65 34.47.93 22.48.93"/></svg>
-      </a>
-    </header>
-
     <main>
+      <a class="brand" href="https://github.com/livekit/livekit-wakeword">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="lk"><path fill="currentColor" d="M14.4 9.6H9.6v4.8h4.8zM19.2 4.8h-4.8v4.8h4.8zM19.2 14.4h-4.8v4.8h4.8zM24 0h-4.8v4.8H24zM24 19.2h-4.8V24H24zM4.8 19.2V0H0v24h14.4v-4.8z"/></svg>
+        <span class="eyebrow">LiveKit Wakeword</span>
+        <svg viewBox="0 0 45 44" aria-hidden="true" class="gh"><path fill="currentColor" fill-rule="evenodd" d="M22.48.93C10.49.93.76 10.65.76 22.65c0 9.6 6.22 17.74 14.85 20.6 1.09.2 1.49-.47 1.49-1.05l-.03-3.7c-6.04 1.32-7.32-2.91-7.32-2.91-.99-2.51-2.41-3.18-2.41-3.18-1.97-1.35.15-1.32.15-1.32 2.18.15 3.33 2.24 3.33 2.24 1.94 3.32 5.08 2.36 6.32 1.8.2-1.4.76-2.36 1.38-2.9-4.82-.55-9.9-2.41-9.9-10.73 0-2.37.85-4.31 2.24-5.83-.22-.55-.97-2.76.21-5.75 0 0 1.82-.58 5.97 2.23a20.8 20.8 0 0 1 10.88 0c4.14-2.81 5.96-2.23 5.96-2.23 1.19 2.99.44 5.2.22 5.75 1.39 1.52 2.23 3.46 2.23 5.83 0 8.34-5.08 10.18-9.92 10.72.78.67 1.47 2 1.47 4.02l-.03 5.96c0 .58.4 1.26 1.5 1.04 8.62-2.88 14.84-11.01 14.84-20.6C44.2 10.65 34.47.93 22.48.93"/></svg>
+      </a>
       <h1 id="title">Say <em>“hey livekit”</em></h1>
 
       <div class="stage" id="stage">

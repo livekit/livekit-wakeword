@@ -93,7 +93,6 @@ async function addFiles(files: Iterable<File>) {
   for (const file of files) {
     try {
       await addModel(await file.arrayBuffer(), file.name.replace(/\.onnx$/i, ''));
-      if (!session) setStatus('');
     } catch (e) {
       setStatus((e as Error).message, true);
     }
@@ -139,30 +138,38 @@ function onDetection(name: string, confidence: number) {
   }
 }
 
-button.onclick = async () => {
-  if (session) {
-    await session.listener.stop(); // ends the detections() loop below
-    return;
-  }
+/** Listens until paused. Starts on load; the browser may wait for a first tap to play audio. */
+let starting = false;
+async function listen() {
+  starting = true;
   button.disabled = true;
   setStatus('starting');
   let current: Session | null = null;
   try {
-    const context = new AudioContext(); // in the click handler, so it may start
+    const context = new AudioContext();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+    if (context.state !== 'running') {
+      const resume = () => void context.resume();
+      setStatus('tap to listen');
+      button.disabled = false; // a tap on it counts too
+      addEventListener('pointerdown', resume, { once: true });
+      addEventListener('keydown', resume, { once: true });
+      await context.resume(); // resolves once the page may play audio
+    }
     const analyser = context.createAnalyser();
     analyser.fftSize = 1024;
     context.createMediaStreamSource(stream).connect(analyser);
     const listener = new WakeWordListener(model, { threshold: THRESHOLD, debounce: 2, onScores });
     current = { listener, stream, context, analyser };
     session = current;
+    starting = false;
     await listener.start({ source: stream, audioContext: context });
     button.classList.add('on');
-    button.ariaLabel = 'Stop listening';
+    button.ariaLabel = 'Pause';
     button.disabled = false;
     setStatus('listening');
     for await (const d of listener.detections()) onDetection(d.name, d.confidence);
-    setStatus('stopped');
+    setStatus('paused');
   } catch (e) {
     console.error(e);
     setStatus((e as Error).message, true);
@@ -172,12 +179,21 @@ button.onclick = async () => {
       await current.context.close();
     }
     session = null;
+    starting = false;
     button.classList.remove('on');
-    button.ariaLabel = 'Start listening';
+    button.ariaLabel = 'Listen';
     button.style.setProperty('--level', '0');
     button.disabled = false;
   }
+}
+
+button.onclick = () => {
+  if (starting) return; // listen() is waiting for this tap
+  if (session)
+    void session.listener.stop(); // ends the detections() loop in listen()
+  else void listen();
 };
+void listen();
 
 fileInput.onchange = () => {
   if (fileInput.files) void addFiles([...fileInput.files]);
