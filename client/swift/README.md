@@ -5,7 +5,7 @@ provider by default). Models come from [training](../python/TRAINING.md) or the
 [release](../../README.md#models).
 
 ```swift
-.package(url: "https://github.com/livekit/livekit-wakeword", from: "2.1.1"),
+.package(url: "https://github.com/livekit/livekit-wakeword", from: "2.1.2"),
 ```
 
 ```swift
