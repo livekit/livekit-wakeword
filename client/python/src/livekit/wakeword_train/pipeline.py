@@ -315,9 +315,20 @@ def run_train(
     from .export import calibrate, export_streaming
     from .loop import TrainConfig, calibration_logit, default_aug, train
 
+    d = config.dataset_dir
+    for kind, counts in _wanted(config).items():  # train never generates speech: setup does
+        reason = _stale(d / kind, config, counts)
+        if reason == "missing":
+            raise SetupError(
+                f"no training speech for {config.wakeword!r}: run "
+                f'`livekit-wakeword setup --wakeword "{config.wakeword}"` first'
+            )
+        if reason:
+            raise SetupError(
+                f"training speech is out of date ({reason}): run "
+                f'`livekit-wakeword setup --wakeword "{config.wakeword}"` first'
+            )
     data = train_datasets(config)
-    if not data:
-        data = run_setup(config)
     config.runs_dir.mkdir(parents=True, exist_ok=True)
     std_ckpt = config.runs_dir / "standard.pt"
     if type == "standard" or not std_ckpt.exists():

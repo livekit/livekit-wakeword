@@ -5,6 +5,7 @@ micro models that [the trainer](../python/TRAINING.md) makes from a phrase (or t
 [release](../../README.md#models)):
 
 ```bash
+livekit-wakeword setup --wakeword "hey livekit"                 # training speech
 livekit-wakeword train --wakeword "hey livekit" --type micro    # on a GPU machine -> hey_livekit_micro.tflite
 ```
 

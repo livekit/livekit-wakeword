@@ -332,6 +332,45 @@ def test_hard_negatives(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     assert pipeline._config_change(tmp_path, none, confusables=False) is None
 
 
+def test_train_needs_up_to_date_speech(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`train` never generates speech: missing or out-of-date speech (such as edited
+    hard_negatives) stops it with the setup command to run."""
+    import yaml
+
+    from livekit.wakeword_train import encoders, pipeline
+
+    class Trained(Exception):
+        pass
+
+    def stop(*a: object, **k: object) -> None:
+        raise Trained
+
+    def generate(*a: object, **k: object) -> None:
+        raise AssertionError("train generated speech")
+
+    monkeypatch.setattr("livekit.wakeword_train.config.CACHE", tmp_path / "cache")
+    monkeypatch.setattr(pipeline, "_generate", generate)
+    monkeypatch.setattr(encoders, "load_pretrained", stop)
+    zh = WakeWordConfig(wakeword="嘿小机", language="zh", data_dir=tmp_path / "data")
+    with pytest.raises(pipeline.SetupError, match="no training speech.*setup --wakeword"):
+        pipeline.run_train(zh)
+    out = zh.dataset_dir / "natural"
+    (out / "data").mkdir(parents=True)
+    (out / "data" / "train-00000.parquet").touch()
+    bench = {
+        "wake_word": "嘿小机",
+        "language": "zh",
+        "splits": {"train": {"n_positive": 1000, "n_adversarial": 500, "n_speech": 150}},
+    }
+    (out / "bench_config.yaml").write_text(yaml.safe_dump(bench, allow_unicode=True))
+    with pytest.raises(Trained):  # up to date: straight to training
+        pipeline.run_train(zh)
+    with pytest.raises(pipeline.SetupError, match=r"out of date \(hard_negatives changed\)"):
+        pipeline.run_train(zh.model_copy(update={"hard_negatives": ["喂小机"]}))
+    with pytest.raises(pipeline.SetupError, match=r"out of date \(clip counts changed\)"):
+        pipeline.run_train(zh.model_copy(update={"n_sentence": 300}))
+
+
 def test_setup_hard_negative_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from livekit.wakeword_train import cli
 

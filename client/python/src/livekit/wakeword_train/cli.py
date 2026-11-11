@@ -203,7 +203,7 @@ def train(
     ),
     out: Path | None = typer.Option(None, "--out", "-o", help="Directory to write the model to"),
 ) -> None:
-    """Train, calibrate and export a model (runs setup first if the datasets are missing)."""
+    """Train, calibrate and export a model (on the speech `setup` generated)."""
     from .pipeline import SetupError, run_train
 
     key = "steps" if type == Kind.standard else "micro_steps"

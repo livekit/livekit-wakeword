@@ -111,7 +111,8 @@ livekit-wakeword eval --wakeword "嘿小机"
 ```
 
 To change them later, edit `hard_negatives` in `嘿小机.yaml` (or add more with `--hard-negative`),
-then run `setup` again, then `train`. The test set holds the same
+then run `setup` again, then `train`. `train` never generates speech: when the speech no longer
+matches the config, it stops and names the `setup` command to run. The test set holds the same
 hard negatives, so `eval` measures how well the model rejects your list. `eval` (and
 `setup --eval`) regenerates the test set when the list changes, so scores from before and after
 are not directly comparable.
