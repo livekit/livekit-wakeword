@@ -27,10 +27,12 @@ if __name__ == "__main__":  # required: training starts worker processes (spawne
    `~/.cache/livekit-wakeword/encoders`), writes the default config `<name>.yaml` if there is
    none, and generates speech for the phrase with
    [livekit-wakeword-bench](https://github.com/livekit/wakeword-bench) through LiveKit Inference
-   TTS: the phrase in many voices, close-sounding confusables and everyday sentences. It is
+   TTS: the phrase in many voices, close-sounding confusables (your `hard_negatives`, plus
+   automatic ones in English) and everyday sentences. It is
    cached under `~/.cache/livekit-wakeword/datasets/<name>` (or `data_dir`). Later runs reuse it
-   when clip counts match; changing the counts regenerates the affected training sets.
-   `--eval` also generates the held-out test set.
+   when its settings match; changing the clip counts, pronunciations or `hard_negatives`
+   regenerates the affected training sets.
+   `--eval` also generates the held-out test set, which includes the `hard_negatives`.
 2. **`train --type standard`** adapts the pretrained encoder `livekit-wakeword-encoder-standard`
    to the phrase, fine-tunes it on the generated speech (background speech streamed from public
    datasets, on-the-fly noise, reverberation, codec and microphone augmentation, quiet input
@@ -57,6 +59,7 @@ from the same directory so they can find the settings saved by `setup`. Each com
 |---|---|---|
 | `setup` | `--language`, `-l` | Language of the phrase (ISO 639-1, such as `es` or `ja`); defaults to `en` for a new config. See [multilingual wake words](../../README.md#train-a-wake-word). |
 | `setup` | `--pronounce WORD=ARPABET` | Pronunciation of an English word outside the dictionary, such as `"zork=Z AO1 R K"`; repeat for several words. Saved in the config. |
+| `setup` | `--hard-negative PHRASE` | A close-sounding phrase the model must not fire on, such as `"hey rabbit"` or `"喂小机"`; repeat for several. Added to `hard_negatives` in the config. |
 | `setup` | `--plan` | TTS concurrency preset: `build` (5 requests), `ship` (20), or `scale` (50). Defaults to `build` for a new config. |
 | `setup` | `--concurrency` | Concurrent TTS requests; overrides the plan's preset. |
 | `setup` | `--clips N` | Multiply the default training clip counts by `N`; accepts decimals of at least `0.1`. |
@@ -94,6 +97,26 @@ effect on detection and false alarms.
 `--out` and `--steps` apply only to that training command; they do not update the saved YAML.
 After using `--out`, pass the exported file to `eval --model` and `listen`, as above.
 
+A wake word in another language takes its code with `--language`. Confusables are generated
+automatically for English only, so give close-sounding phrases with `--hard-negative` (or under
+`hard_negatives` in the config); change a sound, not only the tone, and skip homophones. English
+phrases can take them too, on top of the automatic ones:
+
+```bash
+livekit-wakeword setup --wakeword "嘿小机" --language zh --eval \
+  --hard-negative "喂小机" --hard-negative "嘿小七" --hard-negative "嘿小弟" \
+  --hard-negative "小机" --hard-negative "嘿小"
+livekit-wakeword train --wakeword "嘿小机"
+livekit-wakeword eval --wakeword "嘿小机"
+```
+
+To change them later, edit `hard_negatives` in `嘿小机.yaml` (or add more with `--hard-negative`),
+then run `setup` again, then `train`. `train` never generates speech: when the speech no longer
+matches the config, it stops and names the `setup` command to run. The test set holds the same
+hard negatives, so `eval` measures how well the model rejects your list. `eval` (and
+`setup --eval`) regenerates the test set when the list changes, so scores from before and after
+are not directly comparable.
+
 ## The config file
 
 `setup` writes settings to `<name>.yaml` in the current directory, such as `hey_robot.yaml`.
@@ -109,6 +132,7 @@ same directory without additional flags.
 |---|---|---|
 | `language` | `en` | TTS voices; phrases can be in any language and script |
 | `pronunciations` | none | ARPAbet for English words outside the dictionary, e.g. `zork: Z AO1 R K` (`setup --pronounce`) |
+| `hard_negatives` | none | close-sounding phrases the model must not fire on, e.g. `[hey rabbit]` or `[喂小机, 嘿小七]` (`setup --hard-negative`); English adds automatic ones, other languages have only these. English words outside the dictionary need `pronunciations`. Run `setup` after changing them |
 | `plan` / `concurrency` | `build` / none | LiveKit plan sets concurrent TTS requests (build 5, ship 20, scale 50); `concurrency` overrides it |
 | `n_positive`, `n_confusable`, `n_sentence` | 500, 500, 150 | generated clips per category (`--clips` scales all three; `n_positive` doubles for phrases with no plain-text positives, e.g. brand names) |
 | `steps`, `micro_steps` | 5000, 5000 | fine-tuning steps |

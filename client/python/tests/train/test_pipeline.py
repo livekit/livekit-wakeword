@@ -269,3 +269,124 @@ def test_default_aug_follows_the_log_mel_floor() -> None:
 
     assert default_aug(det(MEL_DEFAULT)) == AugConfig(p_codec=0.25)  # float32 params
     assert default_aug(det(MEL_LOW_FLOOR)) == robust_aug()
+
+
+def test_hard_negatives(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hand-written confusables: the only ones for languages other than English (#118, #119)."""
+    import livekit_wakeword_bench
+    import yaml
+    from pydantic import ValidationError
+
+    from livekit.wakeword_train import pipeline
+
+    zh = WakeWordConfig(
+        wakeword="嘿小机", language="zh", hard_negatives=[" 喂小机", "嘿小七", "喂小机", ""]
+    )
+    assert zh.hard_negatives == ["喂小机", "嘿小七"]
+    en = WakeWordConfig(wakeword="hey robot", hard_negatives=["hey rabbit", "hey zork"])
+    assert pipeline.unknown_hard_negative_words(en) == ["zork"]
+    assert any("'zork' in hard_negatives" in p for p in pipeline.phrase_problems(en))
+    fixed = en.model_copy(update={"pronunciations": {"zork": "Z AO1 R K"}})
+    assert pipeline.phrase_problems(fixed) == []
+    for said in ("嘿小机", "嘿，小机啊"):
+        with pytest.raises(ValidationError, match="wake word"):
+            WakeWordConfig(wakeword="嘿小机", language="zh", hard_negatives=[said])
+    for said in ("Hey Zork!", "hey zork robot", "ok, hey-zork"):
+        with pytest.raises(ValidationError, match="wake word"):
+            WakeWordConfig(wakeword="hey zork", hard_negatives=[said])
+    WakeWordConfig(wakeword="hey zork", hard_negatives=["hey zorkington", "say zork", "hey"])
+    WakeWordConfig(wakeword="привет", language="ru", hard_negatives=["приветствую"])
+    with pytest.raises(ValidationError, match="wake word"):
+        WakeWordConfig(wakeword="ねえ ロボット", language="ja", hard_negatives=["ねえロボット君"])
+
+    # listed (empty) in a non-English config to fill in, left out of an English one
+    assert (
+        "hard_negatives: []"
+        in WakeWordConfig(wakeword="hola", language="es").save(tmp_path / "es.yaml").read_text()
+    )
+    assert (
+        "hard_negatives"
+        not in WakeWordConfig(wakeword="hey robot").save(tmp_path / "en.yaml").read_text()
+    )
+    assert load_config(zh.save(tmp_path / "zh.yaml")) == zh
+
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
+    pipeline._generate(zh, tmp_path, ["train"])
+    assert yaml.safe_load(str(calls[-1]["hard_negatives"])) == ["喂小机", "嘿小七"]
+    pipeline._generate(WakeWordConfig(wakeword="hola", language="es"), tmp_path, ["train"])
+    assert "hard_negatives" not in calls[-1]
+    pipeline._generate(en, tmp_path, ["train"])  # English: with its automatic confusables
+    assert yaml.safe_load(str(calls[-1]["hard_negatives"])) == ["hey rabbit", "hey zork"]
+    pipeline._generate(en, tmp_path, ["train"], hard_negatives=False)
+    assert "hard_negatives" not in calls[-1]  # a set without confusables
+
+    # a dataset made with other hard negatives is out of date
+    bench = {"wake_word": "嘿小机", "language": "zh", "hard_negatives": ["嘿小七", "喂小机"]}
+    (tmp_path / "bench_config.yaml").write_text(yaml.safe_dump(bench, allow_unicode=True))
+    assert pipeline._config_change(tmp_path, zh) is None
+    other = zh.model_copy(update={"hard_negatives": ["小机"]})
+    assert pipeline._config_change(tmp_path, other) == "hard_negatives changed"
+    none = zh.model_copy(update={"hard_negatives": []})
+    assert pipeline._config_change(tmp_path, none) == "hard_negatives changed"
+    assert pipeline._config_change(tmp_path, none, confusables=False) is None
+
+
+def test_train_needs_up_to_date_speech(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`train` never generates speech: missing or out-of-date speech (such as edited
+    hard_negatives) stops it with the setup command to run."""
+    import yaml
+
+    from livekit.wakeword_train import encoders, pipeline
+
+    class Trained(Exception):
+        pass
+
+    def stop(*a: object, **k: object) -> None:
+        raise Trained
+
+    def generate(*a: object, **k: object) -> None:
+        raise AssertionError("train generated speech")
+
+    monkeypatch.setattr("livekit.wakeword_train.config.CACHE", tmp_path / "cache")
+    monkeypatch.setattr(pipeline, "_generate", generate)
+    monkeypatch.setattr(encoders, "load_pretrained", stop)
+    zh = WakeWordConfig(wakeword="嘿小机", language="zh", data_dir=tmp_path / "data")
+    with pytest.raises(pipeline.SetupError, match="no training speech.*setup --wakeword"):
+        pipeline.run_train(zh)
+    out = zh.dataset_dir / "natural"
+    (out / "data").mkdir(parents=True)
+    (out / "data" / "train-00000.parquet").touch()
+    bench = {
+        "wake_word": "嘿小机",
+        "language": "zh",
+        "splits": {"train": {"n_positive": 1000, "n_adversarial": 500, "n_speech": 150}},
+    }
+    (out / "bench_config.yaml").write_text(yaml.safe_dump(bench, allow_unicode=True))
+    with pytest.raises(Trained):  # up to date: straight to training
+        pipeline.run_train(zh)
+    with pytest.raises(pipeline.SetupError, match=r"out of date \(hard_negatives changed\)"):
+        pipeline.run_train(zh.model_copy(update={"hard_negatives": ["喂小机"]}))
+    with pytest.raises(pipeline.SetupError, match=r"out of date \(clip counts changed\)"):
+        pipeline.run_train(zh.model_copy(update={"n_sentence": 300}))
+
+
+def test_setup_hard_negative_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from livekit.wakeword_train import cli
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.check_environment", lambda cfg: [])
+    monkeypatch.setattr("livekit.wakeword_train.pipeline.run_setup", lambda cfg, eval=False: [])
+    runner = CliRunner()
+    args = ["setup", "-w", "嘿小机", "-l", "zh", "--hard-negative", "喂小机"]
+    assert runner.invoke(cli.app, [*args, "--hard-negative", "嘿小七"]).exit_code == 0
+    path = default_config_path("嘿小机")
+    assert load_config(path).hard_negatives == ["喂小机", "嘿小七"]
+    r = runner.invoke(cli.app, ["setup", "-w", "嘿小机", "--hard-negative", "小机"])  # adds
+    assert r.exit_code == 0, r.output
+    assert load_config(path).hard_negatives == ["喂小机", "嘿小七", "小机"]
+    r = runner.invoke(cli.app, ["setup", "-w", "hey robot", "--hard-negative", "hey rabbit"])
+    assert r.exit_code == 0, r.output
+    assert load_config("hey_robot.yaml").hard_negatives == ["hey rabbit"]
+    r = runner.invoke(cli.app, ["setup", "-w", "hey robot", "--hard-negative", "hey robot"])
+    assert r.exit_code == 1 and "wake word" in r.output

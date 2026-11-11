@@ -105,3 +105,44 @@ def test_natural_positives_only_for_dictionary_words() -> None:
     assert natural_positives_help("Computer")
     assert not natural_positives_help("hey livekit")
     assert natural_positives_help("hola livekit", language="es")
+
+
+@pytest.mark.parametrize("with_sentences", [True, False])
+def test_stream_without_confusable_clips_still_batches(
+    monkeypatch: pytest.MonkeyPatch, with_sentences: bool
+) -> None:
+    """Languages with no confusable phrases generate no adversarial clips (#119); the stream
+    must fill those rows from background speech instead of failing."""
+    import numpy as np
+
+    from livekit.wakeword_train import data as D
+    from livekit.wakeword_train.loop import TrainConfig, W, _Stream
+
+    class Clips:
+        def __init__(self, n: int) -> None:
+            self.ends = np.full(n, 8000)
+            self._n = n
+
+        def __len__(self) -> int:
+            return self._n
+
+        def clip(self, i: int) -> np.ndarray:
+            return np.ones(16000, np.int16)
+
+    class Pool:
+        def crop(self, rng: object, n: int) -> np.ndarray:
+            return np.full(n, 7, np.int16)
+
+    sets = {
+        "positive": Clips(2),
+        "adversarial": Clips(0),
+        "speech": Clips(2 if with_sentences else 0),
+    }
+    monkeypatch.setattr(D, "load_clipsets", lambda _: sets)
+    monkeypatch.setattr(D, "negative_speech_files", lambda: ["x"])
+    monkeypatch.setattr(D, "StreamPool", lambda *a, **k: Pool())
+    cfg = TrainConfig(n_pos=1, n_adv=3, n_speech=1, n_noise=0)
+    x, pend, _ = next(iter(_Stream("stub", cfg)))
+    assert x.shape == (5, W)
+    assert (pend[1:] == -1).all()
+    assert (x[1:4] == 7).all()  # background speech, even with sentence clips
