@@ -112,7 +112,7 @@ def test_stream_without_confusable_clips_still_batches(
     monkeypatch: pytest.MonkeyPatch, with_sentences: bool
 ) -> None:
     """Languages with no confusable phrases generate no adversarial clips (#119); the stream
-    must fill those rows from sentence clips or background speech instead of failing."""
+    must fill those rows from background speech instead of failing."""
     import numpy as np
 
     from livekit.wakeword_train import data as D
@@ -145,4 +145,4 @@ def test_stream_without_confusable_clips_still_batches(
     x, pend, _ = next(iter(_Stream("stub", cfg)))
     assert x.shape == (5, W)
     assert (pend[1:] == -1).all()
-    assert (x[1:4] != 0).any(dim=1).all()
+    assert (x[1:4] == 7).all()  # background speech, even with sentence clips

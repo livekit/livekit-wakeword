@@ -96,10 +96,9 @@ class _Stream(IterableDataset):  # type: ignore[type-arg]
         if cfg.n_adv and not len(adv) and wid == 0:  # e.g. languages without confusable phrases
             logger.warning(
                 "dataset %r has no confusable clips (list some under `hard_negatives`): the %d "
-                "confusable rows per batch use %s",
+                "confusable rows per batch use background speech",
                 self.dataset,
                 cfg.n_adv,
-                "its sentence clips" if len(tts) else "background speech",
             )
         files = D.negative_speech_files()
         speech = D.StreamPool(files[wid::nw] or files, seed=wid)
@@ -118,11 +117,11 @@ class _Stream(IterableDataset):  # type: ignore[type-arg]
                 pend[r] = end_at
                 r += 1
             for _ in range(cfg.n_adv):
-                src = tts if len(tts) and (not len(adv) or rng.random() < 0.2) else adv
-                if not len(src):  # no confusables and no sentence clips: background speech
+                if not len(adv):  # real speech in many languages, not a few TTS sentences
                     x[r] = speech.crop(rng, W)
                     r += 1
                     continue
+                src = tts if len(tts) and rng.random() < 0.2 else adv
                 i = int(rng.integers(len(src)))
                 c, e = _speed(src.clip(i), int(src.ends[i]), rng, cfg)
                 st = W - int(rng.uniform(-0.3, 1.2) * SR) - e
