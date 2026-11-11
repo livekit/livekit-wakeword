@@ -2,7 +2,7 @@
 
 Streaming wake word detection in the browser and in Node, on ONNX Runtime. Models come from
 [training](../python/TRAINING.md) or the [release](../../README.md#models). Detection runs on the
-device: in a browser, no audio leaves the page.
+device: in a browser, no audio leaves the page. [Try it live](https://livekit.github.io/livekit-wakeword/).
 
 ```bash
 npm install @livekit/wakeword onnxruntime-web    # browser
@@ -110,7 +110,8 @@ await model.loadModel(bytes, 'hey_livekit');
 
 ## Example
 
-[`example/`](example) is a browser demo with a live score meter. From this folder:
+[`example/`](example) is a browser demo: live scores, and your own `.onnx` models (pick or drop a file).
+Try it at **https://livekit.github.io/livekit-wakeword/**, or run it from this folder:
 
 ```bash
 pnpm install

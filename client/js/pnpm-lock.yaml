@@ -15,6 +15,12 @@ importers:
       '@biomejs/biome':
         specifier: ^2.6.5
         version: 2.6.5
+      '@fontsource-variable/public-sans':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/commit-mono':
+        specifier: 5.3.0
+        version: 5.3.0
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -107,6 +113,12 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/public-sans@5.3.0':
+    resolution: {integrity: sha512-AVfkmAt50BMXWpOO21FAntiJFKGX6xTc2dSL8dxtDteONe9IuRXJWGbs0EbG955vAMCq23ENeuopuW87cGWDSQ==}
+
+  '@fontsource/commit-mono@5.3.0':
+    resolution: {integrity: sha512-Bs+zlEWHDgk/cCVWEMJJaA7LbBU3Ixi5Zums+SSwMKdm2N7RJ4P7jCJTwsMHRt5WFiXYB0tu0q9HMfkn0YsLsQ==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -787,6 +799,10 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.6.5':
     optional: true
+
+  '@fontsource-variable/public-sans@5.3.0': {}
+
+  '@fontsource/commit-mono@5.3.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 
