@@ -124,7 +124,9 @@ false alarms per hour on the bench's conversational speech; raise the threshold 
 ## Train a wake word
 
 You need a CUDA GPU or an Apple silicon Mac, [uv](https://docs.astral.sh/uv/) and a LiveKit Cloud project
-(the free plan works) for the TTS.
+for speech generation through LiveKit Inference TTS. Allow for a few thousand clips per phrase; see
+[LiveKit usage and quota](https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md#livekit-usage-and-quota)
+for usage estimates and help with TTS errors during `setup`.
 
 **1. Get LiveKit credentials.** Sign up at [cloud.livekit.io](https://cloud.livekit.io) and create a
 project, then install the [LiveKit CLI](https://docs.livekit.io/reference/developer-tools/livekit-cli/)
