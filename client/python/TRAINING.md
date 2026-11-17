@@ -163,7 +163,15 @@ dashboard](https://cloud.livekit.io). See [LiveKit quotas and
 limits](https://docs.livekit.io/deploy/admin/quotas-and-limits/) for allowances and concurrency
 limits, and [pricing](https://livekit.io/pricing) for current rates.
 
-If TTS requests still fail after retries, `setup` reports how many clips failed, for example:
+Before generating, `setup` sends one test request, so wrong credentials, a used-up allowance or
+no network stop it within seconds, with the gateway's error:
+
+```text
+LiveKit Inference TTS refused a test request (cartesia/sonic-3: ... 401 Unauthorized ...). ...
+```
+
+If TTS requests still fail after retries during generation, `setup` reports how many clips
+failed, for example:
 
 ```text
 TTS produced no speech for 'hey robot' (natural train set: 1650 clips failed, none made). ...
