@@ -247,6 +247,7 @@ def test_generate_knobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
+    monkeypatch.setattr(pipeline, "_check_speech", lambda *a: None)  # nothing is generated
     cfg = WakeWordConfig(wakeword="hey zork", pronunciations={"zork": "Z AO1 R K"})
     pipeline._generate(cfg, tmp_path, ["train"])
     assert calls[-1]["pronunciations__zork"] == '"Z AO1 R K"' and "tts__phonemes" not in calls[-1]
@@ -312,6 +313,7 @@ def test_hard_negatives(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
+    monkeypatch.setattr(pipeline, "_check_speech", lambda *a: None)  # nothing is generated
     pipeline._generate(zh, tmp_path, ["train"])
     assert yaml.safe_load(str(calls[-1]["hard_negatives"])) == ["喂小机", "嘿小七"]
     pipeline._generate(WakeWordConfig(wakeword="hola", language="es"), tmp_path, ["train"])
@@ -390,3 +392,63 @@ def test_setup_hard_negative_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert load_config("hey_robot.yaml").hard_negatives == ["hey rabbit"]
     r = runner.invoke(cli.app, ["setup", "-w", "hey robot", "--hard-negative", "hey robot"])
     assert r.exit_code == 1 and "wake word" in r.output
+
+
+@pytest.mark.parametrize(
+    ("rows", "failed", "match"),
+    [
+        (0, 1650, r"produced no speech for '你好万事通' \(natural train set: 1650 clips failed"),
+        (1500, 150, r"150 of 1650 clips failed TTS for '你好万事通' \(natural train set\)"),
+        (1649, 1, r"1 of 1650 clips failed TTS"),
+    ],
+)
+def test_setup_fails_loudly_on_tts_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rows: int, failed: int, match: str
+) -> None:
+    """Bench skips clips whose TTS failed and returns normally; a bad key or an exhausted quota
+    must stop setup, not leave no speech (train asks for setup forever, #125) or a short set."""
+    import livekit_wakeword_bench
+
+    from livekit.wakeword_train import pipeline
+
+    def generate(wake_word, out, *, splits, **kw):  # type: ignore[no-untyped-def]
+        if rows:  # bench writes a shard only when some clip was made
+            (out / "data").mkdir(parents=True, exist_ok=True)
+            (out / "data" / "train-00000.parquet").touch()
+        return {"train": {"rows": rows, "hours": 1.0, "tts_failures": failed}}
+
+    monkeypatch.setattr("livekit.wakeword_train.config.CACHE", tmp_path / "cache")
+    monkeypatch.setattr(pipeline, "check_environment", lambda config: [])
+    monkeypatch.setattr(
+        "livekit.wakeword_train.encoders.encoder_dir", lambda tier: tmp_path / "enc" / tier
+    )
+    monkeypatch.setattr(livekit_wakeword_bench, "generate", generate)
+    zh = WakeWordConfig(wakeword="你好万事通", language="zh", data_dir=tmp_path / "data")
+    with pytest.raises(pipeline.SetupError, match=match) as e:
+        pipeline.run_setup(zh)
+    assert "LIVEKIT_API_KEY" in str(e.value) and "quota" in str(e.value)
+    assert not pipeline.train_datasets(zh)  # nothing partial is left for train
+    with pytest.raises(pipeline.SetupError, match="no training speech"):
+        pipeline.run_train(zh)
+
+
+def test_setup_keeps_speech_without_tts_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import livekit_wakeword_bench
+
+    from livekit.wakeword_train import pipeline
+
+    def generate(wake_word, out, *, splits, **kw):  # type: ignore[no-untyped-def]
+        (out / "data").mkdir(parents=True, exist_ok=True)
+        (out / "data" / "train-00000.parquet").touch()
+        return {"train": {"rows": 1650, "hours": 1.0, "tts_failures": 0}}
+
+    monkeypatch.setattr("livekit.wakeword_train.config.CACHE", tmp_path / "cache")
+    monkeypatch.setattr(pipeline, "check_environment", lambda config: [])
+    monkeypatch.setattr(
+        "livekit.wakeword_train.encoders.encoder_dir", lambda tier: tmp_path / "enc" / tier
+    )
+    monkeypatch.setattr(livekit_wakeword_bench, "generate", generate)
+    zh = WakeWordConfig(wakeword="你好万事通", language="zh", data_dir=tmp_path / "data")
+    assert pipeline.run_setup(zh) == [str(zh.dataset_dir / "natural")]

@@ -21,6 +21,12 @@ STANDARD_P_PARTY = 0.3
 MICRO_P_PARTY = 0.6
 
 
+QUOTA_DOCS = (
+    "https://github.com/livekit/livekit-wakeword/blob/main/client/python/TRAINING.md"
+    "#livekit-usage-and-quota"
+)
+
+
 class SetupError(RuntimeError):
     """The environment cannot run the pipeline; the message says what to fix."""
 
@@ -142,7 +148,8 @@ def _generate(
     **knobs: Any,
 ) -> None:
     """Generate `splits` into `out` with bench; `hard_negatives`: send the config's (sets without
-    confusables leave them out, so changing them does not regenerate those)."""
+    confusables leave them out, so changing them does not regenerate those). Raises SetupError
+    when any TTS request failed (see `_check_speech`)."""
     from livekit_wakeword_bench import generate
 
     if config.concurrency:
@@ -156,7 +163,7 @@ def _generate(
         knobs["tts__phonemes"] = False
         for word in unknown_words(config):
             knobs.setdefault(f"pronunciations__{word}", json.dumps("AH0"))
-    generate(
+    stats = generate(
         config.wakeword,
         out,
         size="small",
@@ -166,6 +173,37 @@ def _generate(
         overwrite=overwrite,
         **knobs,
     )
+    for split in splits:
+        _check_speech(config, out, split, (stats or {}).get(split) or {})
+
+
+def _check_speech(config: WakeWordConfig, out: Path, split: str, stats: dict[str, Any]) -> None:
+    """Fail loudly when TTS let us down. Bench retries each request, then skips the clip and
+    carries on, so a wrong or expired key, an exhausted quota or a dropped connection would
+    otherwise leave no speech (train then asks for setup again, forever) or a set short of clips
+    (train goes ahead on less speech). An incomplete set is removed so `train` cannot use it;
+    running setup again requests only the missing clips (the rest are cached in .cache/lkwb/
+    under the directory setup runs from)."""
+    failed = int(stats.get("tts_failures", 0))
+    rows = int(stats.get("rows", 0))
+    fix = (
+        "Check LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET (`lk app env -w` writes them "
+        "to .env.local), your LiveKit plan's TTS quota and the network, then run "
+        f'`livekit-wakeword setup --wakeword "{config.wakeword}"` again (see {QUOTA_DOCS})'
+    )
+    if not _done(out, split):
+        raise SetupError(
+            f"TTS produced no speech for {config.wakeword!r} ({out.name} {split} set: "
+            f"{failed} clips failed, none made). {fix}"
+        )
+    if failed:
+        for part in (out / "data").glob(f"{split}-*.parquet"):
+            part.unlink()  # incomplete: `train` must not use it
+        raise SetupError(
+            f"{failed} of {failed + rows} clips failed TTS for {config.wakeword!r} ({out.name} "
+            f"{split} set), so it was not kept. {fix}; clips already made are cached and not "
+            "requested again"
+        )
 
 
 def _done(d: Path, split: str) -> bool:

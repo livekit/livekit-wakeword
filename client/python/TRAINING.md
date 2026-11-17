@@ -31,8 +31,10 @@ if __name__ == "__main__":  # required: training starts worker processes (spawne
    automatic ones in English) and everyday sentences. It is
    cached under `~/.cache/livekit-wakeword/datasets/<name>` (or `data_dir`). Later runs reuse it
    when its settings match; changing the clip counts, pronunciations or `hard_negatives`
-   regenerates the affected training sets.
-   `--eval` also generates the held-out test set, which includes the `hard_negatives`.
+   regenerates the affected training sets. `--eval` also generates the held-out test set, which
+   includes the `hard_negatives`. If TTS requests still fail after retries, `setup` reports an
+   error and removes the incomplete set; successfully generated clips remain cached for the
+   next attempt. See [LiveKit usage and quota](#livekit-usage-and-quota).
 2. **`train --type standard`** adapts the pretrained encoder `livekit-wakeword-encoder-standard`
    to the phrase, fine-tunes it on the generated speech (background speech streamed from public
    datasets, on-the-fly noise, reverberation, codec and microphone augmentation, quiet input
@@ -150,10 +152,47 @@ On an Apple silicon Mac, training runs on the GPU (MPS). On an M4 Pro a standard
 about 36 minutes after the same speech generation, and a micro model about 1.5 hours more
 (0.87 s per training step, plus about 6 minutes for the TFLite export).
 
+## LiveKit usage and quota
+
+Speech generation uses LiveKit Inference TTS with your LiveKit Cloud project credentials.
+With the default settings, each phrase needs about 1,650 training clips and another 1,150
+for the held-out test set (`--eval`). `--clips N` scales the training counts only; actual counts
+can be lower for languages without automatic confusables when no `hard_negatives` are supplied.
+Before generating speech, check your project's usage in the [LiveKit Cloud
+dashboard](https://cloud.livekit.io). See [LiveKit quotas and
+limits](https://docs.livekit.io/deploy/admin/quotas-and-limits/) for allowances and concurrency
+limits, and [pricing](https://livekit.io/pricing) for current rates.
+
+If TTS requests still fail after retries, `setup` reports how many clips failed, for example:
+
+```text
+TTS produced no speech for 'hey robot' (natural train set: 1650 clips failed, none made). ...
+```
+
+or `150 of 1650 clips failed TTS ...` if some clips succeeded. The incomplete dataset is
+removed so `train` cannot use it. Successfully generated clips remain in the bench's TTS
+cache at `.cache/lkwb/`, relative to the directory where you ran `setup`.
+
+Check the TTS errors in the output to identify the cause:
+
+- **Credentials:** verify that `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` belong
+  to the intended project. To refresh them, run `lk cloud auth` and `lk app env -w`, then export
+  them with `set -a && source .env.local && set +a`.
+- **Usage allowance:** check the dashboard. If you have reached a usage cap, increase the
+  allowance or wait for it to reset before retrying.
+- **Concurrency limit:** lower `--concurrency` to fit your project's available TTS capacity.
+  Changing `--plan` selects a concurrency preset; it does not change your Cloud subscription.
+- **Connection errors:** check your network, proxy and firewall settings.
+
+After addressing the error, rerun the same `setup` command from the same directory. Keep
+`.cache/lkwb/` so the retry can reuse successful clips and request only the missing speech.
+
 ## Requirements
 
-- A CUDA GPU or an Apple silicon Mac, and LiveKit credentials (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`;
-  see [Get LiveKit credentials](../../README.md#train-a-wake-word)).
+- A CUDA GPU or an Apple silicon Mac.
+- LiveKit Cloud credentials (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`) and sufficient
+  TTS allowance. See [Get LiveKit credentials](../../README.md#train-a-wake-word) and
+  [LiveKit usage and quota](#livekit-usage-and-quota).
 - Python 3.12+ for dataset generation (`livekit-wakeword-bench`).
 - Network access for the one-time encoder download from the GitHub release. To use your own copy
   instead, point `LIVEKIT_WAKEWORD_ENCODERS` at a directory with `standard/` and `micro/`.
