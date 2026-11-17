@@ -163,6 +163,7 @@ def _generate(
         knobs["tts__phonemes"] = False
         for word in unknown_words(config):
             knobs.setdefault(f"pronunciations__{word}", json.dumps("AH0"))
+    _check_tts_access(config)
     stats = generate(
         config.wakeword,
         out,
@@ -175,6 +176,62 @@ def _generate(
     )
     for split in splits:
         _check_speech(config, out, split, (stats or {}).get(split) or {})
+
+
+_TTS_OK: set[str] = set()  # languages whose test request worked in this process
+
+
+def _check_tts_access(config: WakeWordConfig) -> None:
+    """One TTS request before generating, so a wrong key or an exhausted quota stops setup in
+    seconds: bench retries every clip, which takes about an hour to fail a whole set. Two voices
+    are tried, so a single provider's hiccup does not stop setup."""
+    if config.language in _TTS_OK:
+        return
+    import asyncio
+
+    from livekit_wakeword_bench.voices import load_voices, voices_for_language
+
+    voices = voices_for_language(load_voices(), config.language)[:2]
+    if not voices:  # bench names the problem itself
+        return
+
+    async def probe(model: str, voice: str) -> str | None:
+        import aiohttp
+
+        from livekit.agents import APIConnectOptions, inference
+
+        async with aiohttp.ClientSession() as http:
+            tts = inference.TTS(
+                model=model,
+                voice=voice,
+                language=config.language,
+                http_session=http,
+                conn_options=APIConnectOptions(max_retry=0, timeout=20.0),
+            )
+            try:
+                async for _ in tts.synthesize(config.wakeword):
+                    return None
+                return "no audio"
+            except Exception as e:  # noqa: BLE001
+                return str(e) or type(e).__name__
+            finally:
+                await tts.aclose()
+
+    errors = []
+    for v in voices:
+        error = asyncio.run(probe(v.model, v.id))
+        if error is None:
+            _TTS_OK.add(config.language)
+            return
+        errors.append(f"{v.model}: {error}")
+    raise SetupError(
+        "LiveKit Inference TTS refused a test request ("
+        + "; ".join(errors)
+        + "). A 401 means LIVEKIT_API_KEY / LIVEKIT_API_SECRET are wrong, expired or for another "
+        "project; otherwise check your LiveKit plan's TTS quota and the network. "
+        "`lk app env -w` writes the credentials to .env.local; then run "
+        f'`livekit-wakeword setup --wakeword "{config.wakeword}"` again (see {QUOTA_DOCS})'
+    )
 
 
 def _check_speech(config: WakeWordConfig, out: Path, split: str, stats: dict[str, Any]) -> None:

@@ -248,6 +248,7 @@ def test_generate_knobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
     monkeypatch.setattr(pipeline, "_check_speech", lambda *a: None)  # nothing is generated
+    monkeypatch.setattr(pipeline, "_check_tts_access", lambda config: None)
     cfg = WakeWordConfig(wakeword="hey zork", pronunciations={"zork": "Z AO1 R K"})
     pipeline._generate(cfg, tmp_path, ["train"])
     assert calls[-1]["pronunciations__zork"] == '"Z AO1 R K"' and "tts__phonemes" not in calls[-1]
@@ -314,6 +315,7 @@ def test_hard_negatives(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(livekit_wakeword_bench, "generate", lambda *a, **kw: calls.append(kw) or {})
     monkeypatch.setattr(pipeline, "_check_speech", lambda *a: None)  # nothing is generated
+    monkeypatch.setattr(pipeline, "_check_tts_access", lambda config: None)
     pipeline._generate(zh, tmp_path, ["train"])
     assert yaml.safe_load(str(calls[-1]["hard_negatives"])) == ["喂小机", "嘿小七"]
     pipeline._generate(WakeWordConfig(wakeword="hola", language="es"), tmp_path, ["train"])
@@ -423,6 +425,7 @@ def test_setup_fails_loudly_on_tts_failures(
         "livekit.wakeword_train.encoders.encoder_dir", lambda tier: tmp_path / "enc" / tier
     )
     monkeypatch.setattr(livekit_wakeword_bench, "generate", generate)
+    monkeypatch.setattr(pipeline, "_check_tts_access", lambda config: None)
     zh = WakeWordConfig(wakeword="你好万事通", language="zh", data_dir=tmp_path / "data")
     with pytest.raises(pipeline.SetupError, match=match) as e:
         pipeline.run_setup(zh)
@@ -450,5 +453,35 @@ def test_setup_keeps_speech_without_tts_failures(
         "livekit.wakeword_train.encoders.encoder_dir", lambda tier: tmp_path / "enc" / tier
     )
     monkeypatch.setattr(livekit_wakeword_bench, "generate", generate)
+    monkeypatch.setattr(pipeline, "_check_tts_access", lambda config: None)
     zh = WakeWordConfig(wakeword="你好万事通", language="zh", data_dir=tmp_path / "data")
     assert pipeline.run_setup(zh) == [str(zh.dataset_dir / "natural")]
+
+
+def test_setup_stops_fast_when_tts_refuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A wrong key fails one test request in seconds, before bench spends an hour retrying."""
+    import livekit_wakeword_bench
+
+    from livekit.agents import inference
+    from livekit.wakeword_train import pipeline
+
+    class Refused:
+        def __init__(self, **kw: object) -> None:
+            pass
+
+        async def synthesize(self, text: str):  # type: ignore[no-untyped-def]
+            raise RuntimeError("Invalid response status (401 Unauthorized)")
+            yield
+
+        async def aclose(self) -> None:
+            pass
+
+    def generate(*a: object, **k: object) -> None:
+        raise AssertionError("generated after a refused test request")
+
+    monkeypatch.setattr(pipeline, "_TTS_OK", set())
+    monkeypatch.setattr(inference, "TTS", Refused)
+    monkeypatch.setattr(livekit_wakeword_bench, "generate", generate)
+    zh = WakeWordConfig(wakeword="你好万事通", language="zh")
+    with pytest.raises(pipeline.SetupError, match=r"refused a test request.*401.*LIVEKIT_API_KEY"):
+        pipeline._generate(zh, tmp_path, ["train"])
