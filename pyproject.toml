@@ -71,7 +71,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
     "mypy>=1.8",
-    "tract>=0.22,<0.23",  # the Rust SDK (ort-tract 0.2)'s runtime: exports must load in it
+    "tract>=0.22,<0.24",  # the Rust SDK (ort-tract 0.2)'s runtime: exports must load in it
 ]
 
 [tool.pytest.ini_options]
