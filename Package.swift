@@ -10,8 +10,8 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-            from: "1.20.0"
+            url: "https://github.com/tryAGI/onnxruntime-swift-package-manager",
+            exact: "1.24.2"
         ),
     ],
     targets: [
