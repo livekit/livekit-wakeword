@@ -46,7 +46,7 @@ class WakeWordListener:
         model: WakeWordModel,
         threshold: float = 0.5,
         debounce: float = 2.0,
-        input_device_index: int | None = None
+        input_device_index: int | None = None,
     ):
         self._model = model
         # model-like objects without a rate get 16 kHz, the rate models run at
