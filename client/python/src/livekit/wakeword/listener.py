@@ -41,7 +41,13 @@ class WakeWordListener:
                 detection = await listener.wait_for_detection()
     """
 
-    def __init__(self, model: WakeWordModel, threshold: float = 0.5, debounce: float = 2.0, input_device_index: int | None = None):
+    def __init__(
+        self,
+        model: WakeWordModel,
+        threshold: float = 0.5,
+        debounce: float = 2.0,
+        input_device_index: int | None = None
+    ):
         self._model = model
         # model-like objects without a rate get 16 kHz, the rate models run at
         self._rate = int(getattr(model, "sample_rate", 16000))
@@ -74,7 +80,7 @@ class WakeWordListener:
                 channels=1,
                 rate=self._rate,  # the model resamples other rates to 16 kHz
                 input=True,
-                input_device_index=self._input_device_index
+                input_device_index=self._input_device_index,
                 frames_per_buffer=self._frame,
             )
         except BaseException:
